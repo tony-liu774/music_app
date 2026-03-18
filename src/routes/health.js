@@ -13,16 +13,22 @@ router.get('/', (req, res) => {
   });
 });
 
-// Detailed health check endpoint
+// Detailed health check endpoint - only available in development
 router.get('/detailed', (req, res) => {
-  res.status(200).json({
+  const response = {
     status: 'ok',
     message: 'Server is running',
     timestamp: new Date().toISOString(),
     environment: config.nodeEnv,
-    uptime: process.uptime(),
-    memory: process.memoryUsage(),
-  });
+  };
+
+  // Only expose system details in development mode
+  if (config.nodeEnv === 'development') {
+    response.uptime = process.uptime();
+    response.memory = process.memoryUsage();
+  }
+
+  res.status(200).json(response);
 });
 
 module.exports = router;
