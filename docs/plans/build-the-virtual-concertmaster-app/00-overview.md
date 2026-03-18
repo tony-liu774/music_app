@@ -80,9 +80,9 @@ This application will be built as a full-stack application with a **Node.js/Expr
 
 ## 5. Total Task Count
 
-**Estimated Total: 24 tasks across 5 milestones**
+**Estimated Total: 25 tasks across 5 milestones**
 
-- Milestone 0 (Backend Infrastructure): 6 tasks
+- Milestone 0 (Backend Infrastructure): 7 tasks
 - Milestone 1 (Song Ingestion): 5 tasks
 - Milestone 2 (Live Analysis): 5 tasks
 - Milestone 3 (Feedback & Metrics): 4 tasks
