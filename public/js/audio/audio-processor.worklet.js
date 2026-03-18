@@ -26,6 +26,7 @@ class AudioProcessor extends AudioWorkletProcessor {
         // Time/sample tracking for consistent decay
         this.sampleRate = 44100;
         this.samplesProcessed = 0;
+        this.samplesAtPeakStart = 0;
         this.frameCount = 0;
 
         // Listen for messages from main thread
@@ -148,12 +149,13 @@ class AudioProcessor extends AudioWorkletProcessor {
         if (this.currentLevel > this.peakLevel) {
             this.peakLevel = this.currentLevel;
             this.peakHoldTime = this.peakHoldDuration;
+            this.samplesAtPeakStart = this.samplesProcessed;
         } else if (this.peakHoldTime > 0) {
             this.peakHoldTime--;
         } else {
-            // Time-based decay: calculate decay based on samples processed
-            // decay = rate * (samples / sampleRate)
-            const timeInSeconds = this.samplesProcessed / this.sampleRate;
+            // Time-based decay: calculate decay based on time since peak started falling
+            const samplesSincePeakStart = this.samplesProcessed - this.samplesAtPeakStart;
+            const timeInSeconds = samplesSincePeakStart / this.sampleRate;
             const decayAmount = this.peakDecayRate * timeInSeconds;
             this.peakLevel = Math.max(this.peakLevel - decayAmount, this.currentLevel);
         }
