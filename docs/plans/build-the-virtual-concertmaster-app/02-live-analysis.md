@@ -29,7 +29,7 @@ Build the core audio processing infrastructure using the Web Audio API for low-l
 - [ ] Audio context initializes on user gesture
 - [ ] Microphone input is captured with <20ms latency
 - [ ] Audio level meter shows real-time input levels
-5. [ ] Device selection works for multiple microphones
+- [ ] Device selection works for multiple microphones
 - [ ] Graceful handling of permission denial
 
 ### Depends On
@@ -91,7 +91,7 @@ Analyze audio characteristics to identify the type of instrument being played, e
 - **Supported Instruments (Initial Scope)**: Monophonic instruments only
   - **Woodwinds**: Flute, Oboe, Clarinet, Bassoon, Saxophone
   - **Brass**: Trumpet, Horn, Trombone, Tuba
-  - **Strings**: Violin, Viola, Cello (single note)
+  - **Strings**: Violin, Viola, Cello, Double Bass (single note)
   - **Excluded**: Piano, Guitar, Harp (polyphonic - limited accuracy)
 - **Monophonic focus**: Initial implementation targets monophonic instruments
 
@@ -172,6 +172,44 @@ Implement the "Follow-the-ball" cursor system for sight-reading practice, provid
 ### Depends On
 - Task 2.4 (Sheet Music Comparison Engine)
 - Task 1.4 (MusicXML/MEI Parser provides note positions)
+
+### Agent Type
+- Coder
+
+---
+
+## Task 2.6: Built-in Metronome
+
+### Description
+Implement a fully functional metronome for timing and tempo reference during practice sessions. This is a core feature required for rhythmic precision practice.
+
+### Technical Notes
+- Use Web Audio API for precise timing (more accurate than setInterval)
+- Support tempo range: 20-300 BPM
+- Need to handle audio context latency compensation
+- Consider adding visual beat indicator
+
+### Subtasks
+1. Create `js/audio/metronome.js` - Core metronome engine
+2. Implement tempo control (BPM slider/input)
+3. Add common tempo presets (Largo, Adagio, Andante, Moderato, Allegro, Presto)
+4. Implement beat subdivision (quarter, eighth, triplet, sixteenth)
+5. Add visual beat indicator (flashing/animating)
+6. Create tap tempo functionality
+7. Add accent on first beat option
+8. Integrate with follow-the-ball cursor (Task 2.5)
+
+### Acceptance Criteria
+- [ ] Metronome plays accurate beats at specified BPM
+- [ ] Tempo adjustable from 20-300 BPM
+- [ ] Audio timing is precise (no drift over time)
+- [ ] Visual beat indicator syncs with audio
+- [ ] Tap tempo detects BPM from user input
+- [ ] Works offline (no network required)
+- [ ] Integrates with follow-the-ball sight reading mode
+
+### Depends On
+- Task 2.1 (Audio Engine provides audio context)
 
 ### Agent Type
 - Coder
