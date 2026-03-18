@@ -10,7 +10,25 @@ class MusicXMLParser {
 
     parse(xmlString) {
         try {
+            if (!xmlString || typeof xmlString !== 'string') {
+                throw new Error('Invalid input: expected a non-empty string');
+            }
+
             const doc = this.parser.parseFromString(xmlString, 'text/xml');
+
+            // Check for parsing errors
+            const parseError = doc.querySelector('parsererror');
+            if (parseError) {
+                const errorText = parseError.textContent || 'XML parsing failed';
+                throw new Error('Invalid MusicXML: ' + errorText.substring(0, 100));
+            }
+
+            // Validate root element
+            const root = doc.documentElement;
+            if (!root || !root.tagName.includes('score')) {
+                throw new Error('Invalid MusicXML: missing score element');
+            }
+
             return this.parseDocument(doc);
         } catch (error) {
             console.error('MusicXML parsing error:', error);
@@ -19,10 +37,17 @@ class MusicXMLParser {
     }
 
     parseDocument(doc) {
-        // Get score metadata
-        const identification = doc.querySelector('identification');
-        const title = doc.querySelector('work-title, movement-title')?.textContent || 'Untitled';
-        const composer = identification?.querySelector('creator')?.textContent || 'Unknown';
+        try {
+            // Get score metadata
+            const identification = doc.querySelector('identification');
+            const title = doc.querySelector('work-title, movement-title')?.textContent || 'Untitled';
+            const composer = identification?.querySelector('creator')?.textContent || 'Unknown';
+
+            // Validate we have at least one part
+            const parts = doc.querySelectorAll('part');
+            if (parts.length === 0) {
+                throw new Error('Invalid MusicXML: no parts found in score');
+            }
 
         // Create score
         const score = new Score(title, composer);

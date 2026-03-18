@@ -53,7 +53,7 @@ class PitchDetector {
         const cmndf = this.computeCMNDF(diff, minTau, maxTau);
 
         // Step 3: Absolute threshold
-        const tau = this.findTau(cmnDF, minTau, maxTau);
+        const tau = this.findTau(cmndf, minTau, maxTau);
 
         if (tau === null) {
             return { frequency: null, confidence: 0 };
@@ -63,7 +63,7 @@ class PitchDetector {
         const frequency = this.sampleRate / this.interpolateTau(buffer, tau);
 
         // Calculate confidence (1 - d'[tau])
-        const confidence = 1 - cmnDF[tau - minTau];
+        const confidence = 1 - cmndf[tau - minTau];
 
         // Validate frequency range
         if (frequency < this.minFrequency || frequency > this.maxFrequency) {

@@ -10,6 +10,8 @@ class ConcertmasterApp {
         this.pitchDetector = null;
         this.metronome = null;
         this.scoreLibrary = null;
+        this.performanceComparator = null;
+        this.rhythmAnalyzer = null;
         this.currentScore = null;
 
         // State
@@ -20,6 +22,10 @@ class ConcertmasterApp {
         // Performance tracking
         this.sessionData = null;
         this.accuracyScorer = null;
+
+        // UI Components
+        this.sheetMusicRenderer = null;
+        this.heatMapRenderer = null;
 
         // DOM Elements
         this.views = {};
@@ -62,6 +68,8 @@ class ConcertmasterApp {
         this.pitchDetector = new PitchDetector();
         this.metronome = new Metronome();
         this.scoreLibrary = new ScoreLibrary();
+        this.performanceComparator = new PerformanceComparator();
+        this.rhythmAnalyzer = new RhythmAnalyzer();
         this.accuracyScorer = new AccuracyScorer();
 
         // Get DOM elements
@@ -73,6 +81,25 @@ class ConcertmasterApp {
         };
 
         this.toastContainer = document.getElementById('toast-container');
+
+        // Initialize renderers
+        this.initRenderers();
+    }
+
+    initRenderers() {
+        // Initialize sheet music renderer
+        const sheetContainer = document.getElementById('sheet-music-container');
+        if (sheetContainer) {
+            this.sheetMusicRenderer = new SheetMusicRenderer(sheetContainer);
+            this.sheetMusicRenderer.init();
+        }
+
+        // Initialize heat map renderer
+        const heatmapPreview = document.getElementById('heatmap-preview');
+        if (heatmapPreview) {
+            this.heatMapRenderer = new HeatMapRenderer(heatmapPreview);
+            this.heatMapRenderer.init();
+        }
     }
 
     async initializeAudio() {
@@ -445,6 +472,14 @@ class ConcertmasterApp {
 
         this.currentScore = score;
 
+        // Set up performance comparator with the score
+        this.performanceComparator.setScore(score);
+
+        // Render sheet music
+        if (this.sheetMusicRenderer) {
+            this.sheetMusicRenderer.setScore(score);
+        }
+
         // Update UI
         const titleEl = document.getElementById('current-piece-title');
         if (titleEl) titleEl.textContent = score.title;
@@ -563,6 +598,11 @@ class ConcertmasterApp {
     processAudio(data) {
         if (!data.timeData) return;
 
+        // Check audio level - ignore if too quiet
+        if (data.level < 0.01) {
+            return;
+        }
+
         // Detect pitch
         this.pitchDetector.sampleRate = data.sampleRate;
         this.pitchDetector.bufferSize = data.bufferSize;
@@ -570,16 +610,54 @@ class ConcertmasterApp {
         const result = this.pitchDetector.process(data.timeData);
 
         if (result) {
+            // Compare against sheet music if score is loaded
+            if (this.currentScore && this.performanceComparator) {
+                const comparison = this.performanceComparator.compare(result);
+
+                if (comparison.matched || comparison.centsDeviation !== undefined) {
+                    // Calculate cents deviation from expected note
+                    if (comparison.expectedNote) {
+                        const expectedFreq = comparison.expectedNote.getFrequency();
+                        result.centsDeviation = this.pitchDetector.centsDeviation(
+                            result.frequency,
+                            expectedFreq
+                        );
+
+                        // Track measure for heat map
+                        const measure = this.performanceComparator.getMeasureAtPosition(
+                            this.performanceComparator.currentPosition
+                        );
+
+                        // Calculate pitch accuracy
+                        const accuracy = this.accuracyScorer.calculatePitchAccuracy(result);
+                        result.measure = measure;
+                        result.accuracy = accuracy;
+                        result.matched = comparison.matched;
+
+                        // Store in session data
+                        if (this.sessionData) {
+                            this.sessionData.pitchAccuracy.push(accuracy);
+                            this.sessionData.notes.push({
+                                note: result,
+                                timestamp: Date.now(),
+                                measure: measure,
+                                accuracy: accuracy,
+                                matched: comparison.matched
+                            });
+                        }
+                    }
+                }
+
+                // Update cursor position
+                if (this.sheetMusicRenderer) {
+                    this.sheetMusicRenderer.setCursorPosition(
+                        this.performanceComparator.getProgress()
+                    );
+                }
+            }
+
             // Update UI with current note
             this.updateFeedbackDisplay(result);
-
-            // Record data
-            if (this.sessionData) {
-                this.sessionData.notes.push({
-                    note: result,
-                    timestamp: Date.now()
-                });
-            }
         }
     }
 
@@ -640,6 +718,12 @@ class ConcertmasterApp {
         const minutes = Math.floor(duration / 60000);
         const seconds = Math.floor((duration % 60000) / 1000);
         document.getElementById('session-duration').textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+        // Update heat map with session data
+        if (this.heatMapRenderer && this.sessionData) {
+            this.heatMapRenderer.setData(this.sessionData);
+            this.heatMapRenderer.render();
+        }
 
         // Show modal
         modal.classList.add('active');
