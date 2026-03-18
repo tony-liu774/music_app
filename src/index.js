@@ -13,14 +13,15 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-eval'"], // Required for AudioWorklet
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", 'data:', 'https:'],
-      connectSrc: ["'self'"],
+      connectSrc: ["'self'", 'blob:'],
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
-      mediaSrc: ["'self'"],
+      mediaSrc: ["'self'", 'blob:', 'mediastream:'],
       frameSrc: ["'none'"],
+      workerSrc: ["'self'", 'blob:'],
     },
   },
 }));
@@ -37,6 +38,9 @@ app.use(rateLimiter);
 // Parse JSON bodies with size limit
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+
+// Serve static files (frontend)
+app.use(express.static('public'));
 
 // Health check routes
 app.use('/health', healthRoutes);
