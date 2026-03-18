@@ -8,8 +8,13 @@ class AudioEngine {
             sampleRate: options.sampleRate || 44100,
             fftSize: options.fftSize || 2048,
             smoothingTimeConstant: options.smoothingTimeConstant || 0.8,
+            workletPath: options.workletPath || '/js/audio/audio-processor.worklet.js',
+            peakDecayRate: options.peakDecayRate || 10, // dB per second
             ...options
         };
+
+        // Track time for consistent peak decay
+        this._lastUpdateTime = 0;
 
         // Audio context and nodes
         this.audioContext = null;
@@ -77,7 +82,7 @@ class AudioEngine {
             }
 
             // Add the worklet processor
-            await this.audioContext.audioWorklet.addModule('/js/audio/audio-processor.worklet.js');
+            await this.audioContext.audioWorklet.addModule(this.options.workletPath);
             this.workletModuleLoaded = true;
         } catch (error) {
             console.warn('Failed to load AudioWorklet module:', error);
@@ -146,19 +151,32 @@ class AudioEngine {
                 await this.audioContext.resume();
             }
 
-            // Get microphone stream
-            const constraints = {
-                audio: {
-                    deviceId: deviceId ? { exact: deviceId } : undefined,
-                    echoCancellation: false,
-                    noiseSuppression: false,
-                    autoGainControl: false,
-                    sampleRate: this.options.sampleRate
-                }
-            };
-
             this._updateStatus('Starting microphone...');
-            this.mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+
+            // Reuse existing stream if available and no device change requested
+            const existingDeviceId = this._getDeviceIdFromStream();
+            if (this.mediaStream && (!deviceId || deviceId === existingDeviceId)) {
+                // Reuse existing stream
+                console.log('Reusing existing media stream');
+            } else {
+                // Need new stream for different device
+                if (this.mediaStream) {
+                    this.mediaStream.getTracks().forEach(track => track.stop());
+                }
+
+                const constraints = {
+                    audio: {
+                        deviceId: deviceId ? { exact: deviceId } : undefined,
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: false,
+                        sampleRate: this.options.sampleRate
+                    }
+                };
+
+                this.mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+            }
+
             this.currentDeviceId = deviceId || this._getDeviceIdFromStream();
 
             // Create audio nodes
@@ -168,6 +186,7 @@ class AudioEngine {
             this._connectNodes();
 
             this.isRunning = true;
+            this._lastUpdateTime = performance.now();
             this._updateStatus('Microphone is active');
 
             // Start visualization loop
@@ -246,14 +265,17 @@ class AudioEngine {
             this.mediaStreamSource.disconnect();
         }
 
-        // Connect: source -> gain -> analyser -> destination
+        // Connect: source -> gain -> [processor] -> analyser -> destination
         this.mediaStreamSource.connect(this.gainNode);
-        this.gainNode.connect(this.analyserNode);
 
-        // Also connect to processor if available
+        // Use worklet path if available, otherwise direct to analyser
         if (this.processorNode) {
+            // path: source -> gain -> processor -> analyser
             this.gainNode.connect(this.processorNode);
             this.processorNode.connect(this.analyserNode);
+        } else {
+            // path: source -> gain -> analyser
+            this.gainNode.connect(this.analyserNode);
         }
 
         // Connect to destination (speakers) - optional, can be disabled
@@ -274,6 +296,10 @@ class AudioEngine {
         const updateVisualization = () => {
             if (!this.isRunning) return;
 
+            const now = performance.now();
+            const deltaTime = (now - this._lastUpdateTime) / 1000; // convert to seconds
+            this._lastUpdateTime = now;
+
             // Get waveform data
             if (this.analyserNode) {
                 this.analyserNode.getFloatTimeDomainData(this.waveformData);
@@ -284,11 +310,13 @@ class AudioEngine {
                     const rms = this._calculateRMS(this.waveformData);
                     this.currentLevel = this._rmsToDb(rms);
 
-                    // Update peak with decay
+                    // Update peak with time-based decay
                     if (this.currentLevel > this.peakLevel) {
                         this.peakLevel = this.currentLevel;
                     } else {
-                        this.peakLevel = Math.max(this.peakLevel - 0.5, this.currentLevel);
+                        // Time-normalized decay (dB per second)
+                        const decayAmount = this.options.peakDecayRate * deltaTime;
+                        this.peakLevel = Math.max(this.peakLevel - decayAmount, this.currentLevel);
                     }
 
                     if (this.onLevelUpdate) {
@@ -351,7 +379,9 @@ class AudioEngine {
             this.analyserNode.disconnect();
         }
         if (this.processorNode) {
+            this.processorNode.port.close();
             this.processorNode.disconnect();
+            this.processorNode = null;
         }
 
         this.isRunning = false;
@@ -474,9 +504,4 @@ class AudioEngine {
             this.onError(message, error);
         }
     }
-}
-
-// Export for use in other modules
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = AudioEngine;
 }

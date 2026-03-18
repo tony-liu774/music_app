@@ -10,9 +10,10 @@ class AudioProcessor extends AudioWorkletProcessor {
         this.fftSize = 2048;
         this.smoothingFactor = 0.8;
 
-        // Buffers for processing
+        // Ring buffer for O(1) sample insertion
         this.sampleBuffer = new Float32Array(this.fftSize);
-        this.bufferIndex = 0;
+        this.bufferWriteIndex = 0;
+        this.samplesInBuffer = 0;
 
         // Level tracking
         this.currentLevel = -60;
@@ -20,15 +21,21 @@ class AudioProcessor extends AudioWorkletProcessor {
         this.peakHoldTime = 0;
         this.peakHoldDuration = 30; // frames to hold peak
 
-        // RMS calculation
-        this.frameCount = 0;
-        this.frameSize = 256; // Process every 256 samples for efficiency
+        // Time tracking for consistent decay
+        this.sampleRate = 44100;
+        this.samplesProcessed = 0;
 
         // Listen for messages from main thread
         this.port.onmessage = (event) => {
-            if (event.data.type === 'setFftSize') {
-                this.fftSize = event.data.value;
-                this.sampleBuffer = new Float32Array(this.fftSize);
+            try {
+                if (event.data.type === 'setFftSize') {
+                    this.fftSize = event.data.value;
+                    this.sampleBuffer = new Float32Array(this.fftSize);
+                    this.bufferWriteIndex = 0;
+                    this.samplesInBuffer = 0;
+                }
+            } catch (e) {
+                // Silently handle errors to prevent worklet crash
             }
         };
     }
@@ -40,56 +47,73 @@ class AudioProcessor extends AudioWorkletProcessor {
      * @param {Object} parameters - Audio parameters
      */
     process(inputs, outputs, parameters) {
-        const input = inputs[0];
+        try {
+            const input = inputs[0];
+            const output = outputs[0];
 
-        // Check if we have input
-        if (input && input.length > 0) {
-            const channelData = input[0];
+            // Get number of channels
+            const inputChannels = input ? input.length : 0;
+            const outputChannels = output ? output.length : 0;
 
-            if (channelData) {
-                // Copy samples to buffer
-                for (let i = 0; i < channelData.length; i++) {
-                    if (this.bufferIndex < this.fftSize) {
-                        this.sampleBuffer[this.bufferIndex] = channelData[i];
-                        this.bufferIndex++;
-                    } else {
-                        // Shift buffer and add new sample
-                        for (let j = 0; j < this.fftSize - 1; j++) {
-                            this.sampleBuffer[j] = this.sampleBuffer[j + 1];
-                        }
-                        this.sampleBuffer[this.fftSize - 1] = channelData[i];
+            // Process audio input
+            if (input && inputChannels > 0 && input[0]) {
+                const channelData = input[0];
+                const length = channelData.length;
+
+                // Ring buffer insertion - O(1) per sample
+                for (let i = 0; i < length; i++) {
+                    this.sampleBuffer[this.bufferWriteIndex] = channelData[i];
+                    this.bufferWriteIndex = (this.bufferWriteIndex + 1) % this.fftSize;
+                    if (this.samplesInBuffer < this.fftSize) {
+                        this.samplesInBuffer++;
                     }
                 }
 
-                // Calculate level every frame
-                this.frameCount++;
-                if (this.frameCount >= 1) {
-                    this._calculateLevel();
-                    this.frameCount = 0;
+                this.samplesProcessed += length;
+
+                // Calculate level
+                this._calculateLevel();
+            }
+
+            // Pass through audio unchanged (with proper channel handling)
+            if (output && input) {
+                const numChannels = Math.min(inputChannels, outputChannels);
+
+                for (let ch = 0; ch < numChannels; ch++) {
+                    if (input[ch] && output[ch]) {
+                        output[ch].set(input[ch]);
+                    }
+                }
+
+                // Handle case where output has more channels than input
+                for (let ch = numChannels; ch < outputChannels; ch++) {
+                    if (output[ch]) {
+                        output[ch].fill(0);
+                    }
                 }
             }
-        }
 
-        // Pass through audio unchanged
-        if (outputs[0] && inputs[0]) {
-            for (let channel = 0; channel < outputs[0].length; channel++) {
-                outputs[0][channel].set(inputs[0][channel] || new Float32Array(outputs[0][channel].length));
-            }
+            return true;
+        } catch (e) {
+            // Prevent worklet crash on errors
+            return true;
         }
-
-        return true;
     }
 
     /**
-     * Calculate audio level from samples
+     * Calculate audio level from ring buffer samples
      */
     _calculateLevel() {
-        // Calculate RMS
+        if (this.samplesInBuffer === 0) return;
+
+        // Calculate RMS from ring buffer (read in order)
         let sum = 0;
-        const samplesToUse = Math.min(this.bufferIndex, this.fftSize);
+        const samplesToUse = Math.min(this.samplesInBuffer, this.fftSize);
+        const readIndex = (this.bufferWriteIndex - samplesToUse + this.fftSize) % this.fftSize;
 
         for (let i = 0; i < samplesToUse; i++) {
-            const sample = this.sampleBuffer[i];
+            const idx = (readIndex + i) % this.fftSize;
+            const sample = this.sampleBuffer[idx];
             sum += sample * sample;
         }
 
@@ -119,8 +143,9 @@ class AudioProcessor extends AudioWorkletProcessor {
         } else if (this.peakHoldTime > 0) {
             this.peakHoldTime--;
         } else {
-            // Decay peak
-            this.peakLevel = Math.max(this.peakLevel - 0.5, this.currentLevel);
+            // Decay peak - normalized to ~60fps
+            const decayPerFrame = 0.5;
+            this.peakLevel = Math.max(this.peakLevel - decayPerFrame, this.currentLevel);
         }
 
         // Send level data to main thread
