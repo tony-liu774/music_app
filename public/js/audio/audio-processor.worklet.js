@@ -9,6 +9,8 @@ class AudioProcessor extends AudioWorkletProcessor {
         // Configuration
         this.fftSize = 2048;
         this.smoothingFactor = 0.8;
+        this.peakDecayRate = 10; // dB per second (default)
+        this.messageInterval = 10; // Send messages every N frames
 
         // Ring buffer for O(1) sample insertion
         this.sampleBuffer = new Float32Array(this.fftSize);
@@ -21,9 +23,10 @@ class AudioProcessor extends AudioWorkletProcessor {
         this.peakHoldTime = 0;
         this.peakHoldDuration = 30; // frames to hold peak
 
-        // Time tracking for consistent decay
+        // Time/sample tracking for consistent decay
         this.sampleRate = 44100;
         this.samplesProcessed = 0;
+        this.frameCount = 0;
 
         // Listen for messages from main thread
         this.port.onmessage = (event) => {
@@ -33,6 +36,10 @@ class AudioProcessor extends AudioWorkletProcessor {
                     this.sampleBuffer = new Float32Array(this.fftSize);
                     this.bufferWriteIndex = 0;
                     this.samplesInBuffer = 0;
+                } else if (event.data.type === 'setPeakDecayRate') {
+                    this.peakDecayRate = event.data.value;
+                } else if (event.data.type === 'setMessageInterval') {
+                    this.messageInterval = event.data.value;
                 }
             } catch (e) {
                 // Silently handle errors to prevent worklet crash
@@ -70,8 +77,9 @@ class AudioProcessor extends AudioWorkletProcessor {
                 }
 
                 this.samplesProcessed += length;
+                this.frameCount++;
 
-                // Calculate level
+                // Calculate level every frame
                 this._calculateLevel();
             }
 
@@ -143,18 +151,23 @@ class AudioProcessor extends AudioWorkletProcessor {
         } else if (this.peakHoldTime > 0) {
             this.peakHoldTime--;
         } else {
-            // Decay peak - normalized to ~60fps
-            const decayPerFrame = 0.5;
-            this.peakLevel = Math.max(this.peakLevel - decayPerFrame, this.currentLevel);
+            // Time-based decay: calculate decay based on samples processed
+            // decay = rate * (samples / sampleRate)
+            const timeInSeconds = this.samplesProcessed / this.sampleRate;
+            const decayAmount = this.peakDecayRate * timeInSeconds;
+            this.peakLevel = Math.max(this.peakLevel - decayAmount, this.currentLevel);
         }
 
-        // Send level data to main thread
-        this.port.postMessage({
-            type: 'level',
-            level: this.currentLevel,
-            peak: this.peakLevel,
-            rms: rms
-        });
+        // Rate limit messages to main thread
+        if (this.frameCount >= this.messageInterval) {
+            this.port.postMessage({
+                type: 'level',
+                level: this.currentLevel,
+                peak: this.peakLevel,
+                rms: rms
+            });
+            this.frameCount = 0;
+        }
     }
 }
 

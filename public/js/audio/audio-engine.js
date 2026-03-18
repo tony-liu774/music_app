@@ -86,6 +86,7 @@ class AudioEngine {
             this.workletModuleLoaded = true;
         } catch (error) {
             console.warn('Failed to load AudioWorklet module:', error);
+            this._handleError('Failed to load AudioWorklet module', error);
             this.workletModuleLoaded = false;
         }
     }
@@ -234,10 +235,17 @@ class AudioEngine {
                 'audio-processor',
                 {
                     processorOptions: {
-                        fftSize: this.options.fftSize
+                        fftSize: this.options.fftSize,
+                        peakDecayRate: this.options.peakDecayRate
                     }
                 }
             );
+
+            // Configure worklet with peakDecayRate
+            this.processorNode.port.postMessage({
+                type: 'setPeakDecayRate',
+                value: this.options.peakDecayRate
+            });
 
             // Listen for processed audio data from worklet
             this.processorNode.port.onmessage = (event) => {
@@ -379,7 +387,9 @@ class AudioEngine {
             this.analyserNode.disconnect();
         }
         if (this.processorNode) {
-            this.processorNode.port.close();
+            if (this.processorNode.port) {
+                this.processorNode.port.close();
+            }
             this.processorNode.disconnect();
             this.processorNode = null;
         }
@@ -416,6 +426,16 @@ class AudioEngine {
      * @param {string} deviceId - New device ID
      */
     async switchDevice(deviceId) {
+        // Validate device exists
+        if (deviceId) {
+            const devices = await this.getAudioDevices();
+            const deviceExists = devices.some(d => d.deviceId === deviceId);
+            if (!deviceExists) {
+                this._handleError('Device not found', new Error(`Device ID ${deviceId} not found`));
+                return false;
+            }
+        }
+
         const wasRunning = this.isRunning;
 
         if (this.isRunning) {
