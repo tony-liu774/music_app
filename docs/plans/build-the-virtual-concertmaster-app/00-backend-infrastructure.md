@@ -269,6 +269,33 @@ The Docker setup must handle both Node.js and Java:
 
 ---
 
+## Task 0.8: Alternative Sheet Music Sources
+
+### Description
+Implement fallback sources for sheet music in case IMSLP is unavailable. This includes integrating with MuseScore.com API and manual upload capabilities.
+
+### Subtasks
+1. Create `/api/musescore/search` endpoint for MuseScore.com API integration
+2. Implement MuseScore API client with authentication
+3. Add support for SheetMusicPlus catalog access
+4. Build unified search interface that queries multiple sources
+5. Add source priority ranking (primary: manual upload, secondary: MuseScore, tertiary: IMSLP)
+6. Implement source health checking and automatic failover
+
+### Acceptance Criteria
+- [ ] Users can search MuseScore.com via backend API
+- [ ] Results from alternative sources display alongside local uploads
+- [ ] System gracefully falls back when primary source unavailable
+- [ ] Source selection is transparent to user
+
+### Depends On
+- Task 0.1 (Express Server)
+
+### Agent Type
+- Coder
+
+---
+
 ## Changes Required
 
 All changes must be on a feature branch with a GitHub PR created via `gh pr create`.

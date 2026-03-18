@@ -10,7 +10,7 @@ Enable users to discover and import sheet music through two primary channels: IM
 - Basic library management UI
 
 ## Prerequisites
-- **Task 0.7 (Backend Testing & Deployment)** must be completed first
+- **Milestone 0 (Backend Infrastructure)** must be fully completed first
 - Frontend connects to backend API endpoints for OMR and IMSLP
 
 ---
@@ -188,6 +188,41 @@ Create the user interface for managing the user's sheet music collection includi
 ### Notes
 - All external integrations use backend endpoints from Task 0.7 (Milestone 0)
 - Frontend never directly calls IMSLP or runs Audiveris
+
+### Agent Type
+- Coder
+
+---
+
+## Task 1.6: Sheet Music Rendering
+
+### Description
+Integrate a music notation rendering library to visually display sheet music. This is essential for the "Follow-the-ball cursor" and "Heat map" features to work properly.
+
+### Technical Notes
+- **Primary**: VexFlow (mature, well-maintained, good VexFlow-based renderer)
+- **Alternative**: OpenSheetMusicDisplay (more modern, better MusicXML support)
+- Must support rendering from parsed MusicXML data
+- Need to handle dynamic rendering updates (for cursor position)
+
+### Subtasks
+1. Integrate VexFlow or OpenSheetMusicDisplay library
+2. Create `js/components/sheet-music-renderer.js` - Main rendering component
+3. Implement score rendering from internal data model
+4. Add support for multiple pages/scrolling
+5. Implement dynamic cursor position updates
+6. Add zoom and pan controls
+7. Support both desktop and mobile viewport sizes
+
+### Acceptance Criteria
+- [ ] Sheet music renders correctly from parsed MusicXML
+- [ ] Multiple pages render with proper navigation
+- [ ] Cursor position can be updated dynamically (for follow-the-ball)
+- [ ] Responsive layout works on mobile and desktop
+- [ ] Rendering supports violin, viola, cello, and double bass clefs
+
+### Depends On
+- Task 1.4 (MusicXML/MEI Parser)
 
 ### Agent Type
 - Coder
