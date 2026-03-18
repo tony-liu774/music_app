@@ -10,7 +10,7 @@ Enable users to discover and import sheet music through two primary channels: IM
 - Basic library management UI
 
 ## Prerequisites
-- **Milestone 0 (Backend Infrastructure)** must be completed first
+- **Task 0.7 (Backend Testing & Deployment)** must be completed first
 - Frontend connects to backend API endpoints for OMR and IMSLP
 
 ---
@@ -21,7 +21,7 @@ Enable users to discover and import sheet music through two primary channels: IM
 Integrate with the backend IMSLP proxy endpoint to allow users to search for and download public domain sheet music. Build search UI with filters for composer, instrument, and difficulty.
 
 ### Technical Notes
-- IMSLP has no public API - we use backend Puppeteer scraping (see Milestone 0.3)
+- IMSLP has no public API - we use backend Puppeteer scraping (see Task 0.3)
 - Frontend makes requests to our backend `/api/imslp/search` endpoint
 - Results are cached on backend for performance
 
@@ -41,7 +41,7 @@ Integrate with the backend IMSLP proxy endpoint to allow users to search for and
 - [ ] Search returns results within 5 seconds (includes backend scraping)
 
 ### Depends On
-- Milestone 0.3 (IMSLP Proxy Service)
+- Task 0.3 (IMSLP Proxy Service)
 
 ### Agent Type
 - Coder
@@ -54,7 +54,7 @@ Integrate with the backend IMSLP proxy endpoint to allow users to search for and
 Build an image upload pipeline for scanning sheet music, including preprocessing and communication with backend Audiveris OMR service. Includes robust error handling for failed scans.
 
 ### Technical Notes
-- OMR is performed server-side via Audiveris (see Milestone 0.2)
+- OMR is performed server-side via Audiveris (see Task 0.2)
 - Frontend uploads images to backend `/api/omr/process` endpoint
 - Processing takes 10-60 seconds depending on complexity
 
@@ -86,7 +86,7 @@ When Audiveris fails or produces poor results:
 - [ ] Mobile camera capture works on iOS and Android
 
 ### Depends On
-- Milestone 0.2 (Audiveris OMR Service)
+- Task 0.2 (Audiveris OMR Service)
 
 ### Agent Type
 - Coder
@@ -135,6 +135,16 @@ Build a robust parser for MusicXML and MEI formats to convert imported sheet mus
 5. Add support for clefs, key signatures, and time signatures
 6. Implement error handling for malformed files
 
+### Error Handling Scenarios
+Parser must handle and provide meaningful errors for:
+- **Missing required elements**: `<score-partwise>`, `<part>` elements missing
+- **Invalid pitch values**: Non-standard pitch names or out-of-range octaves
+- **Malformed durations**: Negative values, zero durations, invalid ties
+- **Unsupported features**: Grace notes, ornaments, advanced notations (warn but continue)
+- **Encoding issues**: Invalid XML entities, encoding mismatches
+- **Empty score**: No notes to parse (distinct from "no playable content")
+- **Corrupted backup files**: Detect and report .bak, .tmp files
+
 ### Acceptance Criteria
 - [ ] Parser correctly extracts notes with pitch and duration
 - [ ] Parser handles all common time signatures (4/4, 3/4, 6/8, etc.)
@@ -176,7 +186,7 @@ Create the user interface for managing the user's sheet music collection includi
 - Task 1.3 (Data model for display)
 
 ### Notes
-- All external integrations use backend endpoints from Milestone 0
+- All external integrations use backend endpoints from Task 0.7 (Milestone 0)
 - Frontend never directly calls IMSLP or runs Audiveris
 
 ### Agent Type
