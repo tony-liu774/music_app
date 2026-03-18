@@ -1,7 +1,7 @@
 # Milestone 0: Backend Infrastructure
 
 ## Goal
-Set up the Node.js backend server required for external integrations that cannot be performed client-side: Audiveris OMR processing and IMSLP web scraping.
+Set up the Node.js backend server required for external integrations that cannot be performed client-side: Audiveris OMR processing and IMSLP web scraping. Also includes PWA/Service Worker implementation for offline capabilities.
 
 ## Scope
 - Express.js REST API server setup
@@ -9,6 +9,7 @@ Set up the Node.js backend server required for external integrations that cannot
 - IMSLP proxy service using Puppeteer for web scraping
 - File storage system for sheet music
 - CORS and security configuration
+- PWA/Service Worker for offline functionality
 
 ---
 
@@ -29,7 +30,7 @@ Create the foundational Express.js server with REST API endpoints, CORS configur
 - [ ] Server starts without errors on port 3000
 - [ ] Health check endpoint returns 200 OK
 - [ ] CORS allows requests from PWA origin
-- [ ] Rate limiting prevents abuse (100 req/min per IP)
+- [ ] Rate limiting: 12 requests per minute per IP (standard endpoints), 1 req/5sec for external scraping endpoints
 - [ ] Environment variables properly loaded
 
 ### Depends On
@@ -175,7 +176,37 @@ Document all backend API endpoints for frontend integration.
 
 ---
 
-## Task 0.6: Backend Testing & Deployment
+## Task 0.6: PWA/Service Worker Implementation
+
+### Description
+Implement Progressive Web App capabilities with Service Worker for offline functionality, caching strategies, and installability.
+
+### Subtasks
+1. Create service worker (`sw.js`) with caching strategies
+2. Configure Web App Manifest (`manifest.json`) for installability
+3. Implement cache-first strategy for static assets
+4. Implement network-first strategy for API calls
+5. Add offline fallback page
+6. Implement background sync for practice sessions
+7. Configure push notification support (optional)
+
+### Acceptance Criteria
+- [ ] App installable on mobile and desktop (PWA install prompt)
+- [ ] App works offline with cached content
+- [ ] Service worker caches static assets (HTML, CSS, JS)
+- [ ] Cached sheet music accessible offline
+- [ ] Offline indicator shown when disconnected
+- [ ] App loads within 3 seconds on slow 3G
+
+### Depends On
+- Task 0.1 (Express Server)
+
+### Agent Type
+- Coder
+
+---
+
+## Task 0.7: Backend Testing & Deployment
 
 ### Description
 Write integration tests for backend services and prepare deployment configuration.
@@ -191,10 +222,21 @@ Write integration tests for backend services and prepare deployment configuratio
 The Docker setup must handle both Node.js and Java:
 - **Base Image**: Use `eclipse-temurin:11-jdk` (or 17+) for Java 11+ runtime
 - **Multi-stage build**: Build Node.js app, copy to final image with JRE
-- **Volume mounts**:
-  - Host directory with Audiveris JAR mounted to container
-  - Input/output directories for OMR processing
-- **Example structure**:
+- **Volume mounts** (explicit host paths):
+  - `./audiveris:/audiveris` - Audiveris JAR files
+  - `./uploads:/app/uploads` - Temporary OMR input files
+  - `./output:/app/output` - OMR output (MusicXML)
+  - `./storage:/app/storage` - Persistent file storage
+- **Example run command**:
+  ```bash
+  docker run -p 3000:3000 \
+    -v $(pwd)/audiveris:/audiveris \
+    -v $(pwd)/uploads:/app/uploads \
+    -v $(pwd)/output:/app/output \
+    -v $(pwd)/storage:/app/storage \
+    virtual-concertmaster
+  ```
+- **Example Dockerfile**:
   ```dockerfile
   FROM eclipse-temurin:17-jdk as base
   # Install Node.js
@@ -205,9 +247,6 @@ The Docker setup must handle both Node.js and Java:
   # Copy application
   COPY . /app
   WORKDIR /app
-
-  # Volume for Audiveris
-  VOLUME /audiveris
 
   # Expose ports
   EXPOSE 3000

@@ -45,6 +45,15 @@ Build the core audio processing infrastructure using the Web Audio API for low-l
 ### Description
 Implement the YIN and pYIN algorithms for accurate pitch detection from audio samples, essential for matching performed notes to sheet music.
 
+### Audio Parameters (Measurable Requirements)
+- **Sample Rate**: 44100 Hz (standard audio)
+- **Buffer Size**: 2048 samples (~46ms latency per buffer)
+- **Hop Size**: 512 samples (overlapping analysis for smooth detection)
+- **Analysis Window**: 2048 samples with Hann window
+- **Frequency Range**: 27.5 Hz (A0) to 4186 Hz (C8) - full piano range
+- **Confidence Threshold**: 0.85 (configurable)
+- **Pitch Detection Latency**: <10ms per analysis cycle
+
 ### Subtasks
 1. Create `js/audio/pitch-detector.js` - Core YIN algorithm implementation
 2. Add pYIN variant for improved accuracy
@@ -59,6 +68,7 @@ Implement the YIN and pYIN algorithms for accurate pitch detection from audio sa
 - [ ] Confidence scores differentiate certain vs uncertain detections
 - [ ] Algorithm handles octave errors correctly
 - [ ] Processing latency stays under 10ms for real-time use
+- [ ] Buffer size: 2048 samples at 44100 Hz sample rate
 
 ### Depends On
 - Task 2.1 (Audio Engine provides sample buffer)
