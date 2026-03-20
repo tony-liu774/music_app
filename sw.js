@@ -1,11 +1,11 @@
-const CACHE_NAME = 'cubemaster-v1';
+const CACHE_NAME = 'concertmaster-v1';
 const ASSETS = [
     '/',
     '/index.html',
     '/manifest.json',
-    'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap',
-    'https://cdn.jsdelivr.net/npm/chart.js',
-    'https://cdn.cubing.net/js/cubing/twisty'
+    '/src/css/themes/midnight-conservatory.css',
+    '/src/css/styles.css',
+    'https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@600;700&family=Source+Sans+3:wght@400;500;600&display=swap'
 ];
 
 // Install event - cache assets
@@ -13,7 +13,7 @@ self.addEventListener('install', event => {
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(cache => {
-                console.log('Caching app assets');
+                console.log('Concertmaster: Caching app assets');
                 return cache.addAll(ASSETS);
             })
             .then(() => self.skipWaiting())
@@ -33,8 +33,22 @@ self.addEventListener('activate', event => {
     );
 });
 
-// Fetch event - cache first strategy
+// Fetch event - cache first strategy for static assets, network first for API
 self.addEventListener('fetch', event => {
+    const url = new URL(event.request.url);
+
+    // API calls - network first
+    if (url.pathname.startsWith('/api/')) {
+        event.respondWith(
+            fetch(event.request)
+                .catch(() => {
+                    return caches.match(event.request);
+                })
+        );
+        return;
+    }
+
+    // Static assets - cache first
     event.respondWith(
         caches.match(event.request)
             .then(response => {
@@ -42,11 +56,11 @@ self.addEventListener('fetch', event => {
                     return response;
                 }
                 return fetch(event.request).then(response => {
-                    // Don't cache non-successful responses
+                    // Don't cache non-successful responses or cross-origin
                     if (!response || response.status !== 200 || response.type !== 'basic') {
                         return response;
                     }
-                    // Clone the response
+                    // Clone and cache
                     const responseToCache = response.clone();
                     caches.open(CACHE_NAME)
                         .then(cache => {
@@ -56,7 +70,7 @@ self.addEventListener('fetch', event => {
                 });
             })
             .catch(() => {
-                // Return offline fallback if needed
+                // Return offline fallback
                 return caches.match('/index.html');
             })
     );

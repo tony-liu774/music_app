@@ -1,199 +1,242 @@
-# CubeMaster - Rubik's Cube Learning Platform
+# The Virtual Concertmaster - Technical Specification
 
 ## 1. Project Overview
 
-**Project Name:** CubeMaster
-**Type:** Educational Single-Page Website
-**Core Functionality:** An interactive platform teaching multiple Rubik's cube solving methods (CFOP, ZBLL) across different cube sizes (2x2, 3x3, 4x4, 5x5)
-**Target Users:** Beginners to intermediate cubers wanting to learn solving methods
+**Project Name:** The Virtual Concertmaster
+**Type:** Progressive Web Application (PWA) for Bowed String Instrument Practice
+**Core Functionality:** Real-time audio analysis and performance feedback for violin, viola, cello, and double bass players. Users can upload/scan sheet music and receive instant feedback on pitch accuracy, timing, and rhythm.
+**Target Users:** Students and musicians practicing bowed string instruments who want to improve intonation and rhythmic precision.
 
 ---
 
 ## 2. UI/UX Specification
 
-### Layout Structure
+### 2.1 Layout Structure
 
-**Navigation (Fixed)**
-- Logo on left: "CubeMaster" with cube icon
-- Nav links: Home, 2x2, 3x3, 4x4, 5x5, Methods, Resources
-- Mobile: Hamburger menu with slide-out drawer
+**App Shell**
+- Fixed top navigation bar with app logo and main nav links
+- Bottom navigation bar on mobile (Library, Practice, Metronome, Settings)
+- Main content area with smooth page transitions
 
-**Hero Section**
-- Full-width section with animated 3D cube visualization
-- Main headline + subheadline
-- CTA buttons: "Start Learning" and "Choose Cube"
+**Main Sections**
+1. **Library View** - Grid of imported sheet music with search/filter
+2. **Practice View** - Sheet music display with real-time feedback overlay
+3. **Session Summary** - Post-practice heat map and score breakdown
+4. **Metronome** - Standalone metronome with visual beat indicator
+5. **Settings** - Instrument selection, sensitivity, theme options
 
-**Cube Selection Section**
-- 4 large cards for each cube size
-- Each card: cube image, name, difficulty badge, "Learn" button
-- Hover effects with lift and glow
+**Responsive Breakpoints**
+- Mobile: < 768px (single column, bottom nav)
+- Tablet: 768px - 1024px (two column where appropriate)
+- Desktop: > 1024px (full layout with sidebar)
 
-**Methods Section**
-- Split into CFOP and ZBLL
-- Method cards showing stages/progression
-- Visual timeline/steps display
-
-**Learning Content Sections (per cube)**
-- Accordion-style lesson modules
-- Algorithm notation helper
-- Progress tracker
-
-**Footer**
-- Quick links, algorithm reference, contact
-- Social icons
-
-### Visual Design
+### 2.2 Visual Design - "Midnight Conservatory" Theme
 
 **Color Palette**
-- Background: `#0a0a0f` (deep charcoal black)
-- Surface: `#14141f` (card backgrounds)
-- Surface Light: `#1e1e2e` (hover states)
-- Primary: `#ff6b35` (vibrant orange - main accent)
-- Secondary: `#00d4aa` (teal/mint - success states)
-- Tertiary: `#7c5cff` (purple - ZBLL accent)
-- Text Primary: `#ffffff`
-- Text Secondary: `#a0a0b0`
+- Background Deep: `#0a0a12` (Oxford Blue dark)
+- Background Surface: `#141420` (card backgrounds)
+- Primary Accent: `#c9a227` (Polished Amber)
+- Secondary Accent: `#2d5a4a` (Emerald - correct intonation)
+- Error Accent: `#8b2942` (Crimson - sharp/flat indicators)
+- Text Primary: `#f5f5dc` (Ivory)
+- Text Secondary: `#a0a0b0` (muted)
 - Border: `#2a2a3a`
 
 **Typography**
-- Headings: "Outfit", sans-serif (700 weight)
-- Body: "DM Sans", sans-serif (400, 500 weight)
-- Code/Algorithms: "JetBrains Mono", monospace
-- H1: 56px, H2: 40px, H3: 28px, H4: 20px
-- Body: 16px, Small: 14px
+- Headings: "Playfair Display" (serif, elegant)
+- Body: "Source Sans 3" (sans-serif, readable)
+- Monospace/Code: "JetBrains Mono" (for BPM, note values)
+- Font sizes: H1: 48px, H2: 32px, H3: 24px, Body: 16px, Small: 14px
 
 **Spacing System**
-- Section padding: 100px vertical
+- Section padding: 64px vertical
 - Container max-width: 1200px
-- Card padding: 32px
-- Gap between cards: 24px
-- Border radius: 16px (cards), 8px (buttons), 4px (small elements)
+- Card padding: 24px
+- Component gap: 16px
+- Border radius: 12px (cards), 8px (buttons), 4px (inputs)
 
 **Visual Effects**
-- Cards: subtle border glow on hover (primary color)
-- Buttons: scale(1.02) on hover with shadow
-- Section transitions: fade-in on scroll
-- Cube animations: CSS 3D rotating cube in hero
-- Gradient overlays on hero
+- Cards: subtle amber glow on hover
+- Active note indicator: pulsing emerald glow
+- Off-pitch indicator: crimson gradient
+- Smooth fade transitions (300ms)
+- Musical note decorations (subtle treble clef motifs)
 
-### Components
+### 2.3 Components
 
-**Cube Card**
-- States: default, hover (lift + glow), active
-- Contains: cube illustration, title, difficulty badge, description
+**Sheet Music Card**
+- Thumbnail preview of first measure
+- Title, composer, instrument badge
+- Difficulty indicator (1-5 stars)
+- Last practiced date
+- States: default, hover (lift + glow), selected
 
-**Method Stage Card**
-- Shows step number, name, description
-- Icon representation
-- Status: locked/unlocked/completed
+**Instrument Selector**
+- Violin, Viola, Cello, Double Bass icons
+- Visual indicator of selected instrument
+- Audio sample preview option
 
-**Algorithm Display**
-- Standard notation (R, L, U, D, F, B, etc.)
-- Move counter
-- Copy button
-- Animation playback controls
+**Real-time Feedback Display**
+- Large note name display (current note)
+- Cents deviation indicator (-50 to +50)
+- Timing accuracy (early/late ms)
+- Running accuracy percentage
 
-**Accordion Module**
-- Expandable lesson sections
-- Progress indicator
-- Checkmark when complete
+**Heat Map Overlay**
+- Color gradient: Green (good) → Yellow (needs work) → Red (struggling)
+- Toggle: Note level / Measure level
+- Interactive: tap measure for detail
 
-**Progress Bar**
-- Horizontal bar showing completion
-- Animated fill with gradient
-
-**Button Variants**
-- Primary: filled with primary color
-- Secondary: outlined
-- Ghost: text only with hover background
+**Metronome Controls**
+- BPM display (large, readable)
+- Tempo slider with presets (Largo, Andante, Allegro, etc.)
+- Tap tempo button
+- Visual beat indicator (4 beats per measure default)
+- Start/Stop button with animation
 
 ---
 
 ## 3. Functionality Specification
 
-### Core Features
+### 3.1 Core Features
 
-**1. Cube Size Selection**
-- 4 cube options: 2x2, 3x3, 4x4, 5x5
-- Click navigates to relevant section
-- Difficulty indicator (2x2=Beginner, 3x3=All Levels, 4x4=Intermediate, 5x5=Advanced)
+**1. Sheet Music Import**
+- IMSLP search via backend proxy (Task 1.1)
+- Image upload for OMR scanning (Task 1.2)
+- Direct MusicXML/MEI file upload
+- Library storage in IndexedDB
 
-**2. Method Navigation**
-- CFOP: Cross → F2L → OLL → PLL
-- ZBLL: Full ZBLL with subsets
-- Clicking method shows detailed breakdown
+**2. Audio Processing Pipeline**
+- Microphone input capture (<20ms latency)
+- YIN/pYIN pitch detection algorithm
+- Real-time pitch-to-note conversion
+- Confidence scoring (threshold: 0.85)
 
-**3. Lesson Content (Accordion)**
-- For 3x3: Cross, First Two Layers (F2L), OLL, PLL, ZBLL
-- For 2x2: Ortega Method basics
-- For 4x4/5x5: Reduction method basics
+**3. Performance Comparison**
+- Match detected notes to expected sheet music
+- Track current position in score
+- Handle tempo variations (DTW-based)
+- Support rubato and ritardando
 
-**4. Algorithm Reference**
-- Standard notation display
-- Visual cube state (can be static images)
+**4. Real-time Feedback**
+- Note accuracy (cents deviation)
+- Sharp/flat visual indicators (Emerald/Crimson)
+- Timing precision (ms early/late)
+- Running score display
 
-**5. Progress Tracking (Local Storage)**
-- Track completed lessons per cube
-- Visual progress bar per section
-- Persists in browser
+**5. Post-Session Analysis**
+- Heat map overlay on sheet music
+- Measure-by-measure breakdown
+- Pitch accuracy graph over time
+- Session history with comparison
 
-**6. Interactive Elements**
-- Smooth scroll navigation
-- Scroll-triggered animations
-- Mobile-responsive hamburger menu
+**6. Metronome**
+- Web Audio API precise timing
+- BPM range: 20-300
+- Tempo presets
+- Tap tempo
+- Visual beat indicator
 
-### User Interactions
+**7. Follow-the-Ball Cursor**
+- Visual cursor moving across score
+- Configurable speed
+- Highlight upcoming notes
+- Practice mode (auto-advance without audio)
 
-- Click cube card → smooth scroll to that cube's section
-- Click method → expand method details
-- Click lesson accordion → expand/collapse content
-- Hover effects on all interactive elements
-- Mobile menu toggle
+### 3.2 User Interactions
 
-### Edge Cases
+- **Import Flow**: Search/Scan → Preview → Confirm → Add to Library
+- **Practice Flow**: Select Score → Start → Real-time Feedback → End Session → View Heat Map
+- **Settings Flow**: Instrument → Sensitivity → Save
+- **Metronome Flow**: Set Tempo → Start → Adjust on fly → Stop
 
-- Ensure all external fonts load
-- Fallback fonts if CDN fails
-- Graceful degradation if JS disabled (content still visible)
+### 3.3 Data Handling
+
+- **Sheet Music Storage**: IndexedDB (musicxml, metadata)
+- **Session Data**: IndexedDB (scores, timestamps, per-note data)
+- **Settings**: localStorage (instrument, theme preferences)
+- **Audio Processing**: Client-side (Web Audio API)
+
+### 3.4 Edge Cases
+
+- **No microphone permission**: Show clear instructions, fallback to manual mode
+- **Poor audio quality**: Display warning, suggest adjustments
+- **Unsupported file format**: Clear error message with supported formats
+- **Offline mode**: Cache essential assets, show offline indicator
+- **OMR failure**: Offer retry or manual entry fallback
+- **Polyphonic detection limits**: Guide user to play single notes
 
 ---
 
-## 4. Content Structure
+## 4. Technical Architecture
 
-### 2x2 Section
-- Method: Ortega (beginner-friendly)
-- Stages: First Face → Orient Last Layer → Permute Last Layer
+### 4.1 Frontend Structure
+```
+src/
+├── js/
+│   ├── audio/
+│   │   ├── audio-engine.js    # Web Audio API management
+│   │   ├── pitch-detector.js  # YIN/pYIN algorithm
+│   │   ├── instrument-detector.js
+│   │   └── metronome.js
+│   ├── analysis/
+│   │   └── performance-comparator.js
+│   ├── components/
+│   │   ├── library-view.js
+│   │   ├── sheet-music-renderer.js
+│   │   ├── follow-the-ball.js
+│   │   └── heat-map-renderer.js
+│   ├── parsers/
+│   │   ├── musicxml-parser.js
+│   │   └── mei-parser.js
+│   ├── services/
+│   │   ├── imslp-client.js
+│   │   ├── omr-uploader.js
+│   │   └── performance-history.js
+│   ├── metrics/
+│   │   ├── accuracy-scorer.js
+│   │   └── rhythm-analyzer.js
+│   ├── models/
+│   │   └── sheet-music.js
+│   └── utils/
+│       └── animations.js
+├── css/
+│   ├── themes/
+│   │   └── midnight-conservatory.css
+│   └── styles.css
+└── index.html
+```
 
-### 3x3 Section
-- Method: CFOP (primary)
-  - Cross (white cross)
-  - F2L (First Two Layers)
-  - OLL (Orient Last Layer) - 57 cases
-  - PLL (Permute Last Layer) - 21 cases
-- Method: ZBLL (advanced)
-  - 493 cases for full ZBLL
-  - Broken into subsets: H, Z, T, etc.
-
-### 4x4 Section
-- Method: Reduction
-  - Centers → Edges → 3x3 solve → Parity fix
-
-### 5x5 Section
-- Method: Reduction
-  - Centers → Edges → 3x3 solve → Parity fixes
+### 4.2 Audio Parameters
+- Sample Rate: 44100 Hz
+- Buffer Size: 2048 samples (46ms)
+- Hop Size: 512 samples
+- Frequency Range: A0 (27.5 Hz) to C8 (4186 Hz)
+- Confidence Threshold: 0.85
 
 ---
 
 ## 5. Acceptance Criteria
 
-- [ ] Hero section displays with animated 3D cube
-- [ ] All 4 cube cards render with correct styling
-- [ ] Navigation works (smooth scroll to sections)
-- [ ] Mobile menu opens/closes correctly
-- [ ] CFOP accordion expands/collapses
-- [ ] ZBLL section displays with purple accent
-- [ ] Progress tracking saves to localStorage
-- [ ] All hover effects work as specified
-- [ ] Color scheme matches specification exactly
-- [ ] Typography matches specification
-- [ ] Responsive on mobile (320px), tablet (768px), desktop (1200px+)
+### Visual
+- [ ] Midnight Conservatory dark theme applied consistently
+- [ ] Amber accents visible on interactive elements
+- [ ] Emerald (correct) and Crimson (incorrect) feedback colors working
+- [ ] Responsive layout works on 320px, 768px, and 1200px widths
+- [ ] Smooth page transitions and micro-interactions
+
+### Functional
+- [ ] Microphone input captures audio with <50ms latency
+- [ ] Pitch detection accurately identifies notes within 5 cents
+- [ ] Sheet music renders from MusicXML
+- [ ] Real-time feedback displays during practice
+- [ ] Heat map shows problem areas after session
+- [ ] Metronome keeps accurate time (no drift)
+- [ ] Follow-the-ball cursor moves smoothly across score
+- [ ] Library stores and displays imported scores
+- [ ] PWA installs on mobile and desktop
+
+### Performance
+- [ ] Initial load under 3 seconds on 3G
+- [ ] Audio processing under 10ms per cycle
+- [ ] 60fps animations on mid-range devices

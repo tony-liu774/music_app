@@ -3,1621 +3,455 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CubeMaster - 3×3 CFOP + Beginner Guide</title>
+    <meta name="description" content="The Virtual Concertmaster - Practice bowed string instruments with real-time feedback">
+    <meta name="theme-color" content="#0a0a12">
+    <title>The Virtual Concertmaster</title>
+    <link rel="manifest" href="manifest.json">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg: #0a0a0f;
-            --surface: #14141f;
-            --primary: #ff6b35;
-            --secondary: #00d4aa;
-            --tertiary: #7c5cff;
-            --text-primary: #ffffff;
-            --text-secondary: #a0a0b0;
-            --text-muted: #6a6a7a;
-            --border: #2a2a3a;
-            --border-light: #3a3a4a;
-        }
-        .cheatsheet {
-            display: none; /* Replaced by modal */
-            position: fixed;
-            max-width: 240px;
-        }
-        .cheatsheet h4 {
-            font-size: 13px;
-            margin-bottom: 10px;
-            color: var(--primary);
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .cheatsheet-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 6px;
-        }
-        .cheatsheet-item {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 8px;
-            background: var(--bg);
-            border-radius: 4px;
-        }
-        .cheatsheet-item span:first-child {
-            font-family: 'JetBrains Mono', monospace;
-            font-weight: 600;
-            color: var(--secondary);
-            min-width: 24px;
-        }
-        .cheatsheet-toggle {
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            width: 40px;
-            height: 40px;
-            background: var(--primary);
-            border: none;
-            border-radius: 50%;
-            color: white;
-            font-size: 20px;
-            cursor: pointer;
-            z-index: 1000;
-            display: none;
-            box-shadow: 0 4px 12px rgba(255,107,53,0.4);
-        }
-        @media (max-width: 768px) {
-            .cheatsheet { display: none; }
-            .cheatsheet-toggle { display: flex; align-items: center; justify-content: center; }
-        }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        html { scroll-behavior: smooth; }
-        body { font-family: 'DM Sans', sans-serif; background-color: var(--bg); color: var(--text-primary); line-height: 1.6; }
-        h1, h2, h3, h4 { font-family: 'Outfit', sans-serif; font-weight: 700; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
-        nav { position: fixed; top: 0; left: 0; right: 0; z-index: 1000; background: rgba(10, 10, 15, 0.95); backdrop-filter: blur(20px); border-bottom: 1px solid var(--border); }
-        .nav-container { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; max-width: 1200px; margin: 0 auto; }
-        .logo { display: flex; align-items: center; gap: 8px; font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 20px; }
-        .logo-cube { width: 28px; height: 28px; background: linear-gradient(135deg, #ff6b35, #ff8f5a); border-radius: 5px; display: flex; align-items: center; justify-content: center; transform: rotate(-10deg); }
-        .nav-links { display: flex; align-items: center; gap: 24px; }
-        .nav-group { display: flex; align-items: center; gap: 12px; }
-        .nav-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
-        .nav-link { color: var(--text-secondary); text-decoration: none; font-size: 13px; font-weight: 500; padding: 6px 10px; border-radius: 6px; transition: all 0.2s; }
-        .nav-link:hover { color: var(--text-primary); background: var(--surface); }
-        .notation-btn { background: var(--surface); border: 1px solid var(--border); cursor: pointer; }
-
-        /* Modal */
-        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 2000; align-items: center; justify-content: center; }
-        .modal-overlay.active { display: flex; }
-        .modal-content { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 24px; max-width: 500px; max-height: 80vh; overflow-y: auto; position: relative; }
-        .modal-close { position: absolute; top: 16px; right: 16px; background: none; border: none; color: var(--text-muted); font-size: 24px; cursor: pointer; }
-        .modal-close:hover { color: var(--text-primary); }
-
-        /* Toggle switch */
-        .view-toggle { display: inline-flex; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 4px; margin-bottom: 16px; }
-        .view-toggle-btn { padding: 6px 14px; border: none; background: none; color: var(--text-secondary); font-size: 12px; font-weight: 500; cursor: pointer; border-radius: 6px; transition: all 0.2s; }
-        .view-toggle-btn.active { background: var(--primary); color: white; }
-
-        /* Sticky sidebar */
-        .algo-layout { display: grid; grid-template-columns: 180px 1fr; gap: 24px; }
-        .algo-sidebar { position: sticky; top: 80px; height: fit-content; }
-        .sidebar-nav { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
-        .sidebar-link { display: block; padding: 8px 12px; color: var(--text-secondary); text-decoration: none; font-size: 12px; border-radius: 6px; transition: all 0.2s; }
-        .sidebar-link:hover { color: var(--text-primary); background: var(--surface); }
-        .sidebar-link.active { color: var(--primary); background: rgba(255,107,53,0.1); }
-        .hero { min-height: 50vh; display: flex; align-items: center; padding-top: 70px; background: radial-gradient(ellipse at 30% 20%, rgba(255, 107, 53, 0.1) 0%, transparent 50%); }
-        .hero-content { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: center; }
-        .hero-text h1 { font-size: 42px; margin-bottom: 12px; background: linear-gradient(135deg, #fff, #bbb); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .hero-text p { color: var(--text-secondary); font-size: 15px; margin-bottom: 20px; max-width: 400px; }
-        .hero-stats { display: flex; gap: 24px; margin-bottom: 24px; }
-        .stat-number { font-family: 'Outfit', sans-serif; font-size: 24px; font-weight: 700; color: var(--primary); }
-        .stat-label { font-size: 11px; color: var(--text-muted); }
-        .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 8px; font-weight: 600; font-size: 13px; text-decoration: none; transition: all 0.2s; border: none; cursor: pointer; }
-        .btn-primary { background: linear-gradient(135deg, #ff6b35, #ff8f5a); color: white; }
-        .hero-cube { display: flex; justify-content: center; perspective: 1000px; }
-        .cube-scene { width: 180px; height: 180px; position: relative; transform-style: preserve-3d; animation: rotateCube 12s infinite linear; }
-        @keyframes rotateCube { 0% { transform: rotateX(-25deg) rotateY(0deg); } 100% { transform: rotateX(-25deg) rotateY(360deg); } }
-        .cube-face { position: absolute; width: 75px; height: 75px; border-radius: 6px; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); gap: 2px; padding: 3px; background: rgba(20, 20, 31, 0.9); }
-        .cube-face.front { transform: translateZ(37px); }
-        .cube-face.back { transform: rotateY(180deg) translateZ(37px); }
-        .cube-face.left { transform: rotateY(-90deg) translateZ(37px); }
-        .cube-face.right { transform: rotateY(90deg) translateZ(37px); }
-        .cube-face.top { transform: rotateX(90deg) translateZ(37px); }
-        .cube-face.bottom { transform: rotateX(-90deg) translateZ(37px); }
-        .cubie { border-radius: 2px; }
-        .cubie.white { background: #fff; }
-        .cubie.yellow { background: #ffd500; }
-        .cubie.red { background: #c41e3a; }
-        .cubie.orange { background: #ff5800; }
-        .cubie.blue { background: #0051ba; }
-        .cubie.green { background: #009b48; }
-        section { padding: 50px 0; }
-        .section-header { text-align: center; margin-bottom: 32px; }
-        .section-header h2 { font-size: 28px; margin-bottom: 10px; }
-        .section-header p { color: var(--text-secondary); font-size: 14px; }
-        .algo-section { background: var(--surface); }
-        .algo-tabs { display: flex; gap: 6px; justify-content: center; margin-bottom: 28px; flex-wrap: wrap; overflow-x: auto; padding-bottom: 10px; scrollbar-width: thin; scrollbar-color: var(--primary) var(--bg); }
-        .algo-tabs::-webkit-scrollbar { height: 6px; }
-        .algo-tabs::-webkit-scrollbar-track { background: var(--bg); border-radius: 3px; }
-        .algo-tabs::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 3px; }
-        .algo-tab { padding: 8px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); font-weight: 500; font-size: 12px; cursor: pointer; transition: all 0.2s; }
-        .algo-tab:hover { border-color: var(--primary); color: var(--text-primary); }
-        .algo-tab.active { background: var(--primary); border-color: var(--primary); color: white; }
-        .algo-category { display: none; }
-        .algo-category.active { display: block; }
-        .category-title { font-size: 18px; margin-bottom: 4px; color: var(--primary); }
-        .category-desc { color: var(--text-secondary); margin-bottom: 16px; font-size: 13px; }
-        .case-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; margin-bottom: 28px; }
-        .case-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px; display: flex; align-items: center; gap: 12px; transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease; cursor: pointer; position: relative; }
-        .case-card:hover { border-color: var(--primary); transform: translateY(-4px); box-shadow: 0 8px 24px rgba(255,107,53,0.2); }
-        .case-card.learned { opacity: 0.7; }
-        .case-card.learned .learn-star { color: var(--primary); }
-        .learn-star { position: absolute; top: 8px; right: 8px; font-size: 16px; color: var(--text-muted); cursor: pointer; transition: transform 0.2s; }
-        .learn-star:hover { transform: scale(1.2); }
-        .case-image { width: 60px; height: 60px; flex-shrink: 0; border-radius: 6px; overflow: hidden; background: var(--surface); display: flex; align-items: center; justify-content: center; }
-        .case-image img { width: 100%; height: 100%; object-fit: contain; }
-        .case-info { flex: 1; min-width: 0; }
-        .case-name { font-weight: 600; font-size: 13px; margin-bottom: 4px; color: var(--text-primary); }
-        .case-moves { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--secondary); word-break: break-all; line-height: 1.4; background: var(--surface); padding: 4px 8px; border-radius: 4px; display: inline-block; }
-
-        /* Search and Filter */
-        .search-filter-bar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
-        .search-input { flex: 1; min-width: 200px; padding: 10px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); font-size: 14px; }
-        .search-input:focus { outline: none; border-color: var(--primary); }
-        .search-input::placeholder { color: var(--text-muted); }
-        .filter-pills { display: flex; gap: 8px; flex-wrap: wrap; }
-        .filter-pill { padding: 6px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 20px; color: var(--text-secondary); font-size: 12px; cursor: pointer; transition: all 0.2s; }
-        .filter-pill:hover { border-color: var(--primary); }
-        .filter-pill.active { background: var(--primary); border-color: var(--primary); color: white; }
-
-        /* Timer */
-        .timer-section { text-align: center; padding: 40px 20px; }
-        .timer-scramble { font-family: 'JetBrains Mono', monospace; font-size: 16px; color: var(--text-secondary); margin-bottom: 20px; background: var(--bg); padding: 12px 20px; border-radius: 8px; display: inline-block; }
-        .timer-display { font-family: 'JetBrains Mono', monospace; font-size: 72px; font-weight: 700; color: var(--text-primary); margin: 30px 0; letter-spacing: 2px; }
-        .timer-display.ready { color: var(--secondary); }
-        .timer-display.running { color: var(--primary); }
-        .timer-controls { display: flex; gap: 12px; justify-content: center; margin-bottom: 30px; }
-        .timer-btn { padding: 12px 30px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; border: none; }
-        .timer-btn.start { background: var(--primary); color: white; }
-        .timer-btn.stop { background: #e74c3c; color: white; }
-        .timer-btn.reset { background: var(--bg); border: 1px solid var(--border); color: var(--text-secondary); }
-        .timer-history { max-width: 500px; margin: 0 auto; }
-        .timer-history h4 { margin-bottom: 12px; color: var(--text-secondary); }
-        .history-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        .history-table th, .history-table td { padding: 8px; text-align: left; border-bottom: 1px solid var(--border); }
-        .history-table th { color: var(--text-muted); font-weight: 500; }
-        .history-table td { color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; }
-
-        /* PDF Button */
-        .pdf-btn { padding: 8px 16px; background: var(--secondary); border: none; border-radius: 6px; color: var(--bg); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-        .pdf-btn:hover { opacity: 0.9; transform: translateY(-1px); }
-        h5 { color: var(--text-secondary); margin: 24px 0 12px; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
-        h5:first-of-type { margin-top: 0; }
-
-        /* Wizard Styles */
-        .wizard-progress { display: flex; justify-content: space-between; margin-bottom: 32px; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; }
-        .progress-step { font-size: 12px; color: var(--text-muted); font-weight: 500; position: relative; flex: 1; text-align: center; }
-        .progress-step::after { content: ''; position: absolute; top: 50%; left: 60%; width: 40%; height: 2px; background: var(--border); z-index: 0; }
-        .progress-step:last-child::after { display: none; }
-        .progress-step.active { color: var(--primary); }
-        .progress-step.active::after { background: var(--primary); }
-        .wizard-step { display: none; }
-        .wizard-step.active { display: block; }
-        .wizard-header { text-align: center; margin-bottom: 24px; }
-        .wizard-header h3 { font-size: 24px; margin-bottom: 8px; color: var(--text-primary); }
-        .wizard-header p { color: var(--text-secondary); font-size: 14px; }
-        .wizard-content { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-bottom: 32px; }
-        .wizard-text { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
-        .wizard-text p { margin-bottom: 12px; color: var(--text-secondary); line-height: 1.7; }
-        .wizard-text ul { margin: 12px 0; padding-left: 20px; color: var(--text-secondary); }
-        .wizard-text li { margin-bottom: 8px; }
-        .wizard-visual { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; display: flex; align-items: center; justify-content: center; min-height: 300px; }
-        .wizard-controls { display: flex; justify-content: space-between; gap: 16px; }
-        .wizard-controls button { min-width: 140px; }
-
-        /* csTimer Wrapper */
-        .cstimer-wrapper { width: 100%; height: 70vh; min-height: 500px; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5); }
-        .cstimer-wrapper iframe { width: 100%; height: 100%; border: none; }
-
-        /* Floating Drill Timer */
-        .floating-timer { position: fixed; bottom: 30px; right: 30px; width: 200px; background: rgba(25, 25, 25, 0.9); backdrop-filter: blur(10px); border: 1px solid var(--primary); border-radius: 12px; padding: 15px; z-index: 9999; display: none; }
-        .floating-timer.active { display: block; }
-        .floating-timer-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-        .floating-timer-title { font-size: 12px; font-weight: 600; color: var(--primary); }
-        .floating-timer-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; }
-        .floating-timer-close:hover { color: var(--text-primary); }
-        .floating-timer-display { font-family: 'JetBrains Mono', monospace; font-size: 32px; font-weight: 700; text-align: center; margin-bottom: 12px; color: var(--text-primary); }
-        .floating-timer-display.ready { color: var(--secondary); }
-        .floating-timer-display.running { color: var(--primary); }
-        .floating-timer-controls { display: flex; gap: 8px; }
-        .floating-timer-controls button { flex: 1; padding: 8px; border-radius: 6px; border: none; font-size: 11px; font-weight: 600; cursor: pointer; }
-        .floating-timer-controls .start-btn { background: var(--secondary); color: var(--bg); }
-        .floating-timer-controls .stop-btn { background: #e74c3c; color: white; }
-        .floating-timer-controls .reset-btn { background: var(--bg); border: 1px solid var(--border); color: var(--text-secondary); }
-        .floating-timer-hint { font-size: 10px; color: var(--text-muted); text-align: center; margin-top: 8px; }
-
-        /* Floating Timer Toggle Button */
-        .timer-toggle-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 18px; padding: 6px; border-radius: 6px; transition: all 0.2s; display: flex; align-items: center; }
-        .timer-toggle-btn:hover { color: var(--primary); background: var(--surface); }
-
-        @media (max-width: 768px) {
-            .hero-content { grid-template-columns: 1fr; text-align: center; }
-            .hero-text p { margin: 0 auto 20px; }
-            .hero-stats { justify-content: center; }
-            .hero-cube { order: -1; margin-bottom: 24px; }
-            .hero-text h1 { font-size: 28px; }
-            .nav-links { display: none; }
-            .nav-container { justify-content: center; }
-            .algo-tabs { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; }
-            .wizard-content { grid-template-columns: 1fr; }
-            .wizard-progress { flex-wrap: wrap; gap: 8px; }
-            .progress-step { flex: none; width: calc(50% - 4px); }
-            .progress-step::after { display: none; }
-        }
-    </style>
-    <link rel="manifest" href="manifest.json">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script type="module" src="https://cdn.cubing.net/js/cubing/twisty" async defer></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@600;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="src/css/themes/midnight-conservatory.css">
+    <link rel="stylesheet" href="src/css/styles.css">
 </head>
 <body>
-    <!-- Notation Modal -->
-    <div class="modal-overlay" id="notationModal">
+    <div id="app">
+        <!-- Navigation -->
+        <nav class="main-nav">
+            <div class="nav-container">
+                <a href="#" class="logo">
+                    <svg class="logo-icon" viewBox="0 0 32 32" fill="none">
+                        <circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="2"/>
+                        <path d="M16 8v16M12 12l4 4 4-4M12 20l4-4 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    <span>Concertmaster</span>
+                </a>
+                <div class="nav-links desktop-only">
+                    <a href="#library" class="nav-link active">Library</a>
+                    <a href="#practice" class="nav-link">Practice</a>
+                    <a href="#metronome" class="nav-link">Metronome</a>
+                    <a href="#settings" class="nav-link">Settings</a>
+                </div>
+                <button class="mobile-menu-btn mobile-only" aria-label="Menu">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+            </div>
+        </nav>
+
+        <!-- Mobile Navigation -->
+        <div class="mobile-nav mobile-only">
+            <a href="#library" class="mobile-nav-link active">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                </svg>
+                <span>Library</span>
+            </a>
+            <a href="#practice" class="mobile-nav-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                    <line x1="12" y1="19" x2="12" y2="22"/>
+                </svg>
+                <span>Practice</span>
+            </a>
+            <a href="#metronome" class="mobile-nav-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2v6l4 2"/>
+                    <circle cx="12" cy="14" r="8"/>
+                </svg>
+                <span>Metronome</span>
+            </a>
+            <a href="#settings" class="mobile-nav-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+                <span>Settings</span>
+            </a>
+        </div>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Library View -->
+            <section id="library-view" class="view active">
+                <div class="section-header">
+                    <h1>Your Library</h1>
+                    <p class="subtitle">Import and manage your sheet music</p>
+                </div>
+
+                <div class="library-actions">
+                    <button class="btn btn-primary" id="import-score-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                        Import Score
+                    </button>
+                    <button class="btn btn-secondary" id="scan-music-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                            <line x1="3" y1="9" x2="21" y2="9"/>
+                            <line x1="9" y1="21" x2="9" y2="9"/>
+                        </svg>
+                        Scan Music
+                    </button>
+                    <button class="btn btn-secondary" id="search-imslp-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"/>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                        </svg>
+                        Search IMSLP
+                    </button>
+                </div>
+
+                <div class="library-search">
+                    <input type="text" placeholder="Search your library..." id="library-search-input">
+                </div>
+
+                <div class="library-grid" id="library-grid">
+                    <!-- Library items will be populated here -->
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M9 18V5l12-2v13"/>
+                            <circle cx="6" cy="18" r="3"/>
+                            <circle cx="18" cy="16" r="3"/>
+                        </svg>
+                        <h3>No scores yet</h3>
+                        <p>Import sheet music to get started with practice</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Practice View -->
+            <section id="practice-view" class="view">
+                <div class="practice-header">
+                    <div class="practice-info">
+                        <h2 id="current-piece-title">Select a piece to practice</h2>
+                        <span class="instrument-badge" id="current-instrument">Violin</span>
+                    </div>
+                    <div class="practice-controls">
+                        <button class="btn btn-icon" id="start-practice-btn" disabled>
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <polygon points="5 3 19 12 5 21 5 3"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="sheet-music-container" id="sheet-music-container">
+                    <div class="sheet-music-placeholder">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="16" y1="13" x2="8" y2="13"/>
+                            <line x1="16" y1="17" x2="8" y2="17"/>
+                            <polyline points="10 9 9 9 8 9"/>
+                        </svg>
+                        <p>Select a piece from your library to start practicing</p>
+                    </div>
+                </div>
+
+                <div class="feedback-panel" id="feedback-panel">
+                    <div class="feedback-current-note">
+                        <span class="note-display" id="current-note">--</span>
+                        <span class="note-octave" id="current-octave"></span>
+                    </div>
+                    <div class="feedback-indicators">
+                        <div class="pitch-indicator">
+                            <span class="indicator-label">Pitch</span>
+                            <div class="pitch-meter" id="pitch-meter">
+                                <div class="pitch-center"></div>
+                                <div class="pitch-marker" id="pitch-marker"></div>
+                            </div>
+                            <span class="cents-display" id="cents-display">0¢</span>
+                        </div>
+                        <div class="timing-indicator">
+                            <span class="indicator-label">Timing</span>
+                            <span class="timing-display" id="timing-display">0ms</span>
+                        </div>
+                    </div>
+                    <div class="score-display">
+                        <span class="score-label">Accuracy</span>
+                        <span class="score-value" id="accuracy-score">--%</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Metronome View -->
+            <section id="metronome-view" class="view">
+                <div class="section-header">
+                    <h1>Metronome</h1>
+                    <p class="subtitle">Keep steady time</p>
+                </div>
+
+                <div class="metronome-display">
+                    <div class="bpm-display" id="bpm-display">120</div>
+                    <div class="tempo-label" id="tempo-label">Allegro</div>
+                </div>
+
+                <div class="tempo-slider-container">
+                    <input type="range" id="tempo-slider" min="20" max="300" value="120" class="tempo-slider">
+                    <div class="tempo-marks">
+                        <span>20</span>
+                        <span>60</span>
+                        <span>120</span>
+                        <span>200</span>
+                        <span>300</span>
+                    </div>
+                </div>
+
+                <div class="tempo-presets">
+                    <button class="preset-btn" data-tempo="50">Largo</button>
+                    <button class="preset-btn" data-tempo="66">Adagio</button>
+                    <button class="preset-btn" data-tempo="76">Andante</button>
+                    <button class="preset-btn" data-tempo="108">Moderato</button>
+                    <button class="preset-btn active" data-tempo="120">Allegro</button>
+                    <button class="preset-btn" data-tempo="168">Presto</button>
+                </div>
+
+                <div class="beat-indicator" id="beat-indicator">
+                    <div class="beat-dot active"></div>
+                    <div class="beat-dot"></div>
+                    <div class="beat-dot"></div>
+                    <div class="beat-dot"></div>
+                </div>
+
+                <div class="metronome-controls">
+                    <button class="btn btn-ghost" id="tap-tempo-btn">Tap Tempo</button>
+                    <button class="btn btn-primary btn-large" id="metronome-toggle">
+                        <svg viewBox="0 0 24 24" fill="currentColor" class="play-icon">
+                            <polygon points="5 3 19 12 5 21 5 3"/>
+                        </svg>
+                        <svg viewBox="0 0 24 24" fill="currentColor" class="pause-icon" style="display:none">
+                            <rect x="6" y="4" width="4" height="16"/>
+                            <rect x="14" y="4" width="4" height="16"/>
+                        </svg>
+                        <span>Start</span>
+                    </button>
+                    <button class="btn btn-ghost" id="reset-tempo-btn">Reset</button>
+                </div>
+            </section>
+
+            <!-- Settings View -->
+            <section id="settings-view" class="view">
+                <div class="section-header">
+                    <h1>Settings</h1>
+                    <p class="subtitle">Customize your experience</p>
+                </div>
+
+                <div class="settings-group">
+                    <h3>Instrument</h3>
+                    <div class="instrument-selector">
+                        <button class="instrument-option active" data-instrument="violin">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M12 2v20M8 6c2-2 6-2 8 0M6 10c3-2 9-2 12 0M8 16c2-2 6-2 8 0M10 22c1-2 5-2 4 0"/>
+                            </svg>
+                            <span>Violin</span>
+                        </button>
+                        <button class="instrument-option" data-instrument="viola">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M12 2v20M8 5c2-1.5 5-1.5 8 0M6 9c2.5-1.5 5.5-1.5 12 0M8 15c2-1.5 5-1.5 8 0"/>
+                            </svg>
+                            <span>Viola</span>
+                        </button>
+                        <button class="instrument-option" data-instrument="cello">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M12 2v20M7 4c2.5-1 6-1 10 0M5 8c3-1.5 8-1.5 14 0M7 14c2-1.5 6-1.5 10 0"/>
+                            </svg>
+                            <span>Cello</span>
+                        </button>
+                        <button class="instrument-option" data-instrument="bass">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M12 2v20M8 6c2-1 5-1 8 0M6 12c2-1.5 5-1.5 12 0"/>
+                            </svg>
+                            <span>Bass</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <h3>Audio Sensitivity</h3>
+                    <div class="slider-setting">
+                        <label for="sensitivity-slider">Detection Threshold</label>
+                        <input type="range" id="sensitivity-slider" min="0.5" max="1" step="0.05" value="0.85">
+                        <span class="setting-value" id="sensitivity-value">0.85</span>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <h3>Display</h3>
+                    <div class="toggle-setting">
+                        <label for="show-heatmap-toggle">Show Heat Map After Practice</label>
+                        <button class="toggle-btn active" id="show-heatmap-toggle" role="switch" aria-checked="true">
+                            <span class="toggle-slider"></span>
+                        </button>
+                    </div>
+                    <div class="toggle-setting">
+                        <label for="show-cursor-toggle">Follow-the-Ball Cursor</label>
+                        <button class="toggle-btn" id="show-cursor-toggle" role="switch" aria-checked="false">
+                            <span class="toggle-slider"></span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Import Modal -->
+        <div class="modal" id="import-modal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content">
+                <button class="modal-close" aria-label="Close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+                <h2>Import Score</h2>
+                <div class="import-options">
+                    <label class="import-option">
+                        <input type="file" accept=".musicxml,.xml,.mei" hidden>
+                        <div class="import-option-content">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                            </svg>
+                            <span>Upload File</span>
+                            <small>MusicXML, MEI</small>
+                        </div>
+                    </label>
+                    <label class="import-option">
+                        <input type="file" id="scan-file-input" accept="image/*" capture="environment" hidden>
+                        <div class="import-option-content">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                <circle cx="8.5" cy="8.5" r="1.5"/>
+                                <polyline points="21 15 16 10 5 21"/>
+                            </svg>
+                            <span>Scan Image</span>
+                            <small>Photo of sheet music</small>
+                        </div>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- IMSLP Search Modal -->
+        <div class="modal" id="imslp-modal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-large">
+                <button class="modal-close" aria-label="Close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+                <h2>Search IMSLP</h2>
+                <div class="search-form">
+                    <input type="text" placeholder="Search by composer, title, or opus..." id="imslp-search-input">
+                    <button class="btn btn-primary" id="imslp-search-btn">Search</button>
+                </div>
+                <div class="search-results" id="imslp-results">
+                    <div class="empty-state">
+                        <p>Search for public domain sheet music</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Session Summary Modal -->
+        <div class="modal" id="session-summary-modal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-large">
+                <button class="modal-close" aria-label="Close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+                <div class="session-summary">
+                    <h2>Practice Complete</h2>
+                    <div class="summary-score">
+                        <span class="big-score" id="final-score">85%</span>
+                        <span class="score-label">Overall Accuracy</span>
+                    </div>
+                    <div class="summary-breakdown">
+                        <div class="breakdown-item">
+                            <span class="breakdown-label">Pitch Accuracy</span>
+                            <span class="breakdown-value" id="pitch-accuracy">92%</span>
+                        </div>
+                        <div class="breakdown-item">
+                            <span class="breakdown-label">Timing Accuracy</span>
+                            <span class="breakdown-value" id="timing-accuracy">78%</span>
+                        </div>
+                        <div class="breakdown-item">
+                            <span class="breakdown-label">Duration</span>
+                            <span class="breakdown-value" id="session-duration">5:32</span>
+                        </div>
+                    </div>
+                    <div class="heatmap-section">
+                        <h3>Practice Areas</h3>
+                        <p class="heatmap-note">Measures colored red need the most practice</p>
+                        <div class="heatmap-preview" id="heatmap-preview">
+                            <!-- Heat map will be rendered here -->
+                        </div>
+                    </div>
+                    <div class="summary-actions">
+                        <button class="btn btn-secondary" id="practice-again-btn">Practice Again</button>
+                        <button class="btn btn-primary" id="view-details-btn">View Details</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Measure Detail Modal -->
+    <div class="modal" id="measure-detail-modal">
+        <div class="modal-backdrop"></div>
         <div class="modal-content">
-            <button class="modal-close" onclick="closeNotationModal()">&times;</button>
-            <h3 style="margin-bottom: 16px;">Cube Notation Guide</h3>
-            <div class="cheatsheet-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
-                <div class="cheatsheet-item"><span>R</span><span>Right</span></div>
-                <div class="cheatsheet-item"><span>L</span><span>Left</span></div>
-                <div class="cheatsheet-item"><span>U</span><span>Up</span></div>
-                <div class="cheatsheet-item"><span>D</span><span>Down</span></div>
-                <div class="cheatsheet-item"><span>F</span><span>Front</span></div>
-                <div class="cheatsheet-item"><span>B</span><span>Back</span></div>
-                <div class="cheatsheet-item"><span>R'</span><span>CCW</span></div>
-                <div class="cheatsheet-item"><span>R2</span><span>180°</span></div>
-                <div class="cheatsheet-item"><span>r</span><span>wide</span></div>
-                <div class="cheatsheet-item"><span>M</span><span>slice</span></div>
-                <div class="cheatsheet-item"><span>x</span><span>rotate</span></div>
-                <div class="cheatsheet-item"><span>S</span><span>standing</span></div>
+            <button class="modal-close" aria-label="Close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+            <div class="measure-detail">
+                <h2>Measure <span id="detail-measure-number">1</span></h2>
+                <div class="detail-score">
+                    <span class="detail-accuracy" id="detail-measure-score">85%</span>
+                    <span class="detail-label">Accuracy</span>
+                </div>
+                <div class="note-breakdown" id="note-breakdown">
+                    <!-- Note details will be inserted here -->
+                </div>
+                <div class="detail-actions">
+                    <button class="btn btn-primary" id="close-detail-btn">Close</button>
+                </div>
             </div>
-            <p style="margin-top: 16px; font-size: 12px; color: var(--text-muted);">No symbol = Clockwise (90°) | ' = Counter-clockwise | 2 = 180°</p>
         </div>
     </div>
 
-    <!-- Floating Drill Timer -->
-    <div class="floating-timer" id="floatingTimer">
-        <div class="floating-timer-header">
-            <span class="floating-timer-title">Drill Timer</span>
-            <button class="floating-timer-close" onclick="toggleFloatingTimer()">&times;</button>
-        </div>
-        <div class="floating-timer-display" id="floatingTimerDisplay">0.00</div>
-        <div class="floating-timer-controls">
-            <button class="reset-btn" onclick="floatingTimerReset()">Reset</button>
-            <button class="start-btn" id="floatingStartBtn" onmousedown="floatingTimerReady()" onmouseup="floatingTimerStart()">Start</button>
-            <button class="stop-btn" id="floatingStopBtn" onclick="floatingTimerStop()" style="display:none;">Stop</button>
-        </div>
-        <p class="floating-timer-hint">Space to ready, release to start, any key to stop</p>
-    </div>
-
-    <nav>
-        <div class="nav-container">
-            <div class="logo"><div class="logo-cube">🎲</div>CubeMaster</div>
-            <div class="nav-links">
-                <div class="nav-group">
-                    <span class="nav-label">Learn</span>
-                    <a href="#algorithms" class="nav-link" onclick="showCategory('beginner')">Beginner</a>
-                    <a href="#algorithms" class="nav-link" onclick="showCategory('f2l')">F2L</a>
-                    <a href="#algorithms" class="nav-link" onclick="showCategory('oll')">OLL</a>
-                    <a href="#algorithms" class="nav-link" onclick="showCategory('pll')">PLL</a>
-                </div>
-                <div class="nav-group">
-                    <span class="nav-label">Tools</span>
-                    <a href="#algorithms" class="nav-link" onclick="showCategory('lookahead')">Lookahead</a>
-                    <a href="#algorithms" class="nav-link" onclick="showCategory('timer')">Timer</a>
-                    <a href="#algorithms" class="nav-link" onclick="showCategory('game')">Game</a>
-                    <a href="#algorithms" class="nav-link" onclick="showCategory('dashboard')">Dashboard</a>
-                </div>
-                <button class="nav-link notation-btn" onclick="openNotationModal()">Notation</button>
-                <button class="timer-toggle-btn" onclick="toggleFloatingTimer()" title="Drill Timer">⏱</button>
-            </div>
-        </div>
-    </nav>
-    <section class="hero">
-        <div class="container">
-            <div class="hero-content">
-                <div class="hero-text">
-                    <h1>3×3 CFOP</h1>
-                    <p>Beginner guide + PLL, OLL & F2L algorithm reference with real cube case images.</p>
-                    <div class="hero-stats">
-                        <div class="stat"><div class="stat-number">Beginner</div><div class="stat-label">Learn</div></div>
-                        <div class="stat"><div class="stat-number">41</div><div class="stat-label">F2L</div></div>
-                        <div class="stat"><div class="stat-number">21</div><div class="stat-label">PLL</div></div>
-                        <div class="stat"><div class="stat-number">57</div><div class="stat-label">OLL</div></div>
-                    </div>
-                    <a href="#algorithms" class="btn btn-primary">View Algorithms ↓</a>
-                </div>
-                <div class="hero-cube">
-                    <div class="cube-scene">
-                        <div class="cube-face front"><div class="cubie white"></div><div class="cubie white"></div><div class="cubie white"></div><div class="cubie white"></div><div class="cubie red"></div><div class="cubie white"></div><div class="cubie white"></div><div class="cubie white"></div><div class="cubie white"></div></div>
-                        <div class="cube-face back"><div class="cubie orange"></div><div class="cubie orange"></div><div class="cubie orange"></div><div class="cubie orange"></div><div class="cubie orange"></div><div class="cubie orange"></div><div class="cubie orange"></div><div class="cubie orange"></div><div class="cubie orange"></div></div>
-                        <div class="cube-face left"><div class="cubie green"></div><div class="cubie green"></div><div class="cubie green"></div><div class="cubie green"></div><div class="cubie green"></div><div class="cubie green"></div><div class="cubie green"></div><div class="cubie green"></div><div class="cubie green"></div></div>
-                        <div class="cube-face right"><div class="cubie blue"></div><div class="cubie blue"></div><div class="cubie blue"></div><div class="cubie blue"></div><div class="cubie blue"></div><div class="cubie blue"></div><div class="cubie blue"></div><div class="cubie blue"></div><div class="cubie blue"></div></div>
-                        <div class="cube-face top"><div class="cubie yellow"></div><div class="cubie yellow"></div><div class="cubie yellow"></div><div class="cubie yellow"></div><div class="cubie yellow"></div><div class="cubie yellow"></div><div class="cubie yellow"></div><div class="cubie yellow"></div><div class="cubie yellow"></div></div>
-                        <div class="cube-face bottom"><div class="cubie white"></div><div class="cubie white"></div><div class="cubie white"></div><div class="cubie white"></div><div class="cubie white"></div><div class="cubie white"></div><div class="cubie white"></div><div class="cubie white"></div><div class="cubie white"></div></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-    <section class="algo-section" id="algorithms">
-        <div class="container">
-            <div class="section-header">
-                <h2 id="sectionTitle">CFOP Algorithms</h2>
-                <p id="sectionSubtitle">Real cube case images from cube.academy</p>
-            </div>
-            <div class="algo-tabs" id="subNav">
-                <button class="algo-tab active" onclick="showCategory('beginner')">Beginner</button>
-                <button class="algo-tab" onclick="showCategory('f2l')">F2L</button>
-                <button class="algo-tab" onclick="showCategory('oll')">OLL</button>
-                <button class="algo-tab" onclick="showCategory('pll')">PLL</button>
-                <button class="algo-tab" onclick="showCategory('coll')">COLL</button>
-                <button class="algo-tab" onclick="showCategory('lookahead')">Lookahead</button>
-                <button class="algo-tab" onclick="showCategory('timer')">Timer</button>
-                <button class="algo-tab" onclick="showCategory('game')">Game</button>
-                <button class="algo-tab" onclick="showCategory('dashboard')">Dashboard</button>
-            </div>
-
-            <!-- Beginner -->
-            <div id="beginner" class="algo-category active">
-                <!-- Progress Tracker -->
-                <div class="wizard-progress">
-                    <div class="progress-step active" data-step="1">1. Cross</div>
-                    <div class="progress-step" data-step="2">2. Corners</div>
-                    <div class="progress-step" data-step="3">3. Edges</div>
-                    <div class="progress-step" data-step="4">4. Y Cross</div>
-                    <div class="progress-step" data-step="5">5. Y Edge</div>
-                    <div class="progress-step" data-step="6">6. Y Corn</div>
-                    <div class="progress-step" data-step="7">7. Permute</div>
-                </div>
-
-                <!-- Step 1: White Cross -->
-                <div class="wizard-step active" data-step="1">
-                    <div class="wizard-header">
-                        <h3>Step 1: The White Cross</h3>
-                        <p>Form a cross on the white face by matching each white edge to its center.</p>
-                    </div>
-                    <div class="wizard-content">
-                        <div class="wizard-text">
-                            <p><strong>Goal:</strong> Create a white cross by placing all 4 white edge pieces in the correct position.</p>
-                            <p><strong>How it works:</strong> The cross is intuitive - there are no algorithms to memorize! Find each white edge and move it to the top layer, then position it correctly.</p>
-                            <p><strong>Tips:</strong></p>
-                            <ul>
-                                <li>Match each white edge to its matching center color</li>
-                                <li>The white cross should have white in the center and the side color matching its adjacent center</li>
-                                <li>Practice until you can do this in under 5 seconds</li>
-                            </ul>
-                        </div>
-                        <div class="wizard-visual">
-                            <twisty-player alg="R U R' U' R U2 R'" hint-facelets="none" background="none" style="width: 100%; height: 200px;"></twisty-player>
-                            <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">Example: One cross move</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Step 2: White Corners -->
-                <div class="wizard-step" data-step="2">
-                    <div class="wizard-header">
-                        <h3>Step 2: Solve White Corners</h3>
-                        <p>Place the white corners in their correct positions.</p>
-                    </div>
-                    <div class="wizard-content">
-                        <div class="wizard-text">
-                            <p><strong>Goal:</strong> Get all white corners in the bottom layer with the white face down.</p>
-                            <p><strong>Algorithm:</strong> Use this simple algorithm when the white corner is in the wrong spot:</p>
-                            <p class="case-moves" style="background: var(--surface); padding: 8px 12px; border-radius: 6px; display: inline-block; margin: 8px 0;">R U R' U'</p>
-                            <p><strong>Finding corners:</strong></p>
-                            <ul>
-                                <li>Look for a white corner in the top layer</li>
-                                <li>If white is on the right: <strong>R U R' U'</strong></li>
-                                <li>If white is on the left: <strong>L' U' L U</strong></li>
-                            </ul>
-                        </div>
-                        <div class="wizard-visual">
-                            <div class="case-grid">
-                                <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/ea99daaf-e582-4c32-91d7-4dc47cc33573/beginner-method-corner-white-right.png" alt="White Right"></div><div class="case-info"><div class="case-name">White on Right</div><div class="case-moves">R U R' U'</div></div></div>
-                                <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/7dc701e4-c979-4c89-9022-a25d5eb25edc/beginner-method-corner-white-left.png" alt="White Left"></div><div class="case-info"><div class="case-name">White on Left</div><div class="case-moves">L' U' L U</div></div></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Step 3: Middle Layer Edges -->
-                <div class="wizard-step" data-step="3">
-                    <div class="wizard-header">
-                        <h3>Step 3: Middle Layer Edges</h3>
-                        <p>Solve the edges in the middle layer (between the white and yellow faces).</p>
-                    </div>
-                    <div class="wizard-content">
-                        <div class="wizard-text">
-                            <p><strong>Goal:</strong> Complete the first two layers (F2L).</p>
-                            <p><strong>Steps:</strong></p>
-                            <ul>
-                                <li>Find an edge in the top layer that doesn't have yellow</li>
-                                <li>Match it with its center color</li>
-                                <li>Apply the algorithm to insert it</li>
-                            </ul>
-                        </div>
-                        <div class="wizard-visual">
-                            <div class="case-grid">
-                                <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/1772762a-3688-4edb-b05e-52394df1fc5e/beginner-method-edge-right.png" alt="Edge Right"></div><div class="case-info"><div class="case-name">Goes Right</div><div class="case-moves">U R U' R' U' F' U F</div></div></div>
-                                <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/7068ab58-4c74-49b0-b46f-a35dedcfee0b/beginner-method-edge-left.png" alt="Edge Left"></div><div class="case-info"><div class="case-name">Goes Left</div><div class="case-moves">U' L' U L U F U' F'</div></div></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Step 4: Yellow Cross -->
-                <div class="wizard-step" data-step="4">
-                    <div class="wizard-header">
-                        <h3>Step 4: Yellow Cross</h3>
-                        <p>Create a yellow cross on the top layer.</p>
-                    </div>
-                    <div class="wizard-content">
-                        <div class="wizard-text">
-                            <p><strong>Algorithm:</strong> <span class="case-moves" style="background: var(--surface); padding: 8px 12px; border-radius: 6px;">F R U R' U' F'</span></p>
-                            <p>Apply this until you see a yellow cross:</p>
-                            <ol>
-                                <li>Yellow dot → Apply 3 times</li>
-                                <li>Yellow hook → Apply 2 times</li>
-                                <li>Yellow line → Apply 1 time</li>
-                                <li>Yellow cross → Done!</li>
-                            </ol>
-                        </div>
-                        <div class="wizard-visual">
-                            <div class="case-grid">
-                                <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/fc3972e9-efbc-4f41-b726-e68c81240b41/beginner-method-yellow-dot.png" alt="Yellow Dot"></div><div class="case-info"><div class="case-name">Yellow Dot</div><div class="case-moves">Apply 3x</div></div></div>
-                                <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/613b53bd-c35d-4468-bc02-5ac87b24a001/beginner-method-yellow-hook.png" alt="Yellow Hook"></div><div class="case-info"><div class="case-name">Yellow Hook</div><div class="case-moves">Apply 2x</div></div></div>
-                                <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/5a04dfc7-00b5-42d1-806c-534ccfb87a12/beginner-method-yellow-line.png" alt="Yellow Line"></div><div class="case-info"><div class="case-name">Yellow Line</div><div class="case-moves">Apply 1x</div></div></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Step 5: Yellow Edges -->
-                <div class="wizard-step" data-step="5">
-                    <div class="wizard-header">
-                        <h3>Step 5: Position Yellow Edges</h3>
-                        <p>Move the yellow edges to their correct positions.</p>
-                    </div>
-                    <div class="wizard-content">
-                        <div class="wizard-text">
-                            <p><strong>Algorithm:</strong> <span class="case-moves" style="background: var(--surface); padding: 8px 12px; border-radius: 6px;">R U R' U R U2 R'</span></p>
-                            <p>Keep applying until edges are correctly positioned. The corners might get messed up - that's okay!</p>
-                        </div>
-                        <div class="wizard-visual">
-                            <div class="case-grid">
-                                <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/34ae4e1d-026d-46a9-a627-0b072940f43b/beginner-method-yellow-edges-diagonal.png" alt="Adjacent"></div><div class="case-info"><div class="case-name">Adjacent</div><div class="case-moves">R U R' U R U2 R'</div></div></div>
-                                <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/39787c51-e591-4df2-b522-87fc223ad02b/beginner-method-yellow-edges-sune.png" alt="Diagonal"></div><div class="case-info"><div class="case-name">Opposite</div><div class="case-moves">Apply 2x</div></div></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Step 6: Yellow Corners -->
-                <div class="wizard-step" data-step="6">
-                    <div class="wizard-header">
-                        <h3>Step 6: Orient Yellow Corners</h3>
-                        <p>Make all yellow corners face up (the "headlights" or "fish" pattern).</p>
-                    </div>
-                    <div class="wizard-content">
-                        <div class="wizard-text">
-                            <p><strong>Goal:</strong> Get all yellow stickers facing up on the top layer.</p>
-                            <p><strong>Main Algorithm:</strong> <span class="case-moves" style="background: var(--surface); padding: 8px 12px; border-radius: 6px;">R' D' R D</span></p>
-                            <p><strong>How to use:</strong></p>
-                            <ol>
-                                <li>Find a corner that doesn't have yellow facing up</li>
-                                <li>Hold it in the <strong>front-right-top</strong> position</li>
-                                <li>Repeat <strong>R' D' R D</strong> until that corner has yellow facing up</li>
-                                <li>Rotate the top layer to bring the next unsolved corner to front-right</li>
-                                <li>Repeat until all corners are solved!</li>
-                            </ol>
-                            <p><strong>Tip:</strong> Look for the "fish" pattern (one yellow corner facing up) - you're almost done!</p>
-                        </div>
-                        <div class="wizard-visual">
-                            <div class="case-grid">
-                                <div class="case-card" style="flex-direction: column; text-align: center;">
-                                    <div class="case-image" style="width: 80px; height: 80px; margin: 0 auto 12px;">
-                                        <img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/31b15ec3-52c9-4e13-88fd-f37578897119/oll+26.png" alt="Sune/Fish">
-                                    </div>
-                                    <div class="case-info">
-                                        <div class="case-name">Sune / Fish</div>
-                                        <div class="case-moves">R U R' U R U2 R'</div>
-                                    </div>
-                                </div>
-                                <div class="case-card" style="flex-direction: column; text-align: center;">
-                                    <div class="case-image" style="width: 80px; height: 80px; margin: 0 auto 12px;">
-                                        <img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/bb430263-ade1-4457-8bdb-fd55583a3ec8/kite.png" alt="Anti-Sune">
-                                    </div>
-                                    <div class="case-info">
-                                        <div class="case-name">Anti-Sune</div>
-                                        <div class="case-moves">R' U' R U' R' U2 R</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Step 7: Permute Yellow Corners -->
-                <div class="wizard-step" data-step="7">
-                    <div class="wizard-header">
-                        <h3>Step 7: Permute Yellow Corners</h3>
-                        <p>Final step! Swap corners to their correct positions.</p>
-                    </div>
-                    <div class="wizard-content">
-                        <div class="wizard-text">
-                            <p><strong>Algorithm:</strong> <span class="case-moves" style="background: var(--surface); padding: 8px 12px; border-radius: 6px;">R' D' R D</span></p>
-                            <p>Hold the cube so a corner that needs to move is in the front-right-top. Apply the algorithm until it's in the right spot. Rotate the top and repeat for other corners.</p>
-                            <p><strong>Congratulations!</strong> You've solved the cube!</p>
-                        </div>
-                        <div class="wizard-visual">
-                            <div style="text-align: center; padding: 40px;">
-                                <div style="font-size: 48px;">🎉</div>
-                                <p style="color: var(--primary); font-weight: 600; margin-top: 12px;">Cube Solved!</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Wizard Controls -->
-                <div class="wizard-controls">
-                    <button class="btn" id="prevStep" onclick="wizardPrev()" style="background: var(--bg); border: 1px solid var(--border); color: var(--text-secondary);">← Previous</button>
-                    <button class="btn btn-primary" id="nextStep" onclick="wizardNext()">Next Step →</button>
-                </div>
-            </div>
-
-            <!-- Notation -->
-            <div id="notation" class="algo-category">
-                <div class="category-title">Cube Notation</div>
-                <p class="category-desc">Learn what each letter means in cube algorithms.</p>
-
-                <h5>Basic Face Moves (Clockwise)</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/b174c36a-cfd0-49bf-b877-3741c6ace208/basic+moves+1.png" alt="R L U"></div><div class="case-info"><div class="case-name">R, L, U</div><div class="case-moves">Right, Left, Up clockwise</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/bc9f23ca-81a0-4fef-8636-69decd5bf0c2/basic+moves+2.png" alt="D F B"></div><div class="case-info"><div class="case-name">D, F, B</div><div class="case-moves">Down, Front, Back clockwise</div></div></div>
-                </div>
-
-                <h5>Prime Moves (Counterclockwise) & Double Moves</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/50f5601e-7550-4fec-ad25-156b18ecf41b/other+moves.png" alt="R' R2 r"></div><div class="case-info"><div class="case-name">R', R2, r</div><div class="case-moves">Prime = counterclockwise, 2 = 180°, lowercase = double layer</div></div></div>
-                </div>
-
-                <h5>Cube Rotations</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/23aa99ba-5da2-4f0f-b4ab-27188f4fb3e2/rotations.png" alt="x y z"></div><div class="case-info"><div class="case-name">x, y, z</div><div class="case-moves">Rotate entire cube on R, U, F axes</div></div></div>
-                </div>
-
-                <h5>Slice Turns</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/94021113-3fea-49d4-b608-295da1579f54/slice+turns.png" alt="M S E"></div><div class="case-info"><div class="case-name">M, S, E</div><div class="case-moves">M=between L/R, S=between F/B, E=between U/D</div></div></div>
-                </div>
-
-                <h5>Notation Reference</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-info"><div class="case-name">R - Right</div><div class="case-moves">Turn Right face clockwise</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">L - Left</div><div class="case-moves">Turn Left face clockwise</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">U - Up</div><div class="case-moves">Turn Up (top) face clockwise</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">D - Down</div><div class="case-moves">Turn Down (bottom) face clockwise</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">F - Front</div><div class="case-moves">Turn Front face clockwise</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">B - Back</div><div class="case-moves">Turn Back face clockwise</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">' (prime)</div><div class="case-moves">Counterclockwise turn</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">2 (double)</div><div class="case-moves">180° half turn</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">Lowercase</div><div class="case-moves">Double layer turn</div></div></div>
-                </div>
-            </div>
-
-            <!-- F2L -->
-            <div id="f2l" class="algo-category">
-                <div class="category-title">F2L - First Two Layers <span class="count">41 Cases</span></div>
-                <p class="category-desc">Pair and insert corner-edge pieces into the first two layers.</p>
-                <h5>Easy Inserts</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/3fc2829f-217e-4805-af33-19cc92c1e0e1/easy+insert01.png" alt="Easy1"></div><div class="case-info"><div class="case-name">White on Right</div><div class="case-moves">U (R U' R')</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/d9074574-d426-4991-96d6-25e053b4ab5d/easy+insert02.png" alt="Easy2"></div><div class="case-info"><div class="case-name">White on Left</div><div class="case-moves">U' (L' U L)</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/57f7fe55-bfcd-4959-9ba6-9b8aae87ecd0/easy+insert03.png" alt="Easy3"></div><div class="case-info"><div class="case-name">Right Insert</div><div class="case-moves">(R U R')</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/b121bfb7-0483-4a64-b0d7-e77f43e7a991/easy+insert04.png" alt="Easy4"></div><div class="case-info"><div class="case-name">Left Insert</div><div class="case-moves">(L' U' L)</div></div></div>
-                </div>
-                <h5>Disconnected Pairs</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/880e7b53-7014-4f68-96c1-25301a6abf98/disconnected+01.png" alt="D1"></div><div class="case-info"><div class="case-name">Back Right</div><div class="case-moves">U' (R U R') [U2 R U' R']</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/5eb29119-bbab-430b-9b48-9f21dd94c9c6/disconnected+02.png" alt="D2"></div><div class="case-info"><div class="case-name">Back Left</div><div class="case-moves">U (L' U' L) [U2' L' U L]</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/64785391-a86a-4078-a711-67ce98ade934/disconnected+03.png" alt="D3"></div><div class="case-info"><div class="case-name">Front Right</div><div class="case-moves">U' (R U2' R') [U2 R U' R']</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/dfaa4efe-e4df-4819-ba96-ff1bc5b7adf1/disconnected+04.png" alt="D4"></div><div class="case-info"><div class="case-name">Front Left</div><div class="case-moves">U (L' U2 L) [U2' L' U L]</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/97e21113-24d4-4bca-8898-e5c6d91cb77d/disconnected+05.png" alt="D5"></div><div class="case-info"><div class="case-name">Side Right</div><div class="case-moves">U' (R U R') [U R U R']</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/11155752-3255-41ef-946a-2f5b789e9dbd/disconnected+06.png" alt="D6"></div><div class="case-info"><div class="case-name">Side Left</div><div class="case-moves">U (L' U' L) [U' L' U' L]</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/b4a86f32-a38c-4f6a-8f62-cbead7e2083b/disconnected+07.png" alt="D7"></div><div class="case-info"><div class="case-name">Front Right U</div><div class="case-moves">U (R U2' R') [U R U' R']</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/7b8e8b88-42d6-431b-94df-0404b9378d0c/disconnected+08.png" alt="D8"></div><div class="case-info"><div class="case-name">Front Left U'</div><div class="case-moves">U' (L' U2 L) [U' L' U L]</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/fbf60be9-8387-4676-8dea-51475468726f/disconnected+09.png" alt="D9"></div><div class="case-info"><div class="case-name">U2 Back Right</div><div class="case-moves">U2 (R U R') [U R U' R']</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/d496bbe2-1318-4aa1-9665-a542ff900ab8/disconnected+10.png" alt="D10"></div><div class="case-info"><div class="case-name">U2 Back Left</div><div class="case-moves">U2 (L' U' L) [U' L' U L]</div></div></div>
-                </div>
-                <h5>Corner in Slot</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/c1c13f4e-64b8-4494-b13e-eb35afad9f1a/corner+ins+slot01.png" alt="C1"></div><div class="case-info"><div class="case-name">Right Back</div><div class="case-moves">U' (R' F R F') [R U R']</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/c47e962c-0479-4b86-a4d7-08232d54fb58/corner+ins+slot02.png" alt="C2"></div><div class="case-info"><div class="case-name">Left Back</div><div class="case-moves">U (L F' L' F) [L' U' L]</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/5790be8e-eaef-421a-8956-355ccbdc6587/corner+ins+slot03.png" alt="C3"></div><div class="case-info"><div class="case-name">Right Front</div><div class="case-moves">(R U' R') [U R U' R']</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/3ca1ff99-2b47-4944-8938-bf0a331a0fbd/corner+ins+slot04.png" alt="C4"></div><div class="case-info"><div class="case-name">Left Front</div><div class="case-moves">(L' U L) [U' L' U L]</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/9488df6b-2206-441f-9934-04bb7cdd3a26/corner+ins+slot05.png" alt="C5"></div><div class="case-info"><div class="case-name">Right Misoriented</div><div class="case-moves">(R U R') [U' R U R']</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/5824af39-f28a-41b7-ae0a-7467ff297851/corner+ins+slot06.png" alt="C6"></div><div class="case-info"><div class="case-name">Left Misoriented</div><div class="case-moves">(L' U' L) [U L' U' L]</div></div></div>
-                </div>
-                <h5>Edge in Slot</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/fb13f8be-b568-413c-86b5-b862a5185230/edge+in+slot01.png" alt="E1"></div><div class="case-info"><div class="case-name">Edge in Slot 1</div><div class="case-moves">U' R U R' U2 (R U' R')</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/07815675-aabb-4244-9931-17898c34f420/edge+in+slot02.png" alt="E2"></div><div class="case-info"><div class="case-name">Edge in Slot 2</div><div class="case-moves">U L' U' L U2 (L' U L)</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/a096a5e7-89c4-4488-aa65-4d234399113a/edge+in+slot03.png" alt="E3"></div><div class="case-info"><div class="case-name">Edge in Slot 3</div><div class="case-moves">U' R U2 R' U2 (R U' R')</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/dabf1505-0ccb-480c-9108-d4d92ae0dfb0/edge+in+slot04.png" alt="E4"></div><div class="case-info"><div class="case-name">Edge in Slot 4</div><div class="case-moves">U L' U2 L U2 (L' U L)</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/d2db5d05-6ea5-4908-b43c-87e96ed2b934/edge+in+slot05.png" alt="E5"></div><div class="case-info"><div class="case-name">Edge in Slot 5</div><div class="case-moves">R U R' U R U' R'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/f8525853-c89c-40e8-90ff-d4f1d6601be1/edge+in+slot06.png" alt="E6"></div><div class="case-info"><div class="case-name">Edge in Slot 6</div><div class="case-moves">L' U' L U' L' U L</div></div></div>
-                </div>
-                <h5>Connected Pairs</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/12f784fa-8383-4222-8e47-445ba2048212/connected+pairs+01.png" alt="CP1"></div><div class="case-info"><div class="case-name">Connected Pair 1</div><div class="case-moves">(R U' R') U (R U R')</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/040e0ea1-de05-434d-be6a-930cfd1d0f94/connected+pairs+02.png" alt="CP2"></div><div class="case-info"><div class="case-name">Connected Pair 2</div><div class="case-moves">(L' U L) U' (L' U' L)</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/db5bf74d-ab11-45b4-aae2-73d1e074dea5/connected+pairs+03.png" alt="CP3"></div><div class="case-info"><div class="case-name">Connected Pair 3</div><div class="case-moves">U (R U' R') (R U R')</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/f6acebae-ced5-4050-a311-9a47c630707f/connected+pairs+04.png" alt="CP4"></div><div class="case-info"><div class="case-name">Connected Pair 4</div><div class="case-moves">U' (L' U L) (L' U' L)</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/6be49a67-4a0c-4b6d-a305-2e6eed27f00c/connected+pairs+05.png" alt="CP5"></div><div class="case-info"><div class="case-name">Connected Pair 5</div><div class="case-moves">R U2 R' U' (R U' R')</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/e0ae9b87-cb69-4f14-8c5f-a1521ebffdb9/connected+pairs+06.png" alt="CP6"></div><div class="case-info"><div class="case-name">Connected Pair 6</div><div class="case-moves">L' U2 L U (L' U L)</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/16bb87af-c2ae-487d-979e-cf35da808a9b/connected+pairs+07.png" alt="CP7"></div><div class="case-info"><div class="case-name">Connected Pair 7</div><div class="case-moves">U R U2 R' U (R U' R')</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/f299ffbf-e392-40cd-a96b-ff19d4e1042d/connected+pairs+08.png" alt="CP8"></div><div class="case-info"><div class="case-name">Connected Pair 8</div><div class="case-moves">U' L' U2 L U' (L' U L)</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/c5e5af44-abe8-483e-b8e6-62bc81c421ae/connected+pairs+09.png" alt="CP9"></div><div class="case-info"><div class="case-name">Connected Pair 9</div><div class="case-moves">R U R' U' R U R'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/1e0bb8c3-4647-4a3d-baad-947b8287d0eb/connected+pairs+10.png" alt="CP10"></div><div class="case-info"><div class="case-name">Connected Pair 10</div><div class="case-moves">L' U' L U L' U' L</div></div></div>
-                </div>
-                <h5>Pieces in Slot</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/a1f4277d-2c4b-44fe-bf7a-46f0f0b4a1d0/both+pieces+in+slot+01.png" alt="P1"></div><div class="case-info"><div class="case-name">Pieces in Slot 1</div><div class="case-moves">R U' R' U' R U R'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/858e2227-6e28-4a34-b1f5-3cd546f9929f/both+pieces+in+slot+02.png" alt="P2"></div><div class="case-info"><div class="case-name">Pieces in Slot 2</div><div class="case-moves">L' U L U L' U' L</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/19e6ccff-0260-45fc-9373-0398d34dbb09/both+pieces+in+slot+03.png" alt="P3"></div><div class="case-info"><div class="case-name">Pieces in Slot 3</div><div class="case-moves">R U R' U R U2 R'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/ad4d6bf3-1a3d-4257-add4-c53baebdb1e7/both+pieces+in+slot+04.png" alt="P4"></div><div class="case-info"><div class="case-name">Pieces in Slot 4</div><div class="case-moves">L' U' L U' L' U2 L</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/8881b499-6bda-4d23-b606-547437b9ce8c/both+pieces+in+slot+05.png" alt="P5"></div><div class="case-info"><div class="case-name">Pieces in Slot 5</div><div class="case-moves">R U2 R' U' R U R'</div></div></div>
-                </div>
-            </div>
-
-            <!-- 2-Look PLL -->
-            <div id="2lookpll" class="algo-category">
-                <div class="category-title">2-Look PLL</div>
-                <p class="category-desc">Simplified PLL - solve corners first, then edges. Only 6 cases!</p>
-
-                <h5>Step 1: Solve Corners</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/c0566d04-85f8-423e-bb1a-79f02b25972d/headlights.png" alt="Headlights"></div><div class="case-info"><div class="case-name">Headlights</div><div class="case-moves">Ua: (R U R' U) R' U' (R2 U' R') U R' U R</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/67f2ff22-2a20-43ec-b7b2-e0026db461dc/no+headlights.png" alt="No Headlights"></div><div class="case-info"><div class="case-name">No Headlights</div><div class="case-moves">Ub: R' U R' U' (R3 U') R' U (R U R2)</div></div></div>
-                </div>
-
-                <h5>Step 2: Solve Edges</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/8bf43bd9-f797-4472-a218-655da04c66fc/ub.png" alt="Ua"></div><div class="case-info"><div class="case-name">Ua Perm</div><div class="case-moves">(R U R' U) R' U' (R2 U' R') U R' U R</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/c30df8ec-36a2-4c47-9fe4-f78757c2cb70/ua.png" alt="Ub"></div><div class="case-info"><div class="case-name">Ub Perm</div><div class="case-moves">R' U R' U' (R3 U') R' U (R U R2)</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/a7d28ba3-7de4-4303-ac44-7d67085051f0/h.png" alt="H"></div><div class="case-info"><div class="case-name">H Perm</div><div class="case-moves">M2 U' (M2 U2 M2) U' M2</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/337b5ec0-f150-4288-832c-11779b14081d/z.png" alt="Z"></div><div class="case-info"><div class="case-name">Z Perm</div><div class="case-moves">M' U' (M2 U') (M2 U') M' U2 M2</div></div></div>
-                </div>
-            </div>
-
-            <!-- 2-Look OLL -->
-            <div id="2lookoll" class="algo-category">
-                <div class="category-title">2-Look OLL</div>
-                <p class="category-desc">Simplified OLL - create yellow cross first, then orient corners. Only 10 cases!</p>
-
-                <h5>Step 1: Create Yellow Cross</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/863f9bb4-e1df-467d-be61-de0f7d44b418/dot.png" alt="Dot"></div><div class="case-info"><div class="case-name">Dot</div><div class="case-moves">F R U R' U' F' (twice)</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/c429ec84-9b2d-445b-b33d-1e21d2fb6dc2/hook.png" alt="Hook"></div><div class="case-info"><div class="case-name">Hook</div><div class="case-moves">F R U R' U' F'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/0058000e-2d10-483e-8f53-dbee6853d596/line.png" alt="Line"></div><div class="case-info"><div class="case-name">Line</div><div class="case-moves">F R U R' U' F'</div></div></div>
-                </div>
-
-                <h5>Step 2: Orient Corners</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/d43941e8-68de-4412-b01e-cfd39617bb13/headlights.png" alt="Headlights"></div><div class="case-info"><div class="case-name">Headlights</div><div class="case-moves">R2 D (R' U2 R) D' (R' U2 R')</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/f62d6d3a-af9f-4629-a2d7-81183da340c9/anti+sune.png" alt="Anti-Sune"></div><div class="case-info"><div class="case-name">Anti-Sune</div><div class="case-moves">R' U' R U' R' U2 R</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/43801bf8-000a-4f95-afde-9eaae8d3b0b4/sune.png" alt="Sune"></div><div class="case-info"><div class="case-name">Sune</div><div class="case-moves">R U R' U R U2 R'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/63f7dbfe-eb49-4408-9bad-74ed6ea100ce/cross+2.png" alt="Cross2"></div><div class="case-info"><div class="case-name">Cross (Solved)</div><div class="case-moves">(none - already solved!)</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/a2881fd9-ffbc-40c1-8886-a505381478e4/cross.png" alt="Cross"></div><div class="case-info"><div class="case-name">Cross</div><div class="case-moves">R U2 (R2 U') (R2 U') R2 U2 R</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/bb430263-ade1-4457-8bdb-fd55583a3ec8/kite.png" alt="Kite"></div><div class="case-info"><div class="case-name">Kite</div><div class="case-moves">(r U R' U') (r' F R F')</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/0c2c0a9f-a349-42f1-bc40-b583948671b4/chameleon.png" alt="Chameleon"></div><div class="case-info"><div class="case-name">Chameleon</div><div class="case-moves">R U R' U R U2 R' F R U R' U' F'</div></div></div>
-                </div>
-            </div>
-
-            <!-- PLL -->
-            <div id="pll" class="algo-category">
-                <div class="category-title">PLL - Permute Last Layer <span class="count">21 Algorithms</span></div>
-                <p class="category-desc">Arrange the last layer pieces without changing orientation.</p>
-                <h5>Edge-Only PLLs</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/41466d7e-511f-4484-8faa-51468e6065bc/PLL+02.png" alt="Ua"></div><div class="case-info"><div class="case-name">Ua Perm</div><div class="case-moves">(R U R' U) R' U' (R2 U' R') U R' U R</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/4ff6d00c-dabf-40a1-b508-0890f29b1e0e/PLL+01.png" alt="Ub"></div><div class="case-info"><div class="case-name">Ub Perm</div><div class="case-moves">R' U R' U' (R3 U') R' U (R U R2)</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/205be9b3-3d05-44fd-808b-ec0885944ad7/PLL+04.png" alt="H"></div><div class="case-info"><div class="case-name">H Perm</div><div class="case-moves">M2 U' (M2 U2 M2) U' M2</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/776ab9b1-69eb-466a-b8b1-c48b9fecc021/PLL+03.png" alt="Z"></div><div class="case-info"><div class="case-name">Z Perm</div><div class="case-moves">M' U' (M2 U') (M2 U') M' U2 M2</div></div></div>
-                </div>
-                <h5>Corner-Only PLLs</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/481455c7-ae37-49b2-aef2-e1225df8343c/PLL+06.png" alt="Aa"></div><div class="case-info"><div class="case-name">Aa Perm</div><div class="case-moves">x R2 D2 (R U R') D2 (R U' R) x'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/6f9e4184-03e8-4758-92e4-d8f0b6752f46/PLL+05.png" alt="Ab"></div><div class="case-info"><div class="case-name">Ab Perm</div><div class="case-moves">x (R' U R') D2 (R U' R') D2 R2 x'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/a5f912d2-b9a3-423a-87dc-62ae528a472c/PLL+07.png" alt="E"></div><div class="case-info"><div class="case-name">E Perm</div><div class="case-moves">x' (R U' R') D (R U R') D' (R U R') D (R U' R') D' x</div></div></div>
-                </div>
-                <h5>Adjacent Corner Swaps</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/f61df290-3f93-43f7-b6e5-cb274e657d48/PLL+10.png" alt="Ja"></div><div class="case-info"><div class="case-name">Ja Perm</div><div class="case-moves">(R U R' U') R' F (R2 U' R') U' (R U R' F')</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/03ee2988-4482-4192-9f04-0482430f267f/PLL+09.png" alt="Jb"></div><div class="case-info"><div class="case-name">Jb Perm</div><div class="case-moves">R' U' F' (R U R' U') R' F (R2 U' R') U' R</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/0a904314-d4c7-40ef-a8fd-6cc0add5ba19/PLL+11.png" alt="T"></div><div class="case-info"><div class="case-name">T Perm</div><div class="case-moves">R U R' F' (R U R' U') R' F (R2 U' R')</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/0fbcece9-9230-43f4-96f7-abac160c08b5/PLL+12.png" alt="Ra"></div><div class="case-info"><div class="case-name">Ra Perm</div><div class="case-moves">R U' R' U' R U R D (R' U' R D') R' U2 R'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/9d3010c4-3773-4e15-a9e0-cdc29f53310b/PLL+13.png" alt="Rb"></div><div class="case-info"><div class="case-name">Rb Perm</div><div class="case-moves">(R' U2 R U2) R' F (R U R' U') R' F' R2</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/ee28a514-142c-4289-81c0-d006e1e0b18b/PLL+08.png" alt="F"></div><div class="case-info"><div class="case-name">F Perm</div><div class="case-moves">R U R' U' R' F R2 U' R' U' R U R' F'</div></div></div>
-                </div>
-                <h5>Diagonal Corner Swaps</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/a68d7a65-b0cf-4456-b57d-d9732a5328b3/PLL+20.png" alt="Y"></div><div class="case-info"><div class="case-name">Y Perm</div><div class="case-moves">F (R U' R' U') R U R' F' (R U R' U') R' F R F'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/29e71bbf-f6e7-4da9-8981-331893d5def7/PLL+18.png" alt="Na"></div><div class="case-info"><div class="case-name">Na Perm</div><div class="case-moves">(R U R' U) R U R' F' (R U R' U') R' F (R2 U' R')</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/8283828f-246d-4eed-8830-f2dbfa4b9b34/PLL+19.png" alt="Nb"></div><div class="case-info"><div class="case-name">Nb Perm</div><div class="case-moves">(R' U R U') R' (F' U' F) R U (R' U' R U') f R f'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/98f7b985-c055-4ca5-bcd3-20334d6769c4/PLL+21.png" alt="V"></div><div class="case-info"><div class="case-name">V Perm</div><div class="case-moves">R' U R' U' R B' R' U2 R U B U' R' U2 R</div></div></div>
-                </div>
-                <h5>G-Perms</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/463d97f4-4f55-4dba-add5-0f69585096ce/PLL+14.png" alt="Ga"></div><div class="case-info"><div class="case-name">Ga Perm</div><div class="case-moves">R2 U R' U R' U' R U' R2 U' R U R</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/463d97f4-4f55-4dba-add5-0f69585096ce/PLL+15.png" alt="Gb"></div><div class="case-info"><div class="case-name">Gb Perm</div><div class="case-moves">R' U' R U' R U R2 U R U2 R' U R U2 R</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/463d97f4-4f55-4dba-add5-0f69585096ce/PLL+16.png" alt="Gc"></div><div class="case-info"><div class="case-name">Gc Perm</div><div class="case-moves">R2 U' R U' R U R' U R2 U R' U' R' U R' U R</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/463d97f4-4f55-4dba-add5-0f69585096ce/PLL+17.png" alt="Gd"></div><div class="case-info"><div class="case-name">Gd Perm</div><div class="case-moves">R U R' U' R' U R2 U' R' U' R' U R' U2 R U' R</div></div></div>
-                </div>
-            </div>
-
-            <!-- OLL -->
-            <div id="oll" class="algo-category">
-                <div class="category-title">OLL - Orient Last Layer <span class="count">57 Algorithms</span></div>
-                <p class="category-desc">Make the entire last layer the same color.</p>
-                <h5>Sune Cases</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/43801bf8-000a-4f95-afde-9eaae8d3b0b4/sune.png" alt="Sune"></div><div class="case-info"><div class="case-name">Sune - OLL 33</div><div class="case-moves">R U R' U R U2 R'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/f62d6d3a-af9f-4629-a2d7-81183da340c9/anti+sune.png" alt="Anti-Sune"></div><div class="case-info"><div class="case-name">Anti-Sune - OLL 34</div><div class="case-moves">R' U' R U' R' U2 R</div></div></div>
-                </div>
-                <h5>H & Pi Cases</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/6871e68d-1c21-48ca-8a23-13598d8b1f1b/oll+50.png" alt="H"></div><div class="case-info"><div class="case-name">H Case - OLL 55</div><div class="case-moves">R U R' U R U2 R'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/ac33a339-c634-4f62-9e6c-78b526378a98/oll+46.png" alt="Pi"></div><div class="case-info"><div class="case-name">Pi Case - OLL 47</div><div class="case-moves">R U2 R2 U' R2 U' R2 U2 R</div></div></div>
-                </div>
-                <h5>T Shapes</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/83430765-fb24-430d-a49d-1e3b08231c8a/oll+09.png" alt="T1"></div><div class="case-info"><div class="case-name">T Case - OLL 9</div><div class="case-moves">r U r' U' r' F r2 U' r' U' r U r' F'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/4df98682-157a-4442-9d0b-b21b90f86bba/oll+08.png" alt="T2"></div><div class="case-info"><div class="case-name">T Case - OLL 8</div><div class="case-moves">R U R' U' R' F R F'</div></div></div>
-                </div>
-                <h5>Block Shapes</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/95ebab14-4741-449e-ae06-b5d47727b9e4/oll+11.png" alt="Block1"></div><div class="case-info"><div class="case-name">Block - OLL 11</div><div class="case-moves">R' F R2 U' R' U F' R U R2</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/9018fe3a-49db-4494-8fe3-147140ee978b/oll+10.png" alt="Block2"></div><div class="case-info"><div class="case-name">Block - OLL 10</div><div class="case-moves">R U R2 U' R' F R U R U2 R'</div></div></div>
-                </div>
-                <h5>Edges Only</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/5b653966-2693-42f4-aaa1-7592201ea120/oll+12.png" alt="Edges1"></div><div class="case-info"><div class="case-name">Edges - OLL 12</div><div class="case-moves">F (R U R' U') F'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/b20a94b3-6171-4865-93d4-2151bb2b587d/oll+13.png" alt="Edges2"></div><div class="case-info"><div class="case-name">Edges - OLL 13</div><div class="case-moves">F' (L' U' L U) F</div></div></div>
-                </div>
-                <h5>Fish & P Shapes</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/31b15ec3-52c9-4e13-88fd-f37578897119/oll+26.png" alt="Fish"></div><div class="case-info"><div class="case-name">Fish - OLL 26</div><div class="case-moves">R U2 R' U' R U' R'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/3915322b-61be-4b17-a5b5-c8bc43980347/oll+20.png" alt="P"></div><div class="case-info"><div class="case-name">P Case - OLL 20</div><div class="case-moves">R' U' F' U F R</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/3a8f49b0-b93e-4a01-9327-f01af7b7e771/oll+24.png" alt="C"></div><div class="case-info"><div class="case-name">C Case - OLL 24</div><div class="case-moves">R U R' U' x D' R U R' D R</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/92afe240-5e9a-47a2-9a52-d341ae9f5e70/oll+36.png" alt="W"></div><div class="case-info"><div class="case-name">W Case - OLL 36</div><div class="case-moves">R U R' U R U' R' U' R' F R F'</div></div></div>
-                </div>
-                <h5>Lightning & L</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/24950fb5-4e3c-4c37-bdf0-9e0687416522/oll+14.png" alt="Lightning"></div><div class="case-info"><div class="case-name">Lightning - OLL 14</div><div class="case-moves">r U r' U R U2 r</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/8b24ee96-cc71-4bff-9e0a-3db1a1a1305b/oll+42.png" alt="L"></div><div class="case-info"><div class="case-name">L Case - OLL 42</div><div class="case-moves">r' U' r U' r' F r2 U' r' U' r U r' F'</div></div></div>
-                </div>
-                <h5>Cross Cases</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/a2881fd9-ffbc-40c1-8886-a505381478e4/cross.png" alt="Cross"></div><div class="case-info"><div class="case-name">Cross - OLL 22</div><div class="case-moves">R U2 (R2 U') (R2 U') R2 U2 R</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/63f7dbfe-eb49-4408-9bad-74ed6ea100ce/cross+2.png" alt="Cross2"></div><div class="case-info"><div class="case-name">Cross+2 - OLL 23</div><div class="case-moves">R U R' U (R U2 R')</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/d43941e8-68de-4412-b01e-cfd39617bb13/headlights.png" alt="Headlights"></div><div class="case-info"><div class="case-name">Headlights - OLL 44</div><div class="case-moves">R2 D (R' U2 R) D' (R' U2 R')</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/bb430263-ade1-4457-8bdb-fd55583a3ec8/kite.png" alt="Kite"></div><div class="case-info"><div class="case-name">Kite - OLL 31</div><div class="case-moves">(r U R' U') (r' F R F')</div></div></div>
-                </div>
-                <h5>More OLL Cases</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/25e9e6ca-6ba3-4088-aea6-91140bca436d/oll+05.png" alt="OLL5"></div><div class="case-info"><div class="case-name">OLL 5</div><div class="case-moves">r U r' U2 r U' r' U' r U' r'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/57f34e1f-0e0b-4f64-9a5e-15a7d2731116/oll+06.png" alt="OLL6"></div><div class="case-info"><div class="case-name">OLL 6</div><div class="case-moves">r' U' r U2 r' U r U r' U r</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/f11c5aef-44a0-4551-88d3-72b128e350fb/oll+15.png" alt="OLL15"></div><div class="case-info"><div class="case-name">OLL 15</div><div class="case-moves">R' F' r U r' F R</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/d40526a3-f73e-4e35-9430-aa69d8c56e9a/oll+16.png" alt="OLL16"></div><div class="case-info"><div class="case-name">OLL 16</div><div class="case-moves">r U r' F R' F' r</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/6a24a1bc-1768-4ac4-969b-46a9f2394f01/oll+30.png" alt="OLL30"></div><div class="case-info"><div class="case-name">OLL 30 - Hook</div><div class="case-moves">r U R' U R U2 r'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/260ef5f1-887c-4989-8233-5fe8d8889c37/oll+38.png" alt="OLL38"></div><div class="case-info"><div class="case-name">OLL 38 - Line</div><div class="case-moves">r' U' r U' r' F r2 U' r' U' r U r' F'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/6871e68d-1c21-48ca-8a23-13598d8b1f1b/oll+50.png" alt="OLL50"></div><div class="case-info"><div class="case-name">OLL 50 - Dot</div><div class="case-moves">R U2 R2 U' R2 U' R2 U2 R</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/ac33a339-c634-4f62-9e6c-78b526378a98/oll+46.png" alt="OLL46"></div><div class="case-info"><div class="case-name">OLL 46 - Awkward</div><div class="case-moves">R U R' U R U2 R' F R U R' U' F'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/3915322b-61be-4b17-a5b5-c8bc43980347/oll+17.png" alt="OLL17"></div><div class="case-info"><div class="case-name">OLL 17</div><div class="case-moves">R U2 R' U' R U' R'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/3915322b-61be-4b17-a5b5-c8bc43980347/oll+18.png" alt="OLL18"></div><div class="case-info"><div class="case-name">OLL 18</div><div class="case-moves">R' U2 R U R' U R</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/3915322b-61be-4b17-a5b5-c8bc43980347/oll+19.png" alt="OLL19"></div><div class="case-info"><div class="case-name">OLL 19</div><div class="case-moves">r U R' U' r' F R F'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/3915322b-61be-4b17-a5b5-c8bc43980347/oll+21.png" alt="OLL21"></div><div class="case-info"><div class="case-name">OLL 21</div><div class="case-moves">R' F' r U r' F R</div></div></div>
-                </div>
-                <h5>Additional OLL Cases</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/3915322b-61be-4b17-a5b5-c8bc43980347/oll+25.png" alt="OLL25"></div><div class="case-info"><div class="case-name">OLL 25</div><div class="case-moves">R U2 R' U' R U' R'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/31b15ec3-52c9-4e13-88fd-f37578897119/oll+27.png" alt="OLL27"></div><div class="case-info"><div class="case-name">OLL 27</div><div class="case-moves">R U R' U R U2 R'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/31b15ec3-52c9-4e13-88fd-f37578897119/oll+28.png" alt="OLL28"></div><div class="case-info"><div class="case-name">OLL 28</div><div class="case-moves">R' U' R U' R' U2 R</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/31b15ec3-52c9-4e13-88fd-f37578897119/oll+29.png" alt="OLL29"></div><div class="case-info"><div class="case-name">OLL 29</div><div class="case-moves">r U R' U' r' F R F'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/31b15ec3-52c9-4e13-88fd-f37578897119/oll+32.png" alt="OLL32"></div><div class="case-info"><div class="case-name">OLL 32</div><div class="case-moves">r' U' r U r' F r2 U' r'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/31b15ec3-52c9-4e13-88fd-f37578897119/oll+35.png" alt="OLL35"></div><div class="case-info"><div class="case-name">OLL 35</div><div class="case-moves">R U R' U' R' F R F'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/31b15ec3-52c9-4e13-88fd-f37578897119/oll+37.png" alt="OLL37"></div><div class="case-info"><div class="case-name">OLL 37</div><div class="case-moves">R' F' R U R' U' F</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/31b15ec3-52c9-4e13-88fd-f37578897119/oll+39.png" alt="OLL39"></div><div class="case-info"><div class="case-name">OLL 39</div><div class="case-moves">R U2 R' U' R U' R'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/31b15ec3-52c9-4e13-88fd-f37578897119/oll+40.png" alt="OLL40"></div><div class="case-info"><div class="case-name">OLL 40</div><div class="case-moves">R' U2 R U R' U R</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/31b15ec3-52c9-4e13-88fd-f37578897119/oll+41.png" alt="OLL41"></div><div class="case-info"><div class="case-name">OLL 41</div><div class="case-moves">R U2 R' U2 R' F R F'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/31b15ec3-52c9-4e13-88fd-f37578897119/oll+43.png" alt="OLL43"></div><div class="case-info"><div class="case-name">OLL 43</div><div class="case-moves">F R U R' U' R U R' U' F'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/31b15ec3-52c9-4e13-88fd-f37578897119/oll+45.png" alt="OLL45"></div><div class="case-info"><div class="case-name">OLL 45</div><div class="case-moves">R' U' R U' R' F R F' U R</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/31b15ec3-52c9-4e13-88fd-f37578897119/oll+47.png" alt="OLL47"></div><div class="case-info"><div class="case-name">OLL 47</div><div class="case-moves">R U2 R2 U' R2 U' R2 U2 R</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/31b15ec3-52c9-4e13-88fd-f37578897119/oll+48.png" alt="OLL48"></div><div class="case-info"><div class="case-name">OLL 48</div><div class="case-moves">R U R' U R U2 R'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/31b15ec3-52c9-4e13-88fd-f37578897119/oll+51.png" alt="OLL51"></div><div class="case-info"><div class="case-name">OLL 51</div><div class="case-moves">R2 D' R U2 R' D R U2 R</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/31b15ec3-52c9-4e13-88fd-f37578897119/oll+52.png" alt="OLL52"></div><div class="case-info"><div class="case-name">OLL 52</div><div class="case-moves">R U R' U' R' F R2 U' R' U' R U R' F'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/31b15ec3-52c9-4e13-88fd-f37578897119/oll+53.png" alt="OLL53"></div><div class="case-info"><div class="case-name">OLL 53</div><div class="case-moves">R' U' R U' R' F R2 U R' U R U' R' F'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/31b15ec3-52c9-4e13-88fd-f37578897119/oll+54.png" alt="OLL54"></div><div class="case-info"><div class="case-name">OLL 54</div><div class="case-moves">R U R' U R U' R' U' R' F R F'</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/31b15ec3-52c9-4e13-88fd-f37578897119/oll+56.png" alt="OLL56"></div><div class="case-info"><div class="case-name">OLL 56</div><div class="case-moves">R' U' R U R' F' R U R' U' R</div></div></div>
-                    <div class="case-card"><div class="case-image"><img src="https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/31b15ec3-52c9-4e13-88fd-f37578897119/oll+57.png" alt="OLL57"></div><div class="case-info"><div class="case-name">OLL 57</div><div class="case-moves">R U R' U' R' F R F' R U R' U'</div></div></div>
-                </div>
-            </div>
-
-            <!-- COLL -->
-            <div id="coll" class="algo-category">
-                <div class="category-title">COLL - Corners of Last Layer <span class="count">40 Cases</span></div>
-                <p class="category-desc">Orient corners while permuting the last layer edges. 7 groups × 6 cases each = 40 cases.</p>
-
-                <h5>Sune (S)</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-info"><div class="case-name">S 1</div><div class="case-moves">R U R' U R U2 R'</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">S 2</div><div class="case-moves">R U R' U R2 D R' U2 R D' R2</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">S 3</div><div class="case-moves">R U2 R' U2 L' U R U' R' L</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">S 4</div><div class="case-moves">R U R' U R U' R D R' U' R D' R2</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">S 5</div><div class="case-moves">R U' L' U R' U' L</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">S 6</div><div class="case-moves">R U R' U R U2 R' F R U R' U' F'</div></div></div>
-                </div>
-
-                <h5>Anti-Sune (AS)</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-info"><div class="case-name">AS 1</div><div class="case-moves">R' U' R U' R' U2 R</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">AS 2</div><div class="case-moves">R2 D R' U R D' R' U R' U' R</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">AS 3</div><div class="case-moves">R' U2 R U2 L U' R' U R L'</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">AS 4</div><div class="case-moves">R' U' R U' R2 D' R U2 R' D R2</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">AS 5</div><div class="case-moves">L U' R' U L' U' R</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">AS 6</div><div class="case-moves">R' D' R U' R' D R U2 R U R' U2 R</div></div></div>
-                </div>
-
-                <h5>H</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-info"><div class="case-name">H 1</div><div class="case-moves">R U2 R' U' R U R' U' R U' R'</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">H 2</div><div class="case-moves">F U R U' R' U R U2 R' U' R U R' F'</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">H 3</div><div class="case-moves">L' U R U' L U' R' U' R U' R'</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">H 4</div><div class="case-moves">F U R U' R' U R U' R' U R U' R' F'</div></div></div>
-                </div>
-
-                <h5>Pi</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-info"><div class="case-name">Pi 1</div><div class="case-moves">R U2 R2 U' R2 U' R2 U2 R</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">Pi 2</div><div class="case-moves">R U R' U F2 R U2 R' U2 R' F2 R</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">Pi 3</div><div class="case-moves">R' U2 R U2 R2 F' R U R U' R' F</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">Pi 4</div><div class="case-moves">F U R U' R' U R U' R2 F' R U R U' R'</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">Pi 5</div><div class="case-moves">L' U' L U' L' U' R U' L U R'</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">Pi 6</div><div class="case-moves">R' U2 R2 U R U R2 D' R U' R' D R'</div></div></div>
-                </div>
-
-                <h5>U</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-info"><div class="case-name">U 1</div><div class="case-moves">R U2 R' U' R U' R2 U2 R U R' U R</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">U 2</div><div class="case-moves">R' F R' F' R U R U' R' F R U' R'</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">U 3</div><div class="case-moves">R U2 R D R' U2 R D' R2</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">U 4</div><div class="case-moves">F R U R' U' R U' R' U' R U R' F'</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">U 5</div><div class="case-moves">R' U2 R' D' R U2 R' D R2</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">U 6</div><div class="case-moves">F U' R' U R U F' R' U2 R</div></div></div>
-                </div>
-
-                <h5>T</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-info"><div class="case-name">T 1</div><div class="case-moves">R' U' R U' R' U2 R2 U R' U R U2 R'</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">T 2</div><div class="case-moves">L' U R' U' L R U2 R' U' R</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">T 3</div><div class="case-moves">F' r U R' U' L' U l</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">T 4</div><div class="case-moves">F R U' R' U R U R' U R U' R' F'</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">T 5</div><div class="case-moves">F R' F' r U R U' r'</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">T 6</div><div class="case-moves">R' U R2 D r' U2 r D' R2 U' R</div></div></div>
-                </div>
-
-                <h5>L</h5>
-                <div class="case-grid">
-                    <div class="case-card"><div class="case-info"><div class="case-name">L 1</div><div class="case-moves">R U R' U R U' R' U R U' R' U R U2 R'</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">L 2</div><div class="case-moves">R2 D' R U2 R' D R U2 R</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">L 3</div><div class="case-moves">R2 D R' U2 R D' R' U2 R'</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">L 4</div><div class="case-moves">R U R D R' U' R D' R2</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">L 5</div><div class="case-moves">R' F' r U R U' r' F</div></div></div>
-                    <div class="case-card"><div class="case-info"><div class="case-name">L 6</div><div class="case-moves">R2 F' R U R U' R' F R U' R' U R</div></div></div>
-                </div>
-            </div>
-
-            <!-- Lookahead -->
-            <div id="lookahead" class="algo-category">
-                <div class="category-title">F2L Lookahead Guide</div>
-                <p class="category-desc" style="max-width: 70ch; margin: 0 auto 24px;">Learn to plan your next F2L pair while executing the current one. This is the key to fast solve times!</p>
-
-                <div style="max-width: 70ch; margin: 0 auto;">
-                <h5>What is Lookahead?</h5>
-                <p class="category-desc" style="text-align: left; line-height: 1.8;">
-                    Lookahead means finding your next F2L pair <strong>before</strong> you finish the current one. Instead of stopping between pairs, you keep your eyes moving and plan ahead. The goal is to have zero pause between F2L pairs.
-                </p>
-
-                <h5>Visual Example</h5>
-                <div style="background: var(--bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 20px;">
-                    <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 12px;">Watch this scramble and try to plan the first 2 F2L pairs:</p>
-                    <twisty-player alg="R U R' U' R U R'" hint-facelets="none" background="none" style="width: 100%; height: 200px;"></twisty-player>
-                    <p style="color: var(--text-muted); font-size: 12px; margin-top: 8px;">Solution: R U R' (first pair), then U' R U R' (second pair)</p>
-                </div>
-
-                <h5>Key Concepts</h5>
-                <div style="display: grid; gap: 16px; max-width: 800px;">
-                    <div style="background: var(--bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border);">
-                        <h6 style="color: var(--secondary); margin-bottom: 8px; font-size: 16px;">1. Slow Down</h6>
-                        <p style="color: var(--text-secondary); font-size: 14px; line-height: 1.6;">Start your solves slowly. It's better to solve at 80% speed with 0 pauses than 100% speed with 5 pauses. Speed will come naturally as lookahead improves.</p>
-                    </div>
-                    <div style="background: var(--bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border);">
-                        <h6 style="color: var(--secondary); margin-bottom: 8px; font-size: 16px;">2. Track the Pieces</h6>
-                        <p style="color: var(--text-secondary); font-size: 14px; line-height: 1.6;">While executing an algorithm, track where your next pair pieces are. Look at the <strong>opposite side</strong> of where you're turning - that's where your next pair usually is!</p>
-                    </div>
-                    <div style="background: var(--bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border);">
-                        <h6 style="color: var(--secondary); margin-bottom: 8px; font-size: 16px;">3. Look at the Last Layer</h6>
-                        <p style="color: var(--text-secondary); font-size: 14px; line-height: 1.6;">After each F2L pair, the corner and edge you're about to solve should be visible on the last layer. Scan the U layer while inserting your current pair.</p>
-                    </div>
-                    <div style="background: var(--bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border);">
-                        <h6 style="color: var(--secondary); margin-bottom: 8px; font-size: 16px;">4. Practice Inspection</h6>
-                        <p style="color: var(--text-secondary); font-size: 14px; line-height: 1.6;">During your 15-second inspection, find your first 2-3 F2L pairs. Plan the first pair, but also note where pairs 2 and 3 are. This builds lookahead habits.</p>
-                    </div>
-                </div>
-
-                <h5>Drills to Improve Lookahead</h5>
-                <div class="case-grid" style="max-width: 800px;">
-                    <div class="case-card" style="padding: 20px;">
-                        <div class="case-name" style="color: var(--primary); font-size: 15px; margin-bottom: 10px;">Slow Solve Drill</div>
-                        <div class="case-moves" style="font-size: 13px; color: var(--text-secondary);">Solve at half speed. Your goal is ZERO pauses. If you pause, you're going too fast. Gradually increase speed as lookahead improves.</div>
-                    </div>
-                    <div class="case-card" style="padding: 20px;">
-                        <div class="case-name" style="color: var(--primary); font-size: 15px; margin-bottom: 10px;">Pause Drill</div>
-                        <div class="case-moves" style="font-size: 13px; color: var(--text-secondary);">Do a solve but STOP after every F2L pair. Find the next pair, then continue. This trains your brain to see pairs quickly.</div>
-                    </div>
-                    <div class="case-card" style="padding: 20px;">
-                        <div class="case-name" style="color: var(--primary); font-size: 15px; margin-bottom: 10px;">Cross+1 Drill</div>
-                        <div class="case-moves" style="font-size: 13px; color: var(--text-secondary);">Solve cross + first F2L pair with lookahead. Stop and find the next 3 pairs. This isolates lookahead practice to just the F2L stage.</div>
-                    </div>
-                    <div class="case-card" style="padding: 20px;">
-                        <div class="case-name" style="color: var(--primary); font-size: 15px; margin-bottom: 10px;">Color Neutrality</div>
-                        <div class="case-moves" style="font-size: 13px; color: var(--text-secondary);">Practice solving from different starting colors. This helps you see F2L pairs from all angles and improves overall recognition.</div>
-                    </div>
-                </div>
-
-                <h5>Common Lookahead Mistakes</h5>
-                <div style="background: var(--bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border); max-width: 800px;">
-                    <ul style="color: var(--text-secondary); font-size: 14px; line-height: 2; padding-left: 20px;">
-                        <li><strong style="color: #e74c3c;">Looking at your hands</strong> - You don't need to watch every turn! Trust your muscle memory.</li>
-                        <li><strong style="color: #e74c3c;">Rushing</strong> - Going too fast prevents you from seeing the next pair. Slow down!</li>
-                        <li><strong style="color: #e74c3c;">Not scanning the U layer</strong> - Most pairs are on the last layer. Always check there first.</li>
-                        <li><strong style="color: #e74c3c;">Stopping between pairs</strong> - Even a 1-second pause kills your flow. Keep moving!</li>
-                        <li><strong style="color: #e74c3c;">Only looking at one side</strong> - Pairs can be anywhere. Do a full 360° scan with your eyes.</li>
-                    </ul>
-                </div>
-
-                <h5>Pro Tips</h5>
-                <div style="background: linear-gradient(135deg, rgba(255,107,53,0.1), rgba(124,92,255,0.1)); padding: 20px; border-radius: 12px; border: 1px solid var(--border); max-width: 800px;">
-                    <p style="color: var(--text-secondary); font-size: 14px; line-height: 1.8;">
-                        <strong style="color: var(--primary);">Start with easy pairs:</strong> Look for white corner + matching edge pairs first (Easy Inserts). Save the harder cases for later in your scan.<br><br>
-                        <strong style="color: var(--primary);">Use peripheral vision:</strong> You don't always need to look directly at a piece. Your peripheral vision can help you spot where pieces are.<br><br>
-                        <strong style="color: var(--primary);">Predict rotations:</strong> If you know you'll need a y or y' move to access the next pair, plan it into your current algorithm when possible.<br><br>
-                        <strong style="color: var(--primary);">Build muscle memory for recognition:</strong> The more you practice, the faster you'll recognize F2L cases instantly - this frees up brain power for lookahead.
-                    </p>
-                </div>
-            </div>
-
-            <!-- Timer -->
-            <div id="timer" class="algo-category">
-                <div class="category-title">Speedcubing Timer</div>
-                <p class="category-desc">Practice your solves with our built-in timer. Click csTimer below for a full-featured WCA timer.</p>
-
-                <!-- Quick Timer First -->
-                <div class="timer-section">
-                    <div class="timer-scramble" id="scramble">Press Generate to get a scramble</div>
-                    <div class="timer-display" id="timerDisplay">0.00</div>
-                    <div class="timer-controls">
-                        <button class="timer-btn reset" onclick="generateScramble()">New Scramble</button>
-                        <button class="timer-btn start" id="startBtn" onmousedown="timerReady()" onmouseup="timerStart()" ontouchstart="timerReady()" ontouchend="timerStart()">Hold Space</button>
-                        <button class="timer-btn stop" onclick="timerStop()" style="display:none;" id="stopBtn">Stop</button>
-                    </div>
-                    <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 20px;">Hold spacebar to ready, release to start, press any key to stop</p>
-
-                    <div class="timer-history">
-                        <h4>Session History</h4>
-                        <table class="history-table">
-                            <thead><tr><th>#</th><th>Time</th><th>Scramble</th></tr></thead>
-                            <tbody id="historyBody"></tbody>
-                        </table>
-                        <button class="btn" style="margin-top: 12px; background: var(--bg); border: 1px solid var(--border); color: var(--text-secondary);" onclick="clearHistory()">Clear History</button>
-                    </div>
-                </div>
-
-                <!-- csTimer Below -->
-                <div style="margin-top: 32px; padding-top: 32px; border-top: 1px solid var(--border);">
-                    <div class="category-title" style="font-size: 20px;">Full Timer (csTimer)</div>
-                    <p class="category-desc">WCA-compliant timer with advanced features. Click the gear icon in csTimer to enable dark theme.</p>
-                    <div class="cstimer-wrapper">
-                        <iframe src="https://cstimer.net/" title="csTimer" frameborder="0" allowfullscreen></iframe>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Recognition Game -->
-            <div id="game" class="algo-category">
-                <div class="category-title">OLL/PLL Recognition Game</div>
-                <p class="category-desc">Test your recognition speed! Identify the case as fast as you can.</p>
-
-                <div class="game-container" style="max-width: 600px; margin: 0 auto; text-align: center;">
-                    <div class="game-stats" style="display: flex; justify-content: space-around; margin-bottom: 24px;">
-                        <div class="stat-box" style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px 24px;">
-                            <div class="stat-number" id="gameScore" style="font-size: 24px; color: var(--primary); font-weight: 700;">0</div>
-                            <div style="font-size: 11px; color: var(--text-muted);">Score</div>
-                        </div>
-                        <div class="stat-box" style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px 24px;">
-                            <div class="stat-number" id="gameTime" style="font-size: 24px; color: var(--secondary); font-weight: 700;">0.0s</div>
-                            <div style="font-size: 11px; color: var(--text-muted);">Last Time</div>
-                        </div>
-                        <div class="stat-box" style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px 24px;">
-                            <div class="stat-number" id="gameStreak" style="font-size: 24px; color: var(--tertiary); font-weight: 700;">0</div>
-                            <div style="font-size: 11px; color: var(--text-muted);">Streak</div>
-                        </div>
-                    </div>
-
-                    <div class="game-case" id="gameCase" style="background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 24px; min-height: 200px; display: flex; align-items: center; justify-content: center;">
-                        <p style="color: var(--text-muted);">Click "Start Game" to begin</p>
-                    </div>
-
-                    <div class="game-controls" style="margin-bottom: 24px;">
-                        <button class="btn btn-primary" id="gameStartBtn" onclick="startGame()">Start Game</button>
-                    </div>
-
-                    <div class="game-options" id="gameOptions" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; display: none;">
-                    </div>
-                </div>
-            </div>
-
-            <!-- Dashboard -->
-            <div id="dashboard" class="algo-category">
-                <div class="category-title">Session Analytics</div>
-                <p class="category-desc">Track your progress over time with Ao5 and Ao12 averages.</p>
-
-                <div class="dashboard-stats" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px;">
-                    <div class="stat-box" style="background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; text-align: center;">
-                        <div class="stat-number" id="dashBest" style="font-size: 28px; color: var(--secondary); font-weight: 700;">--</div>
-                        <div style="font-size: 11px; color: var(--text-muted);">Best Single</div>
-                    </div>
-                    <div class="stat-box" style="background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; text-align: center;">
-                        <div class="stat-number" id="dashAo5" style="font-size: 28px; color: var(--primary); font-weight: 700;">--</div>
-                        <div style="font-size: 11px; color: var(--text-muted);">Ao5</div>
-                    </div>
-                    <div class="stat-box" style="background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; text-align: center;">
-                        <div class="stat-number" id="dashAo12" style="font-size: 28px; color: var(--tertiary); font-weight: 700;">--</div>
-                        <div style="font-size: 11px; color: var(--text-muted);">Ao12</div>
-                    </div>
-                    <div class="stat-box" style="background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; text-align: center;">
-                        <div class="stat-number" id="dashTotal" style="font-size: 28px; color: var(--text-primary); font-weight: 700;">0</div>
-                        <div style="font-size: 11px; color: var(--text-muted);">Total Solves</div>
-                    </div>
-                </div>
-
-                <div class="chart-container" style="background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 24px;">
-                    <canvas id="progressChart" style="max-height: 300px;"></canvas>
-                </div>
-
-                <div class="chart-controls" style="display: flex; gap: 12px; justify-content: center; margin-bottom: 24px;">
-                    <button class="algo-tab active" onclick="renderChart('all')">All Time</button>
-                    <button class="algo-tab" onclick="renderChart(50)">Last 50</button>
-                    <button class="algo-tab" onclick="renderChart(20)">Last 20</button>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <footer>
-        <div class="container">
-            <p>© 2026 CubeMaster - Beginner Guide + 3×3 CFOP Algorithms</p>
-        </div>
-    </footer>
-
-    <script>
-        // Modal functions
-        function openNotationModal() {
-            document.getElementById('notationModal').classList.add('active');
-        }
-        function closeNotationModal() {
-            document.getElementById('notationModal').classList.remove('active');
-        }
-        document.getElementById('notationModal').addEventListener('click', function(e) {
-            if (e.target === this) closeNotationModal();
-        });
-
-        // Navigation
-        const categoryInfo = {
-            beginner: { title: 'Beginner Guide', subtitle: 'Learn to solve a Rubik\'s Cube step by step' },
-            f2l: { title: 'F2L Algorithms', subtitle: 'First Two Layers - 41 cases with real cube images' },
-            oll: { title: 'OLL Algorithms', subtitle: 'Orient Last Layer - 57 cases' },
-            pll: { title: 'PLL Algorithms', subtitle: 'Permute Last Layer - 21 cases' },
-            coll: { title: 'COLL Algorithms', subtitle: 'Corners of Last Layer - 40 cases' },
-            lookahead: { title: 'Lookahead Training', subtitle: 'Learn to plan ahead while solving' },
-            timer: { title: 'Speedcubing Timer', subtitle: 'Practice with scramble generator' },
-            game: { title: 'Recognition Game', subtitle: 'Test your OLL/PLL recognition speed' },
-            dashboard: { title: 'Session Analytics', subtitle: 'Track your progress over time' }
-        };
-
-        function showCategory(category) {
-            document.querySelectorAll('.algo-category').forEach(cat => cat.classList.remove('active'));
-            document.querySelectorAll('.algo-tab').forEach(tab => tab.classList.remove('active'));
-            document.getElementById(category).classList.add('active');
-
-            // Hide hero for beginner section
-            const hero = document.querySelector('.hero');
-            if (hero) {
-                hero.style.display = category === 'beginner' ? 'none' : 'flex';
-            }
-
-            // Update headings
-            if (categoryInfo[category]) {
-                document.getElementById('sectionTitle').textContent = categoryInfo[category].title;
-                document.getElementById('sectionSubtitle').textContent = categoryInfo[category].subtitle;
-            }
-
-            // Update active tab button
-            if (event && event.target) {
-                event.target.classList.add('active');
-            }
-        }
-
-        // Wizard navigation
-        let currentWizardStep = 1;
-        const totalWizardSteps = 7;
-
-        function wizardNext() {
-            if (currentWizardStep < totalWizardSteps) {
-                document.querySelector(`.wizard-step[data-step="${currentWizardStep}"]`).classList.remove('active');
-                document.querySelector(`.progress-step[data-step="${currentWizardStep}"]`).classList.remove('active');
-                currentWizardStep++;
-                document.querySelector(`.wizard-step[data-step="${currentWizardStep}"]`).classList.add('active');
-                document.querySelector(`.progress-step[data-step="${currentWizardStep}"]`).classList.add('active');
-                updateWizardButtons();
-            }
-        }
-
-        function wizardPrev() {
-            if (currentWizardStep > 1) {
-                document.querySelector(`.wizard-step[data-step="${currentWizardStep}"]`).classList.remove('active');
-                document.querySelector(`.progress-step[data-step="${currentWizardStep}"]`).classList.remove('active');
-                currentWizardStep--;
-                document.querySelector(`.wizard-step[data-step="${currentWizardStep}"]`).classList.add('active');
-                document.querySelector(`.progress-step[data-step="${currentWizardStep}"]`).classList.add('active');
-                updateWizardButtons();
-            }
-        }
-
-        function updateWizardButtons() {
-            const prevBtn = document.getElementById('prevStep');
-            const nextBtn = document.getElementById('nextStep');
-            if (prevBtn) prevBtn.disabled = currentWizardStep === 1;
-            if (nextBtn) {
-                nextBtn.textContent = currentWizardStep === totalWizardSteps ? 'Finish' : 'Next Step →';
-            }
-        }
-
-        // Load learned algorithms from localStorage
-        let learnedAlgs = JSON.parse(localStorage.getItem('learnedAlgs') || '{}');
-
-        // Add star icons to all case cards on load
-        document.addEventListener('DOMContentLoaded', function() {
-            addStarIcons();
-            loadHistory();
-
-            // Add keyboard controls for timer
-            document.addEventListener('keydown', function(e) {
-                if (e.code === 'Space') {
-                    e.preventDefault();
-                    if (document.getElementById('timerDisplay').classList.contains('running')) {
-                        timerStop();
-                    } else if (document.getElementById('timerDisplay').classList.contains('ready')) {
-                        timerStart();
-                    } else {
-                        timerReady();
-                    }
-                }
-            });
-
-            document.addEventListener('keyup', function(e) {
-                if (e.code === 'Space') {
-                    e.preventDefault();
-                    if (document.getElementById('timerDisplay').classList.contains('ready')) {
-                        timerStart();
-                    }
-                }
-            });
-        });
-
-        function addStarIcons() {
-            document.querySelectorAll('.case-card').forEach((card, index) => {
-                if (!card.querySelector('.learn-star')) {
-                    const name = card.querySelector('.case-name')?.textContent || '';
-                    const img = card.querySelector('.case-image img')?.alt || '';
-                    const algId = name.toLowerCase().replace(/\s+/g, '-') || img.toLowerCase() || 'alg-' + index;
-
-                    card.setAttribute('data-alg-id', algId);
-
-                    const star = document.createElement('span');
-                    star.className = 'learn-star';
-                    star.innerHTML = learnedAlgs[algId] ? '★' : '☆';
-                    star.onclick = function(e) {
-                        e.stopPropagation();
-                        toggleLearned(algId, star, card);
-                    };
-                    card.appendChild(star);
-
-                    if (learnedAlgs[algId]) {
-                        card.classList.add('learned');
-                    }
-                }
-            });
-        }
-
-        function toggleLearned(id, star, card) {
-            learnedAlgs[id] = !learnedAlgs[id];
-            localStorage.setItem('learnedAlgs', JSON.stringify(learnedAlgs));
-            star.innerHTML = learnedAlgs[id] ? '★' : '☆';
-            card.classList.toggle('learned', learnedAlgs[id]);
-        }
-
-        // Timer functionality
-        let timerState = 'idle';
-        let timerStartTime = 0;
-        let timerInterval = null;
-        let currentScramble = '';
-
-        function generateScramble() {
-            const moves = ['R', 'L', 'U', 'D', 'F', 'B'];
-            const modifiers = ['', "'", '2'];
-            const lastMoves = new Set();
-            let scramble = [];
-            let lastMove = '';
-
-            for (let i = 0; i < 20; i++) {
-                let move;
-                do {
-                    move = moves[Math.floor(Math.random() * moves.length)];
-                } while (move === lastMove || (lastMoves.has(move) && Math.random() > 0.3));
-
-                const modifier = modifiers[Math.floor(Math.random() * modifiers.length)];
-                scramble.push(move + modifier);
-
-                lastMoves.clear();
-                lastMoves.add(lastMove);
-                lastMove = move;
-            }
-
-            currentScramble = scramble.join(' ');
-            document.getElementById('scramble').textContent = currentScramble;
-        }
-
-        function timerReady() {
-            if (timerState === 'idle' || timerState === 'stopped') {
-                timerState = 'ready';
-                document.getElementById('timerDisplay').textContent = '0.00';
-                document.getElementById('timerDisplay').classList.add('ready');
-                document.getElementById('timerDisplay').classList.remove('running');
-                var btn = document.getElementById('startBtn');
-                if (btn) btn.textContent = 'Release to Start';
-            }
-        }
-
-        function timerStart() {
-            if (timerState === 'ready') {
-                timerState = 'running';
-                timerStartTime = performance.now();
-                document.getElementById('timerDisplay').classList.add('running');
-                document.getElementById('timerDisplay').classList.remove('ready');
-                var startBtn = document.getElementById('startBtn');
-                var stopBtn = document.getElementById('stopBtn');
-                if (startBtn) startBtn.style.display = 'none';
-                if (stopBtn) stopBtn.style.display = 'inline-block';
-
-                timerInterval = setInterval(updateTimer, 10);
-            }
-        }
-
-        function updateTimer() {
-            const elapsed = performance.now() - timerStartTime;
-            document.getElementById('timerDisplay').textContent = (elapsed / 1000).toFixed(2);
-        }
-
-        function timerStop() {
-            if (timerState === 'running') {
-                timerState = 'stopped';
-                clearInterval(timerInterval);
-                const finalTime = (performance.now() - timerStartTime) / 1000;
-                document.getElementById('timerDisplay').classList.remove('running');
-                var startBtn = document.getElementById('startBtn');
-                var stopBtn = document.getElementById('stopBtn');
-                if (startBtn) {
-                    startBtn.style.display = 'inline-block';
-                    startBtn.textContent = 'Hold Space';
-                }
-                if (stopBtn) stopBtn.style.display = 'none';
-
-                saveToHistory(finalTime.toFixed(2));
-            }
-        }
-
-        // Floating Drill Timer
-        let floatingTimerState = 'idle';
-        let floatingStartTime = 0;
-        let floatingTimerInterval = null;
-
-        function toggleFloatingTimer() {
-            const timer = document.getElementById('floatingTimer');
-            timer.classList.toggle('active');
-        }
-
-        function floatingTimerReady() {
-            if (floatingTimerState === 'idle' || floatingTimerState === 'stopped') {
-                floatingTimerState = 'ready';
-                document.getElementById('floatingTimerDisplay').textContent = '0.00';
-                document.getElementById('floatingTimerDisplay').classList.add('ready');
-                document.getElementById('floatingTimerDisplay').classList.remove('running');
-                document.getElementById('floatingStartBtn').textContent = 'Release to Start';
-            }
-        }
-
-        function floatingTimerStart() {
-            if (floatingTimerState === 'ready') {
-                floatingTimerState = 'running';
-                floatingStartTime = performance.now();
-                document.getElementById('floatingTimerDisplay').classList.add('running');
-                document.getElementById('floatingTimerDisplay').classList.remove('ready');
-                document.getElementById('floatingStartBtn').style.display = 'none';
-                document.getElementById('floatingStopBtn').style.display = 'inline-block';
-
-                floatingTimerInterval = setInterval(updateFloatingTimer, 10);
-            }
-        }
-
-        function updateFloatingTimer() {
-            const elapsed = performance.now() - floatingStartTime;
-            document.getElementById('floatingTimerDisplay').textContent = (elapsed / 1000).toFixed(2);
-        }
-
-        function floatingTimerStop() {
-            if (floatingTimerState === 'running') {
-                floatingTimerState = 'stopped';
-                clearInterval(floatingTimerInterval);
-                document.getElementById('floatingTimerDisplay').classList.remove('running');
-                document.getElementById('floatingStartBtn').style.display = 'inline-block';
-                document.getElementById('floatingStartBtn').textContent = 'Start';
-                document.getElementById('floatingStopBtn').style.display = 'none';
-            }
-        }
-
-        function floatingTimerReset() {
-            floatingTimerStop();
-            floatingTimerState = 'idle';
-            document.getElementById('floatingTimerDisplay').textContent = '0.00';
-            document.getElementById('floatingTimerDisplay').classList.remove('ready', 'running');
-        }
-
-        // Add keyboard controls for floating timer
-        document.addEventListener('keydown', function(e) {
-            const timer = document.getElementById('floatingTimer');
-            if (!timer.classList.contains('active')) return;
-
-            if (e.code === 'Space' && floatingTimerState !== 'running') {
-                e.preventDefault();
-                floatingTimerReady();
-            } else if (e.code !== 'Space' && floatingTimerState === 'running') {
-                e.preventDefault();
-                floatingTimerStop();
-            }
-        });
-
-        document.addEventListener('keyup', function(e) {
-            const timer = document.getElementById('floatingTimer');
-            if (!timer.classList.contains('active')) return;
-
-            if (e.code === 'Space' && floatingTimerState === 'ready') {
-                e.preventDefault();
-                floatingTimerStart();
-            }
-        });
-
-        // History
-        function saveToHistory(time) {
-            let history = JSON.parse(localStorage.getItem('solveHistory') || '[]');
-            history.unshift({ time: time, scramble: currentScramble, date: new Date().toLocaleDateString() });
-            if (history.length > 20) history = history.slice(0, 20);
-            localStorage.setItem('solveHistory', JSON.stringify(history));
-            loadHistory();
-        }
-
-        function loadHistory() {
-            const history = JSON.parse(localStorage.getItem('solveHistory') || '[]');
-            const tbody = document.getElementById('historyBody');
-            tbody.innerHTML = history.map((solve, i) => `
-                <tr>
-                    <td>${i + 1}</td>
-                    <td style="color: var(--primary); font-weight: 600;">${solve.time}s</td>
-                    <td style="font-size: 10px; max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${solve.scramble}</td>
-                </tr>
-            `).join('');
-        }
-
-        function clearHistory() {
-            localStorage.setItem('solveHistory', '[]');
-            loadHistory();
-        }
-
-        // Generate initial scramble
-        generateScramble();
-
-        // ==================== RECOGNITION GAME ====================
-        const gameCases = [
-            // PLL Cases
-            { name: 'Aa Perm', type: 'pll', img: 'https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/966fa12a-3e0b-4a94-9f44-5d5a65cbbab8/pll+a1.png' },
-            { name: 'Ab Perm', type: 'pll', img: 'https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/ee0c7f5b-9b47-4fb7-bb5c-6b0ff9c3a37b/pll+a2.png' },
-            { name: 'E Perm', type: 'pll', img: 'https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/6c1d2e16-6e58-4bf5-b5c2-20aee2bdf3a9/pll+e.png' },
-            { name: 'H Perm', type: 'pll', img: 'https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/ee8a6a1b-c1a9-4c1b-bd67-29a89cbe8f31/pll+h.png' },
-            { name: 'Ja Perm', type: 'pll', img: 'https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/1cbe5c0d-9b1b-4169-96c9-8cb89d4c6f0c/pll+j1.png' },
-            { name: 'Jb Perm', type: 'pll', img: 'https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/95c2fd3a-1e0a-4975-8fe9-4dab7c94f9e6/pll+j2.png' },
-            { name: 'T Perm', type: 'pll', img: 'https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/9cc5f2e3-5c53-442e-ae2f-f4a9c8c0e1b9/pll+t.png' },
-            { name: 'F Perm', type: 'pll', img: 'https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/d8f0b0e0-4c1e-4a9b-9e4e-0c0e1f2d3c4b/pll+f.png' },
-            { name: 'Na Perm', type: 'pll', img: 'https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/6e5f7a8c-9d0f-4e2a-3b4c-5d6e7f8a9b0c/pll+n1.png' },
-            { name: 'Nb Perm', type: 'pll', img: 'https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/7f6a8b9c-0e1f-4f3b-4c5d-6e7f8a9b0c1d/pll+n2.png' },
-            { name: 'Ra Perm', type: 'pll', img: 'https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/8a7b9c0d-1f2a-4g4c-5d6e-7f8a9b0c1d2e/pll+r1.png' },
-            { name: 'Rb Perm', type: 'pll', img: 'https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/9b8c0d1e-2f3b-4h5d-6e7f-8a9b0c1d2e3f/pll+r2.png' },
-            { name: 'V Perm', type: 'pll', img: 'https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/0c9d1e2f-3g4c-5i6e-7f8a-9b0c1d2e3f4g/pll+v.png' },
-            { name: 'Y Perm', type: 'pll', img: 'https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/1d0e2f3a-4h5d-6j7f-8g9a-0c1d2e3f4g5h/pll+y.png' },
-            { name: 'Z Perm', type: 'pll', img: 'https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/2e1f3a4b-5i6e-7k8g-9h0a-1d2e3f4g5h6i/pll+z.png' },
-            // OLL Cases
-            { name: 'Sune', type: 'oll', img: 'https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/31b15ec3-52c9-4e13-88fd-f37578897119/oll+26.png' },
-            { name: 'Anti-Sune', type: 'oll', img: 'https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/bb430263-ade1-4457-8bdb-fd55583a3ec8/kite.png' },
-            { name: 'H Case', type: 'oll', img: 'https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/a2881fd9-ffbc-40c1-8886-a505381478e4/cross.png' },
-            { name: 'Pi Case', type: 'oll', img: 'https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/3915322b-61be-4b17-a5b5-c8bc43980347/oll+17.png' },
-            { name: 'T Case', type: 'oll', img: 'https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/3915322b-61be-4b17-a5b5-c8bc43980347/oll+18.png' },
-            { name: 'L Case', type: 'oll', img: 'https://images.squarespace-cdn.com/content/v1/668fde52a2afec107b57bdda/8b24ee96-cc71-4bff-9e0a-3db1a1a1305b/oll+42.png' }
-        ];
-
-        let gameState = { score: 0, streak: 0, currentCase: null, startTime: 0, isPlaying: false };
-        let progressChart = null;
-
-        function startGame() {
-            gameState.score = 0;
-            gameState.streak = 0;
-            gameState.isPlaying = true;
-            document.getElementById('gameScore').textContent = '0';
-            document.getElementById('gameStreak').textContent = '0';
-            document.getElementById('gameTime').textContent = '0.0s';
-            document.getElementById('gameStartBtn').textContent = 'Stop Game';
-            document.getElementById('gameStartBtn').onclick = stopGame;
-            nextGameCase();
-        }
-
-        function stopGame() {
-            gameState.isPlaying = false;
-            document.getElementById('gameCase').innerHTML = '<p style="color: var(--text-muted);">Click "Start Game" to play again</p>';
-            document.getElementById('gameOptions').style.display = 'none';
-            document.getElementById('gameStartBtn').textContent = 'Start Game';
-            document.getElementById('gameStartBtn').onclick = startGame;
-        }
-
-        function nextGameCase() {
-            if (!gameState.isPlaying) return;
-            const randomCase = gameCases[Math.floor(Math.random() * gameCases.length)];
-            gameState.currentCase = randomCase;
-            document.getElementById('gameCase').innerHTML = `<img src="${randomCase.img}" alt="${randomCase.name}" style="max-width: 180px; max-height: 180px; border-radius: 8px;">`;
-            const options = [randomCase.name];
-            const wrongOptions = gameCases.filter(c => c.name !== randomCase.name);
-            for (let i = 0; i < 5 && i < wrongOptions.length; i++) {
-                const wrong = wrongOptions[Math.floor(Math.random() * wrongOptions.length)];
-                if (!options.includes(wrong.name)) options.push(wrong.name);
-            }
-            options.sort(() => Math.random() - 0.5);
-            const optionsContainer = document.getElementById('gameOptions');
-            optionsContainer.innerHTML = options.map(opt =>
-                `<button class="algo-tab" onclick="checkAnswer('${opt}')" style="padding: 12px;">${opt}</button>`
-            ).join('');
-            optionsContainer.style.display = 'grid';
-            gameState.startTime = performance.now();
-        }
-
-        function checkAnswer(answer) {
-            if (!gameState.isPlaying) return;
-            const elapsed = (performance.now() - gameState.startTime) / 1000;
-            if (answer === gameState.currentCase.name) {
-                gameState.score++;
-                gameState.streak++;
-                document.getElementById('gameScore').textContent = gameState.score;
-                document.getElementById('gameStreak').textContent = gameState.streak;
-                document.getElementById('gameTime').textContent = elapsed.toFixed(1) + 's';
-                nextGameCase();
-            } else {
-                gameState.streak = 0;
-                document.getElementById('gameStreak').textContent = '0';
-                gameState.startTime += 2000;
-            }
-        }
-
-        // ==================== DASHBOARD ====================
-        function calculateAo(times, n) {
-            if (times.length < n) return null;
-            const recent = times.slice(0, n).map(t => parseFloat(t.time));
-            recent.sort((a, b) => a - b);
-            const trimmed = recent.slice(1, -1);
-            const sum = trimmed.reduce((a, b) => a + b, 0);
-            return (sum / trimmed.length).toFixed(2);
-        }
-
-        function updateDashboard() {
-            const history = JSON.parse(localStorage.getItem('solveHistory') || '[]');
-            const best = history.length > 0 ? Math.min(...history.map(h => parseFloat(h.time))) : null;
-            document.getElementById('dashBest').textContent = best ? best.toFixed(2) + 's' : '--';
-            document.getElementById('dashAo5').textContent = calculateAo(history, 5) ? calculateAo(history, 5) + 's' : '--';
-            document.getElementById('dashAo12').textContent = calculateAo(history, 12) ? calculateAo(history, 12) + 's' : '--';
-            document.getElementById('dashTotal').textContent = history.length;
-        }
-
-        function renderChart(limit) {
-            const history = JSON.parse(localStorage.getItem('solveHistory') || '[]');
-            const data = limit === 'all' ? history : history.slice(0, limit);
-            const ctx = document.getElementById('progressChart').getContext('2d');
-            if (progressChart) progressChart.destroy();
-            const labels = data.map((_, i) => `#${data.length - i}`);
-            const times = data.map(h => parseFloat(h.time));
-            const ao5Data = [];
-            for (let i = 0; i < times.length; i++) {
-                if (i < 4) ao5Data.push(null);
-                else {
-                    const window = times.slice(i - 4, i + 1).sort((a, b) => a - b);
-                    const avg = window.slice(1, 4).reduce((a, b) => a + b, 0) / 3;
-                    ao5Data.push(avg);
-                }
-            }
-            progressChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        { label: 'Single', data: times, borderColor: '#ff6b35', backgroundColor: 'rgba(255, 107, 53, 0.1)', pointRadius: 4, tension: 0.1, fill: false },
-                        { label: 'Ao5', data: ao5Data, borderColor: '#00d4aa', backgroundColor: 'rgba(0, 212, 170, 0.1)', pointRadius: 2, tension: 0.4, fill: false }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    plugins: { legend: { labels: { color: '#a0a0b0' } } },
-                    scales: {
-                        x: { ticks: { color: '#6a6a7a' }, grid: { color: '#2a2a3a' } },
-                        y: { ticks: { color: '#6a6a7a' }, grid: { color: '#2a2a3a' }, title: { display: true, text: 'Time (s)', color: '#6a6a7a' } }
-                    }
-                }
-            });
-        }
-
-        const originalShowCategory = showCategory;
-        showCategory = function(category) {
-            originalShowCategory(category);
-            if (category === 'dashboard') {
-                updateDashboard();
-                renderChart('all');
-            }
-        };
-
-        // Register service worker for PWA
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js').then(() => {
-                console.log('Service Worker registered');
-            }).catch(err => {
-                console.log('Service Worker registration failed:', err);
-            });
-        }
-    </script>
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="src/js/models/sheet-music.js"></script>
+    <script src="src/js/parsers/musicxml-parser.js"></script>
+    <script src="src/js/audio/audio-engine.js"></script>
+    <script src="src/js/audio/pitch-detector.js"></script>
+    <script src="src/js/audio/instrument-detector.js"></script>
+    <script src="src/js/audio/metronome.js"></script>
+    <script src="src/js/analysis/performance-comparator.js"></script>
+    <script src="src/js/components/sheet-music-renderer.js"></script>
+    <script src="src/js/components/heat-map-renderer.js"></script>
+    <script src="src/js/services/performance-history.js"></script>
+    <script src="src/js/services/imslp-client.js"></script>
+    <script src="src/js/services/omr-client.js"></script>
+    <script src="src/js/metrics/accuracy-scorer.js"></script>
+    <script src="src/js/metrics/rhythm-analyzer.js"></script>
+    <script src="src/js/utils/animations.js"></script>
+    <script src="src/js/app.js"></script>
 </body>
 </html>
