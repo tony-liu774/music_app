@@ -8,6 +8,8 @@ class ConcertmasterApp {
         // Core modules
         this.audioEngine = null;
         this.pitchDetector = null;
+        this.precisionTuner = null;
+        this.tunerGauge = null;
         this.metronome = null;
         this.scoreLibrary = null;
         this.performanceComparator = null;
@@ -16,6 +18,7 @@ class ConcertmasterApp {
 
         // State
         this.isPracticing = false;
+        this.isTunerActive = false;
         this.selectedInstrument = 'violin';
         this.confidenceThreshold = 0.85;
         this.cursorEnabled = false;
@@ -55,6 +58,9 @@ class ConcertmasterApp {
             // Initialize audio engine
             await this.initializeAudio();
 
+            // Initialize precision tuner
+            await this.precisionTuner.init();
+
             // Load library
             await this.loadLibrary();
 
@@ -71,6 +77,7 @@ class ConcertmasterApp {
     initializeComponents() {
         // Create core components
         this.pitchDetector = new PitchDetector();
+        this.precisionTuner = new PrecisionTuner();
         this.metronome = new Metronome();
         this.scoreLibrary = new ScoreLibrary();
         this.performanceComparator = new PerformanceComparator();
@@ -81,6 +88,7 @@ class ConcertmasterApp {
         // Get DOM elements
         this.views = {
             library: document.getElementById('library-view'),
+            tuner: document.getElementById('tuner-view'),
             practice: document.getElementById('practice-view'),
             metronome: document.getElementById('metronome-view'),
             settings: document.getElementById('settings-view')
@@ -90,6 +98,78 @@ class ConcertmasterApp {
 
         // Initialize renderers
         this.initRenderers();
+
+        // Initialize tuner components
+        this.initTuner();
+    }
+
+    initTuner() {
+        // Initialize tuner gauge
+        const gaugeContainer = document.getElementById('tuner-gauge');
+        if (gaugeContainer) {
+            this.tunerGauge = new TunerGauge('tuner-gauge', { size: 300 });
+            this.tunerGauge.init();
+        }
+
+        // Initialize precision tuner
+        this.precisionTuner.onNoteDetected = (data) => {
+            if (this.tunerGauge) {
+                this.tunerGauge.update(data);
+            }
+        };
+
+        this.precisionTuner.onError = (error) => {
+            this.showToast('Tuner error: ' + error.message, 'error');
+        };
+
+        // Setup tuner event listeners
+        this.setupTunerListeners();
+    }
+
+    setupTunerListeners() {
+        // Instrument selection buttons
+        document.querySelectorAll('.tuner-instrument-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tuner-instrument-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.selectedInstrument = btn.dataset.instrument;
+                this.precisionTuner.setInstrument(this.selectedInstrument);
+            });
+        });
+
+        // Tuner toggle button
+        const tunerToggle = document.getElementById('tuner-toggle');
+        tunerToggle?.addEventListener('click', async () => {
+            if (this.isTunerActive) {
+                this.precisionTuner.stopListening();
+                this.isTunerActive = false;
+                tunerToggle.classList.remove('active', 'listening');
+                tunerToggle.querySelector('span').textContent = 'Start Tuner';
+                if (this.tunerGauge) {
+                    this.tunerGauge.reset();
+                }
+            } else {
+                const success = await this.precisionTuner.startListening();
+                if (success) {
+                    this.isTunerActive = true;
+                    tunerToggle.classList.add('active', 'listening');
+                    tunerToggle.querySelector('span').textContent = 'Stop Tuner';
+                    this.showToast('Tuner active - play a note', 'success');
+                } else {
+                    this.showToast('Could not access microphone', 'error');
+                }
+            }
+        });
+
+        // Reference frequency input
+        const refFreqInput = document.getElementById('reference-freq');
+        refFreqInput?.addEventListener('change', (e) => {
+            const freq = parseFloat(e.target.value);
+            if (freq >= 430 && freq <= 450) {
+                this.precisionTuner.setReferenceFrequency(freq);
+                this.showToast(`Reference A4 set to ${freq} Hz`, 'info');
+            }
+        });
     }
 
     initRenderers() {

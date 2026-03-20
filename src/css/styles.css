@@ -775,6 +775,251 @@ a:hover {
     gap: var(--space-4);
 }
 
+/* Tuner View */
+.tuner-view {
+    padding: var(--space-8);
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.tuner-header {
+    text-align: center;
+    margin-bottom: var(--space-6);
+}
+
+.tuner-instrument-select {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-8);
+    flex-wrap: wrap;
+}
+
+.tuner-instrument-btn {
+    padding: var(--space-3) var(--space-5);
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.tuner-instrument-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.tuner-instrument-btn.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: var(--bg-deep);
+}
+
+/* Tuner Gauge */
+.tuner-gauge-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: var(--space-8);
+}
+
+.tuner-gauge {
+    position: relative;
+    width: 300px;
+    height: 300px;
+}
+
+.gauge-svg {
+    width: 100%;
+    height: 100%;
+}
+
+.tuner-gauge .needle {
+    transition: transform 100ms ease-out;
+    transform-origin: center center;
+}
+
+.tuner-gauge .note-name {
+    font-family: var(--font-heading);
+    font-size: 48px;
+    fill: var(--text-primary);
+}
+
+.tuner-gauge .note-octave {
+    font-family: var(--font-mono);
+    font-size: 20px;
+    fill: var(--text-secondary);
+}
+
+.tuner-gauge .frequency-display {
+    font-family: var(--font-mono);
+    font-size: 16px;
+    fill: var(--text-muted);
+}
+
+.tuner-gauge .cents-display {
+    font-family: var(--font-mono);
+    font-size: 24px;
+    font-weight: 600;
+}
+
+.tuner-gauge .status-indicator {
+    transition: all var(--transition-fast);
+}
+
+.tuner-gauge .status-text {
+    font-family: var(--font-body);
+    font-size: 12px;
+    fill: var(--text-secondary);
+    text-transform: uppercase;
+}
+
+/* Gauge glow effect */
+.gauge-glow {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 150%;
+    height: 150%;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(
+        circle,
+        transparent 30%,
+        rgba(201, 162, 39, 0.05) 70%,
+        transparent 100%
+    );
+    pointer-events: none;
+    z-index: -1;
+}
+
+/* String Display */
+.tuner-strings {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-6);
+    margin-bottom: var(--space-6);
+    flex-wrap: wrap;
+}
+
+.tuner-string {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: var(--space-3) var(--space-4);
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    min-width: 80px;
+}
+
+.tuner-string.active {
+    border-color: var(--success);
+    box-shadow: 0 0 10px var(--success-glow);
+}
+
+.tuner-string.target {
+    border-color: var(--primary);
+    box-shadow: 0 0 10px var(--primary-glow);
+}
+
+.string-note {
+    font-family: var(--font-mono);
+    font-size: var(--text-lg);
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.string-freq {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    margin-top: var(--space-1);
+}
+
+/* Tuner Controls */
+.tuner-controls {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-4);
+}
+
+.tuner-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-6);
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full);
+    color: var(--text-secondary);
+    font-size: var(--text-base);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.tuner-toggle:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.tuner-toggle.active {
+    background: var(--error);
+    border-color: var(--error);
+    color: var(--text-primary);
+    box-shadow: 0 0 20px var(--error-glow);
+}
+
+.tuner-toggle.active.listening {
+    background: var(--success);
+    border-color: var(--success);
+    box-shadow: 0 0 20px var(--success-glow);
+}
+
+/* Reference Pitch Setting */
+.tuner-reference {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3);
+    margin-top: var(--space-4);
+}
+
+.tuner-reference label {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+}
+
+.tuner-reference input[type="number"] {
+    width: 80px;
+    padding: var(--space-2);
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    text-align: center;
+}
+
+/* In Tune Indicator */
+.in-tune-flash {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--success);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 1000;
+    transition: opacity 200ms ease;
+}
+
+.in-tune-flash.active {
+    opacity: 0.1;
+}
+
 /* Settings */
 .settings-group {
     margin-bottom: var(--space-8);
