@@ -182,7 +182,13 @@
                         <span class="instrument-badge" id="current-instrument">Violin</span>
                     </div>
                     <div class="practice-controls">
-                        <button class="btn btn-icon" id="start-practice-btn" disabled>
+                        <button class="btn btn-icon btn-secondary" id="practice-metronome-btn" title="Toggle Metronome">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2v6l4 2"/>
+                                <circle cx="12" cy="14" r="8"/>
+                            </svg>
+                        </button>
+                        <button class="btn btn-icon" id="start-practice-btn">
                             <svg viewBox="0 0 24 24" fill="currentColor">
                                 <polygon points="5 3 19 12 5 21 5 3"/>
                             </svg>
@@ -219,7 +225,16 @@
                         </div>
                         <div class="timing-indicator">
                             <span class="indicator-label">Timing</span>
+                            <div class="timing-meter" id="timing-meter">
+                                <div class="timing-center"></div>
+                                <div class="timing-marker" id="timing-marker"></div>
+                            </div>
+                            <div class="timing-labels">
+                                <span class="timing-early">Early</span>
+                                <span class="timing-late">Late</span>
+                            </div>
                             <span class="timing-display" id="timing-display">0ms</span>
+                            <span class="timing-status" id="timing-status"></span>
                         </div>
                     </div>
                     <div class="score-display">
@@ -439,6 +454,9 @@
                             <span class="breakdown-label">Duration</span>
                             <span class="breakdown-value" id="session-duration">5:32</span>
                         </div>
+                    </div>
+                    <div class="timing-analysis" id="timing-analysis">
+                        <!-- Timing analysis message will appear here -->
                     </div>
                     <div class="heatmap-section">
                         <h3>Practice Areas</h3>
