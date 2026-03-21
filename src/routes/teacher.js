@@ -6,16 +6,24 @@
  */
 
 const express = require('express');
+const jwt = require('jsonwebtoken');
 
 const router = express.Router();
+
+// Get JWT secret from config
+const JWT_SECRET = process.env.JWT_SECRET || 'development-secret-change-in-production';
 
 // In-memory store (would be replaced by a database in production)
 const students = new Map();
 const practiceLogs = new Map();
 
-// Video snippets storage (in-memory for demo; would use cloud storage in production)
+// Video snippets storage - export for scheduler
 const videoSnippets = new Map();
 const REACTION_AUTO_DELETE_DAYS = 7;
+const MAX_VIDEO_SIZE_MB = 10;
+
+// Export videoSnippets for scheduler access
+router.videoSnippets = videoSnippets;
 
 let nextId = 1;
 function generateId() {
@@ -35,16 +43,52 @@ function getWeekStart() {
 }
 
 /**
+ * Middleware: validate JWT token for authentication
+ */
+function requireAuth(req, res, next) {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const token = authHeader.split(' ')[1];
+
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        req.user = decoded;
+        next();
+    } catch (error) {
+        return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+}
+
+/**
+ * Middleware: require teacher role
+ */
+function requireTeacher(req, res, next) {
+    if (req.user.role !== 'teacher') {
+        return res.status(403).json({ error: 'Teacher access required' });
+    }
+    next();
+}
+
+/**
  * Middleware: require X-Teacher-Mode header to access teacher routes
  */
 function requireTeacherMode(req, res, next) {
+    // Allow snippet routes without teacher mode for students
+    if (req.path.startsWith('/snippets')) {
+        return next();
+    }
+
     if (req.headers['x-teacher-mode'] !== 'true') {
         return res.status(403).json({ error: 'Teacher mode not enabled' });
     }
     next();
 }
 
-// Apply teacher mode check to all routes
+// Apply teacher mode check to non-snippet routes
 router.use(requireTeacherMode);
 
 /**
@@ -278,13 +322,38 @@ function generateSnippetId() {
 }
 
 /**
- * Get snippets for a student (inbox view)
+ * Validate video size to prevent memory exhaustion
+ */
+function validateVideoSize(videoData, maxSizeMB = MAX_VIDEO_SIZE_MB) {
+    if (!videoData) return { valid: false, error: 'No video data' };
+
+    // Estimate size from base64
+    const base64Length = videoData.length;
+    const sizeInBytes = (base64Length * 3) / 4;
+    const sizeInMB = sizeInBytes / (1024 * 1024);
+
+    if (sizeInMB > maxSizeMB) {
+        return { valid: false, error: `Video too large: ${sizeInMB.toFixed(2)}MB (max: ${maxSizeMB}MB)` };
+    }
+
+    return { valid: true, sizeInMB: sizeInMB.toFixed(2) };
+}
+
+/**
+ * Get snippets for a student (student's own sent snippets view)
  * GET /api/teacher/snippets/:studentId
  */
-router.get('/snippets/:studentId', (req, res) => {
+router.get('/snippets/:studentId', requireAuth, (req, res) => {
     const { studentId } = req.params;
+    const isTeacher = req.user.role === 'teacher';
 
-    if (!students.has(studentId)) {
+    // Students can only view their own snippets
+    if (!isTeacher && req.user.userId !== studentId) {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // For students, check if they exist (validate student)
+    if (!isTeacher && !students.has(studentId)) {
         return res.status(404).json({ error: 'Student not found' });
     }
 
@@ -292,16 +361,48 @@ router.get('/snippets/:studentId', (req, res) => {
         .filter(s => s.studentId === studentId)
         .sort((a, b) => b.submittedAt - a.submittedAt);
 
-    res.json({ snippets, total: snippets.length });
+    // Don't expose video data in list view
+    const sanitizedSnippets = snippets.map(s => ({
+        id: s.id,
+        studentId: s.studentId,
+        studentName: s.studentName,
+        thumbnail: s.thumbnail,
+        duration: s.duration,
+        title: s.title,
+        notes: s.notes,
+        submittedAt: s.submittedAt,
+        status: s.status,
+        teacherReply: s.teacherReply ? '(Reply received)' : null,
+        replyType: s.replyType,
+        replyAt: s.replyAt,
+        expiresAt: s.expiresAt
+    }));
+
+    res.json({ snippets: sanitizedSnippets, total: sanitizedSnippets.length });
 });
 
 /**
  * Get all pending snippets (teacher inbox)
  * GET /api/teacher/snippets
  */
-router.get('/snippets', (req, res) => {
+router.get('/snippets', requireAuth, requireTeacher, (req, res) => {
     const allSnippets = Array.from(videoSnippets.values())
         .sort((a, b) => b.submittedAt - a.submittedAt);
+
+    // Don't expose full video data in list view for performance
+    const sanitizedSnippets = allSnippets.map(s => ({
+        id: s.id,
+        studentId: s.studentId,
+        studentName: s.studentName,
+        thumbnail: s.thumbnail,
+        duration: s.duration,
+        title: s.title,
+        notes: s.notes,
+        submittedAt: s.submittedAt,
+        status: s.status,
+        hasReply: !!s.teacherReply,
+        expiresAt: s.expiresAt
+    }));
 
     // Group by student for teacher view
     const snippetsByStudent = {};
@@ -327,30 +428,61 @@ router.get('/snippets', (req, res) => {
  * Submit a new video snippet (from student)
  * POST /api/teacher/snippets
  */
-router.post('/snippets', (req, res) => {
-    const { studentId, studentName, videoData, thumbnail, duration, title, notes } = req.body;
+router.post('/snippets', requireAuth, async (req, res) => {
+    const { studentId, studentName, videoData, thumbnail, duration, title, notes, trimStart, trimEnd } = req.body;
+    const isTeacher = req.user.role === 'teacher';
 
     // Validate required fields
     if (!studentId) {
         return res.status(400).json({ error: 'Student ID is required' });
     }
 
+    // Students can only submit for themselves
+    if (!isTeacher && req.user.userId !== studentId) {
+        return res.status(403).json({ error: 'Cannot submit for other users' });
+    }
+
     if (!videoData) {
         return res.status(400).json({ error: 'Video data is required' });
+    }
+
+    // Validate video size to prevent memory exhaustion
+    const sizeValidation = validateVideoSize(videoData);
+    if (!sizeValidation.valid) {
+        return res.status(400).json({ error: sizeValidation.error });
     }
 
     // Validate video duration (max 15 seconds for office hours drop)
     const validatedDuration = typeof duration === 'number' && duration > 0 ? Math.min(duration, 15) : 15;
 
+    // Generate snippet ID
+    const snippetId = generateSnippetId();
+
+    // In production, upload to cloud storage (S3)
+    // For now, store locally with base64
+    let videoUrl = videoData;
+    let videoKey = null;
+    let storageType = 'local';
+
+    // Note: In production, uncomment this to use S3
+    // const { PutObjectCommand, S3Client } = require('@aws-sdk/client-s3');
+    // ... upload logic here
+
     const snippet = {
-        id: generateSnippetId(),
+        id: snippetId,
         studentId: sanitizeString(studentId, 100),
-        studentName: sanitizeString(studentName || 'Anonymous', 200),
-        videoData: videoData, // Base64 encoded video
+        studentName: sanitizeString(studentName || req.user.name || 'Anonymous', 200),
+        videoData: videoData, // Base64 encoded video (keep for demo)
+        videoUrl: videoUrl,  // Cloud URL when available
+        videoKey: videoKey,  // S3 key for deletion
+        storageType: storageType,
         thumbnail: thumbnail || null,
         duration: validatedDuration,
         title: sanitizeString(title || 'Untitled Recording', 200),
         notes: sanitizeString(notes || '', 1000),
+        // Video trimming data
+        trimStart: typeof trimStart === 'number' ? Math.max(0, trimStart) : 0,
+        trimEnd: typeof trimEnd === 'number' ? Math.min(validatedDuration, trimEnd) : validatedDuration,
         submittedAt: Date.now(),
         status: 'pending', // pending, reviewed, replied
         teacherReply: null,
@@ -367,7 +499,7 @@ router.post('/snippets', (req, res) => {
  * Add teacher reply to a snippet
  * POST /api/teacher/snippets/:id/reply
  */
-router.post('/snippets/:id/reply', (req, res) => {
+router.post('/snippets/:id/reply', requireAuth, requireTeacher, async (req, res) => {
     const { id } = req.params;
     const { replyText, replyVoiceData, replyType } = req.body;
 
@@ -380,16 +512,28 @@ router.post('/snippets/:id/reply', (req, res) => {
     const validReplyType = ['text', 'voice'].includes(replyType) ? replyType : 'text';
 
     if (validReplyType === 'text') {
-        snippet.teacherReply = sanitizeString(replyText || '', 2000);
+        if (!replyText || replyText.trim().length === 0) {
+            return res.status(400).json({ error: 'Reply text is required' });
+        }
+        snippet.teacherReply = sanitizeString(replyText, 2000);
     } else if (validReplyType === 'voice') {
+        if (!replyVoiceData) {
+            return res.status(400).json({ error: 'Voice data is required' });
+        }
         snippet.teacherReply = replyVoiceData; // Base64 audio data
     }
 
     snippet.replyType = validReplyType;
     snippet.replyAt = Date.now();
+    snippet.replyBy = req.user.name || 'Teacher';
     snippet.status = 'replied';
 
     videoSnippets.set(id, snippet);
+
+    // Notify student of reply (would integrate with push notification service)
+    console.log(`Teacher replied to snippet ${id}: ${validReplyType} reply`);
+
+    // Return the full snippet with reply
     res.json(snippet);
 });
 

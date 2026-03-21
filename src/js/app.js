@@ -630,12 +630,17 @@ class ConcertmasterApp {
         }
 
         // Reply type switching
+        let currentReplyType = 'text';
+        let currentSnippetId = null;
+        let voiceRecordingData = null;
+
         replyTypeBtns.forEach(btn => {
             btn.addEventListener('click', () => {
                 replyTypeBtns.forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
 
                 const type = btn.dataset.type;
+                currentReplyType = type;
                 if (type === 'text') {
                     replyText.style.display = 'block';
                     voiceReplyRecorder.style.display = 'none';
@@ -649,10 +654,169 @@ class ConcertmasterApp {
         // Send reply
         if (sendReplyBtn) {
             sendReplyBtn.addEventListener('click', async () => {
-                // TODO: Implement reply submission
-                this.showToast('Reply feature coming soon!', 'info');
+                if (!currentSnippetId) {
+                    this.showToast('No snippet selected', 'error');
+                    return;
+                }
+
+                try {
+                    let replyTextValue = null;
+                    let replyVoiceDataValue = null;
+
+                    if (currentReplyType === 'text') {
+                        replyTextValue = replyText.value.trim();
+                        if (!replyTextValue) {
+                            this.showToast('Please enter a reply', 'error');
+                            return;
+                        }
+                    } else {
+                        replyVoiceDataValue = voiceRecordingData;
+                        if (!replyVoiceDataValue) {
+                            this.showToast('Please record a voice note', 'error');
+                            return;
+                        }
+                    }
+
+                    await window.videoSnippetService.submitReply(
+                        currentSnippetId,
+                        replyTextValue,
+                        replyVoiceDataValue,
+                        currentReplyType
+                    );
+
+                    this.showToast('Reply sent!', 'success');
+                    this.closeModal(videoReplyModal);
+                    replyText.value = '';
+                    voiceRecordingData = null;
+                    currentSnippetId = null;
+
+                    // Refresh inbox
+                    this.loadTeacherInbox();
+                } catch (error) {
+                    this.showToast('Failed to send reply: ' + error.message, 'error');
+                }
             });
         }
+
+        // Load teacher inbox data
+        this.loadTeacherInbox = async () => {
+            try {
+                const response = await window.videoSnippetService.getAllSnippets();
+                this.renderTeacherInbox(response.snippets);
+            } catch (error) {
+                console.error('Failed to load inbox:', error);
+            }
+        };
+
+        // Render teacher inbox
+        this.renderTeacherInbox = (snippets) => {
+            const receivedList = document.getElementById('received-snippets-list');
+            if (!receivedList) return;
+
+            receivedList.innerHTML = '';
+
+            if (snippets.length === 0) {
+                document.getElementById('inbox-empty-received').style.display = 'block';
+                return;
+            }
+
+            document.getElementById('inbox-empty-received').style.display = 'none';
+
+            snippets.forEach(snippet => {
+                const item = document.createElement('div');
+                item.className = 'inbox-item';
+                item.innerHTML = `
+                    <img class="inbox-item-thumb" src="${snippet.thumbnail || ''}" alt="">
+                    <div class="inbox-item-info">
+                        <div class="inbox-item-title">${snippet.title || 'Untitled'}</div>
+                        <div class="inbox-item-meta">
+                            ${snippet.studentName}
+                            <span class="inbox-item-status ${snippet.status}">${snippet.status}</span>
+                        </div>
+                    </div>
+                `;
+                item.addEventListener('click', () => this.openReplyModal(snippet));
+                receivedList.appendChild(item);
+            });
+        };
+
+        // Open reply modal
+        this.openReplyModal = (snippet) => {
+            currentSnippetId = snippet.id;
+            const videoPlayer = document.getElementById('reply-video-player');
+            if (videoPlayer && snippet.videoData) {
+                // Convert base64 to blob URL
+                const blob = this.base64ToBlob(snippet.videoData, 'video/webm');
+                videoPlayer.src = URL.createObjectURL(blob);
+            }
+            this.openModal(videoReplyModal);
+        };
+
+        // Convert base64 to blob
+        this.base64ToBlob = (base64, mimeType) => {
+            const byteCharacters = atob(base64.split(',')[1]);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            return new Blob([byteArray], { type: mimeType });
+        };
+
+        // Load student's sent snippets
+        this.loadStudentSnippets = async () => {
+            try {
+                const studentId = localStorage.getItem('user_id') || 'student-1';
+                const response = await window.videoSnippetService.getSnippets(studentId);
+                this.renderStudentSnippets(response.snippets);
+            } catch (error) {
+                console.error('Failed to load student snippets:', error);
+            }
+        };
+
+        // Render student sent snippets
+        this.renderStudentSnippets = (snippets) => {
+            const sentList = document.getElementById('sent-snippets-list');
+            if (!sentList) return;
+
+            sentList.innerHTML = '';
+
+            if (snippets.length === 0) {
+                document.getElementById('inbox-empty-sent').style.display = 'block';
+                return;
+            }
+
+            document.getElementById('inbox-empty-sent').style.display = 'none';
+
+            snippets.forEach(snippet => {
+                const card = document.createElement('div');
+                card.className = 'sent-snippet-card';
+
+                const hasReply = snippet.teacherReply && snippet.teacherReply.length > 0;
+
+                card.innerHTML = `
+                    <img class="sent-snippet-thumb" src="${snippet.thumbnail || ''}" alt="">
+                    <div class="sent-snippet-info">
+                        <div class="sent-snippet-title">${snippet.title || 'Untitled'}</div>
+                        <div class="sent-snippet-meta">
+                            ${new Date(snippet.submittedAt).toLocaleDateString()}
+                            <span class="sent-snippet-status ${snippet.status}">${snippet.status}</span>
+                        </div>
+                        ${hasReply ? `<div class="sent-snippet-reply">${snippet.replyType === 'voice' ? 'Voice reply received' : snippet.teacherReply}</div>` : ''}
+                    </div>
+                `;
+                sentList.appendChild(card);
+            });
+        };
+
+        // Listen for tab changes to load student snippets
+        inboxTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                if (tab.dataset.tab === 'sent') {
+                    this.loadStudentSnippets();
+                }
+            });
+        });
     }
 
     async startVideoPreview(videoElement, overlay, startBtn) {

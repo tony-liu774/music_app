@@ -1465,6 +1465,21 @@
                     </div>
 
                     <div class="video-form" id="video-form" style="display: none;">
+                        <div class="video-trim-controls">
+                            <label>Trim Video (optional)</label>
+                            <div class="trim-slider-container">
+                                <div class="trim-slider" id="trim-slider">
+                                    <div class="trim-range" id="trim-range"></div>
+                                    <div class="trim-handle trim-handle-start" id="trim-handle-start"></div>
+                                    <div class="trim-handle trim-handle-end" id="trim-handle-end"></div>
+                                </div>
+                                <div class="trim-times">
+                                    <span id="trim-start-time">0:00</span>
+                                    <span id="trim-end-time">0:15</span>
+                                </div>
+                            </div>
+                            <p class="trim-hint">Drag handles to trim your recording</p>
+                        </div>
                         <div class="form-group">
                             <label for="snippet-title">Title (optional)</label>
                             <input type="text" id="snippet-title" placeholder="e.g., Scales practice - C major">
@@ -1609,6 +1624,8 @@
     <script src="src/js/components/scale-engine-ui.js"></script>
     <script src="src/js/services/teacher-service.js"></script>
     <script src="src/js/services/video-snippet-service.js"></script>
+    <script src="src/js/services/video-storage-service.js"></script>
+    <script src="src/js/services/push-notification-service.js"></script>
     <script src="src/js/components/studio-dashboard.js"></script>
     <!-- Cloud Sync & Teacher Export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
