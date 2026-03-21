@@ -189,9 +189,9 @@ async function verifyGoogleToken(idToken) {
         throw new OAuthVerificationError('Invalid token issuer');
     }
 
-    // Validate expiration
-    if (payload.exp && payload.exp * 1000 < Date.now()) {
-        throw new OAuthVerificationError('Token expired');
+    // Validate expiration (reject tokens without exp as a defense-in-depth measure)
+    if (!payload.exp || payload.exp * 1000 < Date.now()) {
+        throw new OAuthVerificationError('Token expired or missing expiration');
     }
 
     // Validate audience (must match our client ID)
@@ -246,9 +246,9 @@ async function verifyAppleToken(idToken) {
         throw new OAuthVerificationError('Invalid token issuer');
     }
 
-    // Validate expiration
-    if (payload.exp && payload.exp * 1000 < Date.now()) {
-        throw new OAuthVerificationError('Token expired');
+    // Validate expiration (reject tokens without exp as a defense-in-depth measure)
+    if (!payload.exp || payload.exp * 1000 < Date.now()) {
+        throw new OAuthVerificationError('Token expired or missing expiration');
     }
 
     // Validate audience

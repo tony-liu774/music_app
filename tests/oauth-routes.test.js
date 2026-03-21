@@ -162,6 +162,18 @@ describe('OAuth Routes - Unit Tests', () => {
             await assert.rejects(() => verifyGoogleToken(token), /Token expired/);
         });
 
+        it('should reject token without exp claim', async () => {
+            const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
+            const body = Buffer.from(JSON.stringify({
+                iss: 'accounts.google.com',
+                sub: 'google-no-exp',
+                email: 'noexp@gmail.com',
+                email_verified: true
+            })).toString('base64url');
+            const sig = Buffer.from('sig').toString('base64url');
+            await assert.rejects(() => verifyGoogleToken(`${header}.${body}.${sig}`), /Token expired or missing expiration/);
+        });
+
         it('should accept token with https issuer', async () => {
             const token = createGoogleIdToken({ iss: 'https://accounts.google.com' });
             const result = await verifyGoogleToken(token);
@@ -215,6 +227,16 @@ describe('OAuth Routes - Unit Tests', () => {
         it('should reject expired Apple token', async () => {
             const token = createAppleIdToken({}, true);
             await assert.rejects(() => verifyAppleToken(token), /Token expired/);
+        });
+
+        it('should reject Apple token without exp claim', async () => {
+            const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
+            const body = Buffer.from(JSON.stringify({
+                iss: 'https://appleid.apple.com',
+                sub: 'apple-no-exp'
+            })).toString('base64url');
+            const sig = Buffer.from('sig').toString('base64url');
+            await assert.rejects(() => verifyAppleToken(`${header}.${body}.${sig}`), /Token expired or missing expiration/);
         });
 
         it('should handle token without email', async () => {
