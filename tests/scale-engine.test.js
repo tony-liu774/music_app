@@ -7,7 +7,8 @@
 const {
     CHROMATIC_NOTES, CIRCLE_OF_FIFTHS, KEY_SIGNATURES,
     SCALE_INTERVALS, ARPEGGIO_INTERVALS, ETUDE_PATTERNS,
-    INSTRUMENT_CONFIG, midiToPitch, noteNameToMidiBase, midiToPitchInKey
+    INSTRUMENT_CONFIG, midiToPitch, noteNameToMidiBase, midiToPitchInKey,
+    getKeySignatureFifths
 } = require('../src/js/models/scale-data');
 
 const { MusicXMLGenerator } = require('../src/js/parsers/musicxml-generator');
@@ -582,6 +583,351 @@ function runTests() {
         const xml = gen.generate({ title: 'Empty', notes: [] });
         assertTrue(xml.includes('score-partwise'), 'Still generates valid structure');
     });
+
+    // ============================================
+    // Minor Key Signature Tests (P0 fix)
+    // ============================================
+    console.log('\n--- Minor Key Signatures ---');
+
+    test('getKeySignatureFifths returns 0 for C major', () => {
+        assertEqual(getKeySignatureFifths('C', false), 0, 'C major = 0 fifths');
+    });
+
+    test('getKeySignatureFifths returns 0 for A minor (relative of C major)', () => {
+        assertEqual(getKeySignatureFifths('A', true), 0, 'A minor = 0 fifths');
+    });
+
+    test('getKeySignatureFifths returns -1 for D minor (relative of F major)', () => {
+        assertEqual(getKeySignatureFifths('D', true), -1, 'D minor = -1 fifth');
+    });
+
+    test('getKeySignatureFifths returns 1 for E minor (relative of G major)', () => {
+        assertEqual(getKeySignatureFifths('E', true), 1, 'E minor = 1 sharp');
+    });
+
+    test('getKeySignatureFifths returns -3 for C minor (relative of Eb major)', () => {
+        assertEqual(getKeySignatureFifths('C', true), -3, 'C minor = -3 flats');
+    });
+
+    test('ScaleEngine uses correct key signature for minor scales', () => {
+        const engine = new ScaleEngine();
+        engine.setConfig({ key: 'A', scaleType: 'natural_minor', octaves: 1, instrument: 'violin' });
+        const result = engine.generate();
+        // A minor should have 0 fifths (relative major is C)
+        assertTrue(result.musicxml.includes('<fifths>0</fifths>'), 'A minor has 0 fifths in MusicXML');
+        assertTrue(result.musicxml.includes('<mode>minor</mode>'), 'Mode is minor');
+    });
+
+    test('ScaleEngine uses correct key signature for minor arpeggio', () => {
+        const engine = new ScaleEngine();
+        engine.setConfig({ key: 'A', exerciseType: 'arpeggio', arpeggioType: 'minor', octaves: 1, instrument: 'violin' });
+        const result = engine.generate();
+        assertTrue(result.musicxml.includes('<fifths>0</fifths>'), 'A minor arpeggio has 0 fifths');
+        assertTrue(result.musicxml.includes('<mode>minor</mode>'), 'Mode is minor for minor arpeggio');
+    });
+
+    // ============================================
+    // Input Validation Tests (P1 fix)
+    // ============================================
+    console.log('\n--- Input Validation ---');
+
+    test('setConfig throws on unknown instrument', () => {
+        const engine = new ScaleEngine();
+        let threw = false;
+        try {
+            engine.setConfig({ instrument: 'banjo' });
+        } catch (e) {
+            threw = true;
+            assertTrue(e.message.includes('banjo'), 'Error mentions the invalid instrument');
+        }
+        assertTrue(threw, 'Should throw for unknown instrument');
+    });
+
+    test('setConfig throws on unknown key', () => {
+        const engine = new ScaleEngine();
+        let threw = false;
+        try {
+            engine.setConfig({ key: 'H' });
+        } catch (e) {
+            threw = true;
+            assertTrue(e.message.includes('H'), 'Error mentions the invalid key');
+        }
+        assertTrue(threw, 'Should throw for unknown key');
+    });
+
+    test('setConfig clamps tempo to valid range', () => {
+        const engine = new ScaleEngine();
+        engine.setConfig({ tempo: 5 });
+        assertEqual(engine.getConfig().tempo, 20, 'Tempo clamped to minimum 20');
+
+        engine.setConfig({ tempo: 500 });
+        assertEqual(engine.getConfig().tempo, 300, 'Tempo clamped to maximum 300');
+    });
+
+    test('setConfig clamps octaves to valid range', () => {
+        const engine = new ScaleEngine();
+        engine.setConfig({ octaves: 0 });
+        assertEqual(engine.getConfig().octaves, 1, 'Octaves clamped to minimum 1');
+
+        engine.setConfig({ octaves: 5 });
+        assertEqual(engine.getConfig().octaves, 3, 'Octaves clamped to maximum 3');
+    });
+
+    // ============================================
+    // Etude Pattern Fix Tests (P0 fix)
+    // ============================================
+    console.log('\n--- Etude Pattern Fixes ---');
+
+    test('Sixths etude at 1 octave produces notes', () => {
+        const engine = new ScaleEngine();
+        engine.setConfig({
+            key: 'C', exerciseType: 'etude', etudePattern: 'sixths',
+            scaleType: 'major', octaves: 1, instrument: 'cello'
+        });
+        const result = engine.generate();
+        assertTrue(result.notes.length > 0, 'Sixths at 1 octave should produce notes');
+    });
+
+    test('Octaves etude at 1 octave produces notes', () => {
+        const engine = new ScaleEngine();
+        engine.setConfig({
+            key: 'C', exerciseType: 'etude', etudePattern: 'octaves',
+            scaleType: 'major', octaves: 1, instrument: 'cello'
+        });
+        const result = engine.generate();
+        assertTrue(result.notes.length > 0, 'Octaves at 1 octave should produce notes');
+    });
+
+    // ============================================
+    // Shifts & Double Stops Tests (P2 feature)
+    // ============================================
+    console.log('\n--- Shifts & Double Stops ---');
+
+    test('Shifts etude pattern generates notes', () => {
+        const engine = new ScaleEngine();
+        engine.setConfig({
+            key: 'C', exerciseType: 'etude', etudePattern: 'shifts',
+            scaleType: 'major', octaves: 2, instrument: 'cello'
+        });
+        const result = engine.generate();
+        assertTrue(result.notes.length > 0, 'Shifts pattern generates notes');
+        // Shifts generate 4-note fragments; should be multiple of 4
+        assertEqual(result.notes.length % 4, 0, 'Shift notes come in groups of 4');
+    });
+
+    test('Double stops etude pattern generates notes', () => {
+        const engine = new ScaleEngine();
+        engine.setConfig({
+            key: 'C', exerciseType: 'etude', etudePattern: 'double_stops',
+            scaleType: 'major', octaves: 2, instrument: 'cello'
+        });
+        const result = engine.generate();
+        assertTrue(result.notes.length > 0, 'Double stops pattern generates notes');
+        // Double stops generate pairs of notes
+        assertEqual(result.notes.length % 2, 0, 'Double stop notes come in pairs');
+    });
+
+    test('ETUDE_PATTERNS includes shifts and double_stops', () => {
+        assertTrue(!!ETUDE_PATTERNS.shifts, 'Shifts pattern exists');
+        assertTrue(!!ETUDE_PATTERNS.double_stops, 'Double stops pattern exists');
+        assertTrue(ETUDE_PATTERNS.shifts.shift === true, 'Shifts has shift flag');
+        assertTrue(ETUDE_PATTERNS.double_stops.doubleStop === true, 'Double stops has doubleStop flag');
+    });
+
+    // ============================================
+    // Final Barline Test (P2 fix)
+    // ============================================
+    console.log('\n--- Final Barline ---');
+
+    test('MusicXMLGenerator adds final barline to last measure', () => {
+        const gen = new MusicXMLGenerator();
+        const xml = gen.generate({
+            title: 'Barline Test',
+            notes: [
+                { step: 'C', octave: 4, alter: 0, duration: 1 },
+                { step: 'D', octave: 4, alter: 0, duration: 1 }
+            ],
+            clef: 'G',
+            clefLine: 2,
+            fifths: 0,
+            mode: 'major'
+        });
+        assertTrue(xml.includes('light-heavy'), 'Has final barline style');
+        assertTrue(xml.includes('barline'), 'Has barline element');
+    });
+
+    // ============================================
+    // Circle of Fifths Mutation Test (P3 fix)
+    // ============================================
+    console.log('\n--- Circle of Fifths ---');
+
+    test('generateCircleOfFifths restores original key', () => {
+        const engine = new ScaleEngine();
+        engine.setConfig({ key: 'D', scaleType: 'major', octaves: 1, instrument: 'cello' });
+        engine.generateCircleOfFifths();
+        assertEqual(engine.getConfig().key, 'D', 'Original key D is restored after circle of fifths');
+    });
+
+    // ============================================
+    // ScaleEngineUI Tests
+    // ============================================
+    console.log('\n--- ScaleEngineUI ---');
+
+    // Mock DOM environment for UI tests
+    function createMockDOM() {
+        const elements = {};
+        const createElement = (tag) => {
+            const el = {
+                tagName: tag.toUpperCase(),
+                className: '',
+                id: '',
+                innerHTML: '',
+                style: {},
+                children: [],
+                parentNode: null,
+                disabled: false,
+                textContent: '',
+                classList: {
+                    _classes: new Set(),
+                    add(c) { this._classes.add(c); },
+                    remove(c) { this._classes.delete(c); },
+                    toggle(c, force) {
+                        if (force !== undefined) {
+                            force ? this._classes.add(c) : this._classes.delete(c);
+                        } else {
+                            this._classes.has(c) ? this._classes.delete(c) : this._classes.add(c);
+                        }
+                    },
+                    contains(c) { return this._classes.has(c); }
+                },
+                _listeners: {},
+                addEventListener(event, fn) {
+                    if (!this._listeners[event]) this._listeners[event] = [];
+                    this._listeners[event].push(fn);
+                },
+                setAttribute(name, value) { this[`_attr_${name}`] = value; },
+                getAttribute(name) { return this[`_attr_${name}`]; },
+                appendChild(child) {
+                    this.children.push(child);
+                    child.parentNode = this;
+                    // Parse innerHTML to populate queryable elements
+                },
+                removeChild(child) {
+                    const idx = this.children.indexOf(child);
+                    if (idx >= 0) this.children.splice(idx, 1);
+                    child.parentNode = null;
+                },
+                querySelector(selector) {
+                    // Simple ID-based selector for testing
+                    if (selector.startsWith('#')) {
+                        const id = selector.slice(1);
+                        return elements[id] || null;
+                    }
+                    return null;
+                }
+            };
+            return el;
+        };
+
+        // Create mock elements that ScaleEngineUI queries
+        const ids = [
+            'scale-instrument', 'scale-key', 'scale-exercise-type',
+            'scale-type', 'arpeggio-type', 'etude-pattern',
+            'scale-octaves', 'scale-tempo', 'scale-tempo-display',
+            'scale-generate-btn', 'scale-practice-btn', 'scale-cof-btn',
+            'scale-exercise-info', 'scale-exercise-title', 'scale-note-count',
+            'scale-type-field', 'arpeggio-type-field', 'etude-pattern-field'
+        ];
+        for (const id of ids) {
+            elements[id] = createElement('div');
+            elements[id].id = id;
+        }
+
+        const container = createElement('div');
+        container.querySelector = (selector) => {
+            if (selector.startsWith('#')) {
+                return elements[selector.slice(1)] || null;
+            }
+            return null;
+        };
+
+        // Override createElement to return our mock panel
+        const panel = createElement('div');
+        panel.querySelector = container.querySelector;
+
+        return { container, panel, elements, createElement };
+    }
+
+    // Mock localStorage
+    const mockStorage = {};
+    const origGetItem = global.localStorage;
+    global.localStorage = {
+        getItem: (key) => mockStorage[key] || null,
+        setItem: (key, value) => { mockStorage[key] = String(value); },
+        removeItem: (key) => { delete mockStorage[key]; }
+    };
+
+    // Load ScaleEngineUI
+    const { ScaleEngineUI } = require('../src/js/components/scale-engine-ui');
+
+    test('ScaleEngineUI loads default settings', () => {
+        const { container } = createMockDOM();
+        const ui = new ScaleEngineUI(container);
+        assertEqual(ui.settings.instrument, 'violin', 'Default instrument');
+        assertEqual(ui.settings.key, 'C', 'Default key');
+        assertEqual(ui.settings.scaleType, 'major', 'Default scale type');
+        assertEqual(ui.settings.tempo, 80, 'Default tempo');
+    });
+
+    test('ScaleEngineUI saves and loads settings from localStorage', () => {
+        const { container } = createMockDOM();
+        const ui = new ScaleEngineUI(container);
+        ui.settings.key = 'G';
+        ui.settings.tempo = 120;
+        ui.saveSettings();
+
+        assertEqual(mockStorage['scaleEngine_key'], 'G', 'Key saved to localStorage');
+        assertEqual(mockStorage['scaleEngine_tempo'], '120', 'Tempo saved to localStorage');
+
+        // Load into a new instance
+        const ui2 = new ScaleEngineUI(container);
+        assertEqual(ui2.settings.key, 'G', 'Key loaded from localStorage');
+        assertEqual(ui2.settings.tempo, 120, 'Tempo loaded from localStorage');
+
+        // Clean up
+        delete mockStorage['scaleEngine_key'];
+        delete mockStorage['scaleEngine_tempo'];
+    });
+
+    test('ScaleEngineUI connectModules stores references', () => {
+        const { container } = createMockDOM();
+        const ui = new ScaleEngineUI(container);
+        const mockMetronome = { setBPM: () => {}, start: () => {}, stop: () => {} };
+        const mockFollowTheBall = { reset: () => {}, enabled: false };
+        const mockRenderer = { setScore: () => {} };
+
+        ui.connectModules({
+            metronome: mockMetronome,
+            followTheBall: mockFollowTheBall,
+            sheetMusicRenderer: mockRenderer
+        });
+
+        assertTrue(ui.metronome === mockMetronome, 'Metronome stored');
+        assertTrue(ui.followTheBall === mockFollowTheBall, 'FollowTheBall stored');
+        assertTrue(ui.sheetMusicRenderer === mockRenderer, 'SheetMusicRenderer stored');
+        assertTrue(ui.intonationAnalyzer === null, 'IntonationAnalyzer null when not provided');
+    });
+
+    test('ScaleEngineUI getCurrentScore returns null initially', () => {
+        const { container } = createMockDOM();
+        const ui = new ScaleEngineUI(container);
+        assertEqual(ui.getCurrentScore(), null, 'No score initially');
+    });
+
+    // Restore localStorage
+    if (origGetItem) {
+        global.localStorage = origGetItem;
+    }
 
     console.log(`\n${passed} passed, ${failed} failed`);
 

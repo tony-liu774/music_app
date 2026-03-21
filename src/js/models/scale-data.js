@@ -43,6 +43,8 @@ const ETUDE_PATTERNS = {
     sixths: { name: 'Sixths', intervals: [0, 5, 1, 6, 2, 7, 3, 8, 4, 9, 5, 10] },
     octaves: { name: 'Octaves', intervals: [0, 7, 1, 8, 2, 9, 3, 10, 4, 11, 5, 12] },
     broken_thirds: { name: 'Broken Thirds', intervals: [0, 2, 4, 2, 4, 5, 7, 5] },
+    shifts: { name: 'Shifts', intervals: [0, 1, 2, 3, 4, 5, 6, 7], shift: true },
+    double_stops: { name: 'Double Stops', intervals: [0, 2], doubleStop: true },
     chromatic: { name: 'Chromatic', intervals: null } // special case
 };
 
@@ -111,6 +113,29 @@ const INSTRUMENT_CONFIG = {
 };
 
 /**
+ * Get key signature fifths value, adjusting for minor keys.
+ * Minor keys use the relative major's key signature (3 semitones up).
+ * @param {string} keyName - Key name (e.g. 'A', 'D', 'Bb')
+ * @param {boolean} isMinor - Whether the scale is minor
+ * @returns {number} fifths value for MusicXML
+ */
+function getKeySignatureFifths(keyName, isMinor) {
+    if (!isMinor) {
+        return KEY_SIGNATURES[keyName] || 0;
+    }
+    // Minor key: relative major is 3 semitones up
+    const minorBase = noteNameToMidiBase(keyName);
+    const relativeMajorBase = (minorBase + 3) % 12;
+    // Find the key name for the relative major
+    const baseToKey = {
+        0: 'C', 1: 'Db', 2: 'D', 3: 'Eb', 4: 'E', 5: 'F',
+        6: 'F#', 7: 'G', 8: 'Ab', 9: 'A', 10: 'Bb', 11: 'B'
+    };
+    const relativeMajorKey = baseToKey[relativeMajorBase];
+    return KEY_SIGNATURES[relativeMajorKey] || 0;
+}
+
+/**
  * Convert a MIDI number to pitch object { step, octave, alter }
  */
 function midiToPitch(midi) {
@@ -175,7 +200,8 @@ if (typeof window !== 'undefined') {
         INSTRUMENT_CONFIG,
         midiToPitch,
         noteNameToMidiBase,
-        midiToPitchInKey
+        midiToPitchInKey,
+        getKeySignatureFifths
     };
 }
 
@@ -192,6 +218,7 @@ if (typeof module !== 'undefined' && module.exports) {
         INSTRUMENT_CONFIG,
         midiToPitch,
         noteNameToMidiBase,
-        midiToPitchInKey
+        midiToPitchInKey,
+        getKeySignatureFifths
     };
 }

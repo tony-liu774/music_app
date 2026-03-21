@@ -154,7 +154,7 @@ class ConcertmasterApp {
                 metronome: this.metronome,
                 followTheBall: this.followTheBall,
                 intonationAnalyzer: this.intonationAnalyzer,
-                sessionLogger: this.sessionData
+                sheetMusicRenderer: this.sheetMusicRenderer
             });
         }
     }

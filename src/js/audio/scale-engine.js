@@ -30,9 +30,21 @@ class ScaleEngine {
     }
 
     /**
-     * Set configuration and optionally regenerate
+     * Set configuration with validation
      */
     setConfig(newConfig) {
+        if (newConfig.instrument && !this.scaleData.INSTRUMENT_CONFIG[newConfig.instrument]) {
+            throw new Error(`Unknown instrument: ${newConfig.instrument}`);
+        }
+        if (newConfig.key && this.scaleData.KEY_SIGNATURES[newConfig.key] === undefined) {
+            throw new Error(`Unknown key: ${newConfig.key}`);
+        }
+        if (newConfig.tempo !== undefined) {
+            newConfig.tempo = Math.max(20, Math.min(300, newConfig.tempo));
+        }
+        if (newConfig.octaves !== undefined) {
+            newConfig.octaves = Math.max(1, Math.min(3, newConfig.octaves));
+        }
         Object.assign(this.config, newConfig);
         if (this.onConfigChange) {
             this.onConfigChange(this.config);
@@ -69,9 +81,13 @@ class ScaleEngine {
         }
 
         const instrumentConfig = this.scaleData.INSTRUMENT_CONFIG[this.config.instrument];
+        if (!instrumentConfig) {
+            throw new Error(`Unknown instrument: ${this.config.instrument}`);
+        }
         const title = this.getExerciseTitle();
-        const fifths = this.scaleData.KEY_SIGNATURES[this.config.key] || 0;
-        const isMinor = this.config.scaleType.includes('minor');
+        const isMinor = this.config.scaleType.includes('minor') ||
+            (this.config.exerciseType === 'arpeggio' && this.config.arpeggioType === 'minor');
+        const fifths = this.scaleData.getKeySignatureFifths(this.config.key, isMinor);
 
         const musicxml = this.xmlGenerator.generate({
             title,
@@ -160,20 +176,34 @@ class ScaleEngine {
             return this.generateChromaticPattern(rootMidi, octaves, key);
         }
 
+        // Shifts pattern: play scale from each position (simulating position shifts)
+        if (pattern.shift) {
+            return this.generateShiftPattern(fullScale, key);
+        }
+
+        // Double stops: play pairs of notes (thirds) simultaneously
+        if (pattern.doubleStop) {
+            return this.generateDoubleStopPattern(fullScale, key);
+        }
+
         // Apply the pattern indices to the scale
         const notes = [];
         const patternIndices = pattern.intervals;
         const maxIndex = fullScale.length - 1;
 
-        for (let offset = 0; offset + patternIndices[patternIndices.length - 1] <= maxIndex; offset++) {
+        // Find the maximum pattern offset that still has the first note within range
+        for (let offset = 0; offset <= maxIndex; offset++) {
+            let addedAny = false;
             for (const idx of patternIndices) {
                 const scaleIndex = offset + idx;
                 if (scaleIndex <= maxIndex) {
                     const midi = fullScale[scaleIndex];
                     const pitch = this.scaleData.midiToPitchInKey(midi, key);
                     notes.push({ ...pitch, duration: this.config.noteDuration });
+                    addedAny = true;
                 }
             }
+            if (!addedAny) break;
         }
 
         return this.clampToInstrumentRange(notes);
@@ -200,6 +230,41 @@ class ScaleEngine {
             notes.push({ ...pitch, duration: this.config.noteDuration });
         }
 
+        return this.clampToInstrumentRange(notes);
+    }
+
+    /**
+     * Generate shift pattern - plays scale fragments starting from successive positions
+     * Simulates left-hand position shifts on a string instrument
+     */
+    generateShiftPattern(fullScale, key) {
+        const notes = [];
+        const fragmentSize = 4; // 4-note groups per position
+        for (let pos = 0; pos + fragmentSize <= fullScale.length; pos++) {
+            for (let i = 0; i < fragmentSize; i++) {
+                const midi = fullScale[pos + i];
+                const pitch = this.scaleData.midiToPitchInKey(midi, key);
+                notes.push({ ...pitch, duration: this.config.noteDuration });
+            }
+        }
+        return this.clampToInstrumentRange(notes);
+    }
+
+    /**
+     * Generate double stop pattern - pairs of notes a third apart
+     * Each pair is written as two sequential notes (bottom then top)
+     */
+    generateDoubleStopPattern(fullScale, key) {
+        const notes = [];
+        const interval = 2; // thirds (2 scale degrees apart)
+        for (let i = 0; i + interval < fullScale.length; i++) {
+            const lowerMidi = fullScale[i];
+            const upperMidi = fullScale[i + interval];
+            const lowerPitch = this.scaleData.midiToPitchInKey(lowerMidi, key);
+            const upperPitch = this.scaleData.midiToPitchInKey(upperMidi, key);
+            notes.push({ ...lowerPitch, duration: this.config.noteDuration });
+            notes.push({ ...upperPitch, duration: this.config.noteDuration });
+        }
         return this.clampToInstrumentRange(notes);
     }
 
@@ -407,12 +472,12 @@ class ScaleEngine {
         const originalKey = this.config.key;
 
         for (const key of this.scaleData.CIRCLE_OF_FIFTHS) {
-            this.config.key = key;
+            this.setConfig({ key });
             const result = this.generate();
             results.push({ key, ...result });
         }
 
-        this.config.key = originalKey;
+        this.setConfig({ key: originalKey });
         return results;
     }
 

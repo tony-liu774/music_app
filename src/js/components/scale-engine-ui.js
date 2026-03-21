@@ -14,7 +14,7 @@ class ScaleEngineUI {
         this.metronome = null;
         this.followTheBall = null;
         this.intonationAnalyzer = null;
-        this.sessionLogger = null;
+        this.sheetMusicRenderer = null;
 
         // State
         this.currentScore = null;
@@ -37,11 +37,11 @@ class ScaleEngineUI {
     /**
      * Connect integration modules
      */
-    connectModules({ metronome, followTheBall, intonationAnalyzer, sessionLogger } = {}) {
+    connectModules({ metronome, followTheBall, intonationAnalyzer, sheetMusicRenderer } = {}) {
         this.metronome = metronome || null;
         this.followTheBall = followTheBall || null;
         this.intonationAnalyzer = intonationAnalyzer || null;
-        this.sessionLogger = sessionLogger || null;
+        this.sheetMusicRenderer = sheetMusicRenderer || null;
     }
 
     /**
@@ -161,6 +161,8 @@ class ScaleEngineUI {
                             <option value="sixths" ${this.settings.etudePattern === 'sixths' ? 'selected' : ''}>Sixths</option>
                             <option value="octaves" ${this.settings.etudePattern === 'octaves' ? 'selected' : ''}>Octaves</option>
                             <option value="broken_thirds" ${this.settings.etudePattern === 'broken_thirds' ? 'selected' : ''}>Broken Thirds</option>
+                            <option value="shifts" ${this.settings.etudePattern === 'shifts' ? 'selected' : ''}>Shifts</option>
+                            <option value="double_stops" ${this.settings.etudePattern === 'double_stops' ? 'selected' : ''}>Double Stops</option>
                             <option value="chromatic" ${this.settings.etudePattern === 'chromatic' ? 'selected' : ''}>Chromatic</option>
                         </select>
                     </div>
@@ -309,9 +311,19 @@ class ScaleEngineUI {
         if (titleEl) titleEl.textContent = this.scaleEngine.getExerciseTitle();
         if (countEl) countEl.textContent = `${result.notes.length} notes`;
 
-        // Enable practice button
+        // Enable practice button (only if notes were generated)
         const practiceBtn = this.element.querySelector('#scale-practice-btn');
-        if (practiceBtn) practiceBtn.disabled = false;
+        if (practiceBtn) practiceBtn.disabled = result.notes.length === 0;
+
+        // Warn if no notes were generated
+        if (result.notes.length === 0 && countEl) {
+            countEl.textContent = 'No notes in range';
+        }
+
+        // Render score to sheet music display
+        if (this.sheetMusicRenderer && result.score) {
+            this.sheetMusicRenderer.setScore(result.score);
+        }
 
         // Sync metronome tempo
         if (this.metronome) {
@@ -320,7 +332,7 @@ class ScaleEngineUI {
 
         // Reset follow-the-ball cursor
         if (this.followTheBall) {
-            this.followTheBall.setPosition(0);
+            this.followTheBall.reset();
         }
 
         // Reset intonation analyzer
@@ -363,16 +375,7 @@ class ScaleEngineUI {
         // Enable follow-the-ball
         if (this.followTheBall) {
             this.followTheBall.enabled = true;
-            this.followTheBall.setPosition(0);
-        }
-
-        // Log session start
-        if (this.sessionLogger) {
-            this.sessionLogger.startSession({
-                type: 'warmup',
-                exercise: this.scaleEngine.getExerciseTitle(),
-                config: this.scaleEngine.getConfig()
-            });
+            this.followTheBall.reset();
         }
     }
 
@@ -388,11 +391,6 @@ class ScaleEngineUI {
         // Stop follow-the-ball
         if (this.followTheBall) {
             this.followTheBall.enabled = false;
-        }
-
-        // Log session end
-        if (this.sessionLogger) {
-            this.sessionLogger.endSession();
         }
 
         this.isPracticing = false;

@@ -38,9 +38,11 @@ class MusicXMLGenerator {
 
         const measures = this.groupNotesIntoMeasures(notes, beats, beatType);
         const measuresXml = measures.map((measureNotes, index) => {
-            return this.generateMeasure(measureNotes, index + 1, index === 0 ? {
+            const isFirst = index === 0;
+            const isLast = index === measures.length - 1;
+            return this.generateMeasure(measureNotes, index + 1, isFirst ? {
                 clef, clefLine, fifths, mode, beats, beatType, tempo
-            } : null);
+            } : null, isLast);
         }).join('\n');
 
         return this.wrapInScore(title, measuresXml);
@@ -82,7 +84,7 @@ class MusicXMLGenerator {
     /**
      * Generate XML for a single measure
      */
-    generateMeasure(notes, measureNumber, attributes) {
+    generateMeasure(notes, measureNumber, attributes, isLast = false) {
         let xml = `      <measure number="${measureNumber}">\n`;
 
         if (attributes) {
@@ -94,7 +96,7 @@ class MusicXMLGenerator {
             xml += this.generateNote(note);
         }
 
-        if (measureNumber === -1) {
+        if (isLast) {
             xml += '        <barline location="right">\n';
             xml += '          <bar-style>light-heavy</bar-style>\n';
             xml += '        </barline>\n';
