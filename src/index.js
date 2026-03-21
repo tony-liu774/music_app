@@ -27,7 +27,7 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-eval'"], // Required for AudioWorklet
+      scriptSrc: ["'self'", "'unsafe-eval'", "https://cdnjs.cloudflare.com"], // Required for AudioWorklet + jsPDF CDN
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", 'data:', 'https:'],
       connectSrc: ["'self'", 'blob:'],
