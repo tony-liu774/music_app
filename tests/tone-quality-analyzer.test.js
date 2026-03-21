@@ -147,6 +147,17 @@ describe('ToneQualityAnalyzer', () => {
         assert.ok(result.score < 60, 'Harsh tone should have lower score');
     });
 
+    test('should not return NaN when harshnessThreshold is 0', () => {
+        analyzer.configure({ harshnessThreshold: 0 });
+        const fft = new Float32Array(2048).fill(0.5);
+        const frequencies = analyzer.computeFrequencyBins();
+        const range = analyzer.instrumentRanges.violin;
+        const result = analyzer.detectHarshness(fft, frequencies, range);
+        assert.ok(Number.isFinite(result.score), 'score must not be NaN');
+        assert.strictEqual(result.level, 'excellent');
+        assert.strictEqual(result.score, 100);
+    });
+
     test('should return correct harshness level labels at boundaries', () => {
         // Test via getQualityStatus static method (same thresholds as detectHarshness)
         assert.strictEqual(ToneQualityAnalyzer.getQualityStatus(100), 'excellent', 'Score 100 = excellent');
