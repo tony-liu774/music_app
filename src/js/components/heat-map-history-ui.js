@@ -450,14 +450,16 @@ class HeatMapHistoryUI {
             <div class="practice-log">
                 <h3>Practice Sessions</h3>
                 <div class="session-list">
-                    ${weekSessions.map(s => `
+                    ${weekSessions.map(s => {
+                        const pieceName = this._escapeHtml(s.pieceName || s.scoreId);
+                        return `
                         <div class="session-item">
                             <span class="session-date">${new Date(s.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
-                            <span class="session-piece">${this._escapeHtml(s.pieceName || s.scoreId)}</span>
+                            <span class="session-piece">${pieceName}</span>
                             <span class="session-duration">${this.heatMapService.formatPracticeTime(s.durationMs)}</span>
                             <span class="session-errors">${s.totalDeviations} errors</span>
                         </div>
-                    `).join('')}
+                    `}).join('')}
                 </div>
             </div>
         `;
