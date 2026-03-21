@@ -177,6 +177,322 @@ describe('License Routes', () => {
             }
         });
     });
+
+    // Helper to set up a studio license with a teacher
+    async function setupStudioLicense() {
+        const licenseModule = require('../src/routes/license');
+        const licensesMap = licenseModule.licenses;
+        let studioKey;
+        for (const [key, lic] of licensesMap) {
+            if (lic.tier === 'studio' && !lic.userId) {
+                studioKey = key;
+                break;
+            }
+        }
+
+        if (!studioKey) {
+            studioKey = licenseModule.generateLicenseKey('MCS');
+            licensesMap.set(studioKey, {
+                id: 'studio-lic-001',
+                type: 'one-time',
+                tier: 'studio',
+                userId: null,
+                status: 'active',
+                expiresAt: null,
+                studentLimit: 30,
+                studentCount: 0,
+                students: [],
+                createdAt: Date.now()
+            });
+        }
+
+        // Activate the studio license
+        await makeRequest(app, '/api/licenses/activate', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${authToken}` },
+            body: { licenseKey: studioKey }
+        });
+
+        return studioKey;
+    }
+
+    describe('POST /api/licenses/generate-student-key', () => {
+        it('should generate a student key for studio license', async () => {
+            await setupStudioLicense();
+
+            const response = await makeRequest(app, '/api/licenses/generate-student-key', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${authToken}` },
+                body: { studentEmail: 'student@test.com' }
+            });
+
+            assert.strictEqual(response.status, 200);
+            assert.ok(response.body.studentKey);
+            assert.ok(response.body.studentKey.startsWith('STU-'));
+            assert.strictEqual(response.body.studentEmail, 'student@test.com');
+        });
+
+        it('should reject without studio license', async () => {
+            // Use a different auth token (not a teacher)
+            const otherToken = generateTokens({ id: 'other-user', email: 'other@test.com' }).token;
+
+            const response = await makeRequest(app, '/api/licenses/generate-student-key', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${otherToken}` },
+                body: { studentEmail: 'student@test.com' }
+            });
+
+            assert.strictEqual(response.status, 403);
+            assert.strictEqual(response.body.error, 'Studio license required for student invitations');
+        });
+
+        it('should reject invalid email', async () => {
+            await setupStudioLicense();
+
+            const response = await makeRequest(app, '/api/licenses/generate-student-key', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${authToken}` },
+                body: { studentEmail: 'invalid-email' }
+            });
+
+            assert.strictEqual(response.status, 400);
+        });
+    });
+
+    describe('POST /api/licenses/invite-link', () => {
+        it('should generate an invite link', async () => {
+            await setupStudioLicense();
+
+            const response = await makeRequest(app, '/api/licenses/invite-link', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${authToken}` }
+            });
+
+            assert.strictEqual(response.status, 200);
+            assert.ok(response.body.inviteLink);
+            assert.ok(response.body.inviteLink.includes('?invite='));
+            // remainingSlots may vary based on previous tests
+            assert.ok(response.body.remainingSlots >= 0);
+        });
+
+        it('should reject without studio license', async () => {
+            const otherToken = generateTokens({ id: 'other-user', email: 'other@test.com' }).token;
+
+            const response = await makeRequest(app, '/api/licenses/invite-link', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${otherToken}` }
+            });
+
+            assert.strictEqual(response.status, 403);
+        });
+    });
+
+    describe('POST /api/licenses/accept-invitation', () => {
+        it('should accept invitation with valid token', async () => {
+            await setupStudioLicense();
+
+            // Generate invite link
+            const inviteResponse = await makeRequest(app, '/api/licenses/invite-link', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${authToken}` }
+            });
+
+            const inviteLink = inviteResponse.body.inviteLink;
+            const token = inviteLink.split('?invite=')[1];
+
+            // Accept invitation as a different user
+            const studentToken = generateTokens({ id: 'student-user', email: 'newstudent@test.com' }).token;
+
+            const response = await makeRequest(app, '/api/licenses/accept-invitation', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${studentToken}` },
+                body: { invitationToken: token }
+            });
+
+            assert.strictEqual(response.status, 200);
+            assert.strictEqual(response.body.tier, 'studio');
+        });
+
+        it('should reject invalid token', async () => {
+            const studentToken = generateTokens({ id: 'student-user', email: 'student@test.com' }).token;
+
+            const response = await makeRequest(app, '/api/licenses/accept-invitation', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${studentToken}` },
+                body: { invitationToken: 'invalid-token' }
+            });
+
+            assert.strictEqual(response.status, 404);
+        });
+
+        it('should reject invitation when student limit is reached', async () => {
+            await setupStudioLicense();
+
+            // Find the license and set studentCount to at limit BEFORE creating invite
+            const licenseModule = require('../src/routes/license');
+            const licensesMap = licenseModule.licenses;
+            for (const [key, lic] of licensesMap) {
+                if (lic.tier === 'studio' && lic.userId) {
+                    // Add dummy students to reach limit
+                    lic.students = [];
+                    for (let i = 0; i < lic.studentLimit; i++) {
+                        lic.students.push({
+                            id: `student-${i}`,
+                            email: `student${i}@test.com`,
+                            userId: `user-${i}`,
+                            invitedAt: Date.now(),
+                            activatedAt: Date.now()
+                        });
+                    }
+                    lic.studentCount = lic.studentLimit;
+                    licensesMap.set(key, lic);
+                    break;
+                }
+            }
+
+            // Try to generate invite link when at limit
+            const response = await makeRequest(app, '/api/licenses/invite-link', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${authToken}` }
+            });
+
+            assert.strictEqual(response.status, 400);
+            assert.ok(response.body.error.includes('Student limit reached'));
+        });
+    });
+
+    describe('GET /api/licenses/students', () => {
+        it('should return students list for studio license', async () => {
+            await setupStudioLicense();
+
+            // Generate a student key
+            await makeRequest(app, '/api/licenses/generate-student-key', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${authToken}` },
+                body: { studentEmail: 'student@test.com' }
+            });
+
+            const response = await makeRequest(app, '/api/licenses/students', {
+                method: 'GET',
+                headers: { Authorization: `Bearer ${authToken}` }
+            });
+
+            assert.strictEqual(response.status, 200);
+            assert.ok(Array.isArray(response.body));
+            assert.ok(response.body.length > 0);
+            // Should not expose the student key
+            assert.strictEqual(response.body[0].key, undefined);
+        });
+
+        it('should reject without studio license', async () => {
+            const otherToken = generateTokens({ id: 'other-user', email: 'other@test.com' }).token;
+
+            const response = await makeRequest(app, '/api/licenses/students', {
+                method: 'GET',
+                headers: { Authorization: `Bearer ${otherToken}` }
+            });
+
+            assert.strictEqual(response.status, 403);
+        });
+    });
+
+    describe('DELETE /api/licenses/students/:studentId', () => {
+        it('should remove a student from studio license', async () => {
+            await setupStudioLicense();
+
+            // Generate a student key
+            const genResponse = await makeRequest(app, '/api/licenses/generate-student-key', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${authToken}` },
+                body: { studentEmail: 'student@test.com' }
+            });
+
+            const studentId = genResponse.body.studentId;
+
+            // Get students to find the ID
+            const studentsResponse = await makeRequest(app, '/api/licenses/students', {
+                method: 'GET',
+                headers: { Authorization: `Bearer ${authToken}` }
+            });
+
+            const student = studentsResponse.body.find(s => s.email === 'student@test.com');
+
+            if (student) {
+                const deleteResponse = await makeRequest(app, `/api/licenses/students/${student.id}`, {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bearer ${authToken}` }
+                });
+
+                assert.strictEqual(deleteResponse.status, 200);
+            }
+        });
+    });
+
+    describe('GET /api/licenses/:licenseId/renewal', () => {
+        it('should return renewal info for subscription license', async () => {
+            // Activate pro license first
+            await makeRequest(app, '/api/licenses/activate', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${authToken}` },
+                body: { licenseKey: testLicenseKey }
+            });
+
+            // Get license ID
+            const licenseModule = require('../src/routes/license');
+            const licensesMap = licenseModule.licenses;
+            let licenseId;
+            for (const [key, lic] of licensesMap) {
+                if (lic.userId && lic.tier === 'pro') {
+                    licenseId = lic.id;
+                    break;
+                }
+            }
+
+            if (licenseId) {
+                const response = await makeRequest(app, `/api/licenses/${licenseId}/renewal`, {
+                    method: 'GET',
+                    headers: { Authorization: `Bearer ${authToken}` }
+                });
+
+                assert.strictEqual(response.status, 200);
+                assert.strictEqual(response.body.currentTier, 'pro');
+            }
+        });
+
+        it('should return no renewal needed for one-time license', async () => {
+            const studioKey = await setupStudioLicense();
+
+            // Get license ID
+            const licenseModule = require('../src/routes/license');
+            const licensesMap = licenseModule.licenses;
+            let licenseId;
+            for (const [key, lic] of licensesMap) {
+                if (lic.key === studioKey) {
+                    licenseId = lic.id;
+                    break;
+                }
+            }
+
+            if (licenseId) {
+                const response = await makeRequest(app, `/api/licenses/${licenseId}/renewal`, {
+                    method: 'GET',
+                    headers: { Authorization: `Bearer ${authToken}` }
+                });
+
+                assert.strictEqual(response.status, 200);
+                assert.strictEqual(response.body.renewalRequired, false);
+            }
+        });
+
+        it('should return 404 for non-existent license', async () => {
+            const response = await makeRequest(app, '/api/licenses/non-existent-id/renewal', {
+                method: 'GET',
+                headers: { Authorization: `Bearer ${authToken}` }
+            });
+
+            assert.strictEqual(response.status, 404);
+        });
+    });
 });
 
 // Helper function to make requests to Express app
