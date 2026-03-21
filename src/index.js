@@ -1,6 +1,7 @@
 const express = require('express');
 const helmet = require('helmet');
 const multer = require('multer');
+const path = require('path');
 const config = require('./config');
 const logger = require('./middleware/logger');
 const cors = require('./middleware/cors');
@@ -54,7 +55,11 @@ app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // Serve static files (frontend) - root directory for PWA
-app.use(express.static('.', { index: 'index.html' }));
+app.use(express.static(path.join(__dirname, '..')));
+// Serve index.html at root URL
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'index.html'));
+});
 
 // Health check routes
 app.use('/health', healthRoutes);
