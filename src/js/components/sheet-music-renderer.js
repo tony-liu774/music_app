@@ -1,6 +1,7 @@
 /**
  * Sheet Music Renderer - Visual rendering of music notation
  * Displays notes from the parsed score
+ * Optimized for 60fps rendering
  */
 
 class SheetMusicRenderer {
@@ -13,6 +14,12 @@ class SheetMusicRenderer {
         this.noteWidth = 30;
         this.staffY = 80;
         this.lineSpacing = 10;
+
+        // Performance optimization
+        this.isDirty = true;
+        this.animationFrameId = null;
+        this.lastRenderTime = 0;
+        this.renderInterval = 1000 / 60; // 60fps target
     }
 
     init() {
@@ -21,7 +28,7 @@ class SheetMusicRenderer {
         this.canvas.className = 'sheet-music-canvas';
         this.container?.appendChild(this.canvas);
 
-        this.ctx = this.canvas.getContext('2d');
+        this.ctx = this.canvas.getContext('2d', { alpha: false });
         this.resize();
 
         window.addEventListener('resize', () => this.resize());
@@ -29,7 +36,7 @@ class SheetMusicRenderer {
 
     setScore(score) {
         this.score = score;
-        this.render();
+        this.markDirty();
     }
 
     resize() {
@@ -38,17 +45,43 @@ class SheetMusicRenderer {
         const rect = this.container.getBoundingClientRect();
         this.canvas.width = rect.width;
         this.canvas.height = rect.height;
+        this.markDirty();
+    }
+
+    markDirty() {
+        this.isDirty = true;
+        this.scheduleRender();
+    }
+
+    scheduleRender() {
+        if (this.animationFrameId) return;
+
+        const now = performance.now();
+        const timeSinceLastRender = now - this.lastRenderTime;
+
+        if (timeSinceLastRender >= this.renderInterval) {
+            this.render();
+        } else {
+            this.animationFrameId = requestAnimationFrame(() => {
+                this.animationFrameId = null;
+                this.render();
+            });
+        }
     }
 
     render() {
         if (!this.ctx || !this.canvas) return;
+        if (!this.isDirty) return;
 
-        // Clear canvas
+        this.lastRenderTime = performance.now();
+
+        // Clear canvas with background color
         this.ctx.fillStyle = '#141420';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
         if (!this.score) {
             this.renderPlaceholder();
+            this.isDirty = false;
             return;
         }
 
@@ -61,8 +94,15 @@ class SheetMusicRenderer {
         // Draw notes
         this.drawNotes();
 
+        // Draw cursor highlight if active
+        if (this.cursorPosition !== null) {
+            this.drawCursorHighlight();
+        }
+
         // Draw measure numbers
         this.drawMeasureNumbers();
+
+        this.isDirty = false;
     }
 
     renderPlaceholder() {
@@ -234,19 +274,67 @@ class SheetMusicRenderer {
         }
     }
 
+    drawCursorHighlight() {
+        if (!this.score || !this.score.parts.length) return;
+
+        const ctx = this.ctx;
+        const startX = 100;
+        const measures = this.score.parts[0].measures || [];
+        const measureWidth = (this.canvas.width - 140) / Math.min(measures.length, 8);
+
+        // Find note at cursor position
+        let foundX = null;
+        let foundY = null;
+
+        measures.forEach((measure, measureIndex) => {
+            if (measureIndex >= 8) return;
+
+            const measureX = startX + measureIndex * measureWidth;
+
+            measure.notes.forEach((note, noteIndex) => {
+                const noteX = measureX + 20 + noteIndex * this.noteWidth;
+                const noteY = this.getNoteY(note);
+
+                // Check if this note is at or before the cursor position
+                if (measureIndex < this.cursorPosition ||
+                    (measureIndex === this.cursorPosition && noteIndex === 0)) {
+                    foundX = noteX;
+                    foundY = noteY;
+                }
+            });
+        });
+
+        if (foundX !== null && foundY !== null) {
+            // Draw highlight box around current note
+            ctx.strokeStyle = 'rgba(201, 162, 39, 0.5)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.roundRect(foundX - 15, foundY - 15, 30, 30, 4);
+            ctx.stroke();
+        }
+    }
+
     setCursorPosition(position) {
         this.cursorPosition = position;
-        this.render();
+        this.markDirty();
     }
 
     clear() {
         if (this.ctx && this.canvas) {
-            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            this.ctx.fillStyle = '#141420';
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         }
     }
 
     getCanvas() {
         return this.canvas;
+    }
+
+    destroy() {
+        if (this.animationFrameId) {
+            cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
+        }
     }
 }
 

@@ -406,6 +406,69 @@ a:hover {
     opacity: 1;
 }
 
+/* Focused state for keyboard navigation */
+.library-card.focused {
+    transform: translateY(-4px) scale(1.02);
+    border-color: var(--primary);
+    box-shadow: var(--shadow-lg), 0 0 30px var(--primary-glow);
+    outline: none;
+}
+
+.library-card.focused::before {
+    opacity: 1;
+}
+
+/* Soft glow effects on interactive elements */
+.btn-primary:focus-visible,
+.btn-icon:focus-visible,
+.preset-btn:focus-visible,
+.instrument-option:focus-visible {
+    box-shadow: 0 0 0 3px var(--primary-glow), var(--shadow-glow);
+}
+
+/* Lazy thumbnail styles */
+.lazy-thumbnail {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0;
+    transition: opacity var(--transition-normal);
+}
+
+.lazy-thumbnail.loaded {
+    opacity: 1;
+}
+
+/* Screen reader only class */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Library grid zoom transform */
+.library-grid {
+    transition: transform var(--transition-normal);
+    transform-origin: top left;
+}
+
+/* Glow effect on score display */
+.score-value {
+    text-shadow: 0 0 20px var(--primary-glow);
+}
+
+/* Smooth cursor highlight animation */
+@keyframes cursorPulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+}
+
 .library-card-thumbnail {
     width: 100%;
     height: 120px;
@@ -554,7 +617,8 @@ a:hover {
 }
 
 .pitch-indicator,
-.timing-indicator {
+.timing-indicator,
+.intonation-indicator {
     display: flex;
     align-items: center;
     gap: var(--space-3);
@@ -599,11 +663,17 @@ a:hover {
 }
 
 .cents-display,
-.timing-display {
+.timing-display,
+.intonation-score {
     font-family: var(--font-mono);
     font-size: var(--text-sm);
     min-width: 50px;
     text-align: right;
+}
+
+.intonation-score {
+    font-weight: 600;
+    color: var(--success);
 }
 
 .score-display {
@@ -1119,6 +1189,32 @@ a:hover {
     color: var(--text-muted);
 }
 
+.radar-chart-section {
+    text-align: center;
+    margin-bottom: var(--space-6);
+}
+
+.radar-chart-section h3 {
+    margin-bottom: var(--space-3);
+}
+
+#radar-chart-canvas {
+    display: block;
+    margin: 0 auto;
+    max-width: 100%;
+}
+
+.recommendation {
+    background: var(--bg-elevated);
+    border-left: 3px solid var(--primary);
+    padding: var(--space-4);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-6);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
 .summary-actions {
     display: flex;
     justify-content: center;
@@ -1249,4 +1345,347 @@ a:hover {
 ::selection {
     background: var(--primary);
     color: var(--bg-deep);
+}
+
+<<<<<<< HEAD
+/* Follow-the-Ball Cursor */
+.follow-the-ball-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 100;
+    transition: opacity 0.3s ease;
+}
+
+.follow-the-ball {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    transform: translate(-50%, -50%);
+    transition: left 0.15s ease-out, top 0.15s ease-out;
+}
+
+.follow-the-ball-inner {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #ffd700, #c9a227, #8b6914);
+    box-shadow:
+        0 4px 8px rgba(0, 0, 0, 0.4),
+        inset 0 2px 4px rgba(255, 255, 255, 0.4);
+    position: relative;
+    animation: ballPulse 2s ease-in-out infinite;
+}
+
+.follow-the-ball-highlight {
+    position: absolute;
+    top: 8%;
+    left: 20%;
+    width: 30%;
+    height: 30%;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.8) 0%, transparent 70%);
+}
+
+/* Amber glow effect */
+.follow-the-ball-glow {
+    position: absolute;
+    width: 80px;
+    height: 80px;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle, rgba(201, 162, 39, 0.4) 0%, rgba(201, 162, 39, 0.2) 40%, transparent 70%);
+    animation: glowPulse 2s ease-in-out infinite;
+    pointer-events: none;
+}
+
+/* Bounce animation on note detection */
+.follow-the-ball.bouncing .follow-the-ball-inner {
+    animation: ballBounce 0.3s ease-out;
+}
+
+.follow-the-ball.bouncing .follow-the-ball-glow {
+    animation: glowBounce 0.3s ease-out;
+}
+
+/* Animations */
+@keyframes ballPulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+@keyframes glowPulse {
+    0%, 100% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0.8;
+    }
+    50% {
+        transform: translate(-50%, -50%) scale(1.1);
+        opacity: 1;
+    }
+}
+
+@keyframes ballBounce {
+    0% {
+        transform: scale(1);
+    }
+    30% {
+        transform: scale(1.3);
+    }
+    60% {
+        transform: scale(0.9);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+@keyframes glowBounce {
+    0% {
+        transform: translate(-50%, -50%) scale(1);
+    }
+    30% {
+        transform: translate(-50%, -50%) scale(1.5);
+    }
+    60% {
+        transform: translate(-50%, -50%) scale(0.8);
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+/* Highlight upcoming notes */
+.note-highlight {
+    position: relative;
+}
+
+.note-highlight::after {
+    content: '';
+    position: absolute;
+    top: -5px;
+    left: -5px;
+    right: -5px;
+    bottom: -5px;
+    border-radius: 50%;
+    background: rgba(201, 162, 39, 0.2);
+    animation: noteHighlight 1s ease-in-out infinite;
+}
+
+@keyframes noteHighlight {
+    0%, 100% {
+        opacity: 0.3;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.6;
+        transform: scale(1.2);
+    }
+}
+
+/* Cursor controls in settings */
+#cursor-controls-group {
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Small button style */
+.btn-small {
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--text-sm);
+}
+
+/* Post-Session Deep Navy Overlay */
+.sheet-music-container.session-ended::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(10, 25, 47, 0.85);
+    pointer-events: none;
+    z-index: 50;
+    animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* Heat Map Colors (Crimson for areas needing improvement) */
+.heatmap-container .measure-needs-work {
+    background: var(--error) !important;
+}
+
+.heatmap-container .measure-good {
+    background: var(--success) !important;
+}
+
+/* Radar Chart */
+.radar-chart-section {
+    margin-bottom: var(--space-6);
+    text-align: center;
+}
+
+.radar-chart-section h3 {
+    margin-bottom: var(--space-4);
+}
+
+.radar-chart-container {
+    display: flex;
+    justify-content: center;
+    padding: var(--space-4);
+}
+
+.radar-chart {
+    width: 180px;
+    height: 180px;
+}
+
+.radar-circle {
+    fill: none;
+    stroke: var(--border);
+    stroke-width: 1;
+}
+
+.radar-axis {
+    stroke: var(--border);
+    stroke-width: 1;
+}
+
+.radar-polygon {
+    fill: rgba(201, 162, 39, 0.3);
+    stroke: var(--primary);
+    stroke-width: 2;
+}
+
+.radar-label {
+    font-size: 12px;
+    fill: var(--text-secondary);
+    font-weight: 600;
+}
+
+/* Recommendation Section */
+.recommendation-section {
+    text-align: left;
+    margin-bottom: var(--space-6);
+    padding: var(--space-4);
+    background: var(--bg-elevated);
+    border-radius: var(--radius-md);
+    border-left: 3px solid var(--primary);
+}
+
+.recommendation-section h3 {
+    margin-bottom: var(--space-2);
+    font-size: var(--text-base);
+}
+
+.recommendation-text {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+/* Three-axis color coding */
+.breakdown-value.good {
+    color: var(--success);
+}
+
+.breakdown-value.warning {
+    color: var(--warning);
+}
+
+.breakdown-value.poor {
+    color: var(--error);
+}
+
+.heatmap-container .measure-ok {
+    background: var(--warning) !important;
+}
+
+/* Session ended state for sheet music */
+.sheet-music-container.session-ended .sheet-music-canvas {
+    filter: grayscale(30%);
+}
+
+/* Enhanced note highlighting */
+.sheet-music-canvas .upcoming-note {
+    filter: drop-shadow(0 0 8px rgba(201, 162, 39, 0.6));
+}
+
+.sheet-music-canvas .current-note {
+    filter: drop-shadow(0 0 12px rgba(201, 162, 39, 0.8));
+}
+
+.sheet-music-canvas .passed-note {
+    opacity: 0.6;
+}
+
+/* Ensure typography uses theme fonts */
+body {
+    font-family: var(--font-body);
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+}
+
+/* Consistent soft glow on active/focused elements */
+.nav-link:focus-visible,
+.mobile-nav-link:focus-visible {
+    box-shadow: 0 0 10px var(--primary-glow);
+}
+
+/* Metronome beat glow effect */
+.beat-dot.active {
+    animation: beatPulse 0.3s ease-out;
+}
+
+@keyframes beatPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+
+/* Smooth transitions for all interactive elements */
+.library-card,
+.btn,
+.preset-btn,
+.instrument-option,
+.toggle-btn,
+.preset-btn {
+    will-change: transform, box-shadow;
+}
+
+/* Performance: reduce animations on motion preference */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
 }

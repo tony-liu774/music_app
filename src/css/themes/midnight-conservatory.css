@@ -14,12 +14,12 @@
 
     /* Secondary Accent - Emerald (correct intonation) */
     --success: #2d5a4a;
-    --success-light: #3d7a64;
+    --success-light: #3d7a6a;
     --success-glow: rgba(45, 90, 74, 0.4);
 
     /* Error Accent - Crimson (sharp/flat) */
     --error: #8b2942;
-    --error-light: #ab3a54;
+    --error-light: #ab3952;
     --error-glow: rgba(139, 41, 66, 0.4);
 
     /* Warning - Amber/Yellow */

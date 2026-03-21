@@ -8,6 +8,7 @@ class RhythmAnalyzer {
         this.beatTimestamps = [];
         this.noteOnsets = [];
         this.expectedIntervals = [];
+        this.timingSensitivity = 1.0;
     }
 
     setTempo(bpm) {
@@ -34,7 +35,8 @@ class RhythmAnalyzer {
 
         for (let i = 1; i < this.beatTimestamps.length; i++) {
             const actualInterval = this.beatTimestamps[i] - this.beatTimestamps[i - 1];
-            const deviation = Math.abs(actualInterval - expectedInterval);
+            // Apply timing sensitivity - higher sensitivity = more lenient scoring
+            const deviation = Math.abs(actualInterval - expectedInterval) / this.timingSensitivity;
             deviations.push(deviation);
         }
 
