@@ -9,8 +9,6 @@ class ToneQualityAnalyzer {
         // Audio parameters
         this.sampleRate = 44100;
         this.fftSize = 4096;
-        this.bufferSize = 2048;
-        this.hopSize = 512;
 
         // Frequency ranges for string instruments
         this.instrumentRanges = {
@@ -33,16 +31,13 @@ class ToneQualityAnalyzer {
         this.purityThreshold = 60;       // Minimum purity score for good tone
 
         // Wolf tone detection - common wolf tone frequencies for each instrument
+        // More accurate frequencies based on typical instrument physics
         this.wolfToneFrequencies = {
-            violin: [280, 315, 355, 400, 450, 500, 560, 630, 710],  // E string region
-            viola: [175, 197, 220, 247, 278, 313],                     // C string region
-            cello: [88, 98, 110, 123, 139, 156, 175],                  // C string region
-            bass: [41, 55, 73, 82]                                      // E string region
+            violin: [659, 698, 740, 784, 830, 880, 932, 988],  // E5 and above
+            viola: [220, 247, 277, 311, 349, 392, 440],         // A4 and above
+            cello: [147, 165, 175, 196, 220, 247],             // D3 and above
+            bass: [55, 82, 110, 147]                             // A1 and above
         };
-
-        // State
-        this.lastAnalysisTime = 0;
-        this.analysisInterval = 30; // Target <30ms latency
 
         // History for smoothing
         this.qualityHistory = [];
@@ -54,35 +49,65 @@ class ToneQualityAnalyzer {
         this.currentHarshnessScore = 0;
         this.wolfToneDetected = false;
         this.wolfToneFrequency = null;
+
+        // Pre-computed frequency bins (for when using external FFT data)
+        this.frequencyBins = null;
     }
 
     /**
      * Configure the analyzer
      */
     configure(options = {}) {
-        if (options.sampleRate) this.sampleRate = options.sampleRate;
-        if (options.fftSize) this.fftSize = options.fftSize;
-        if (options.bufferSize) this.bufferSize = options.bufferSize;
-        if (options.hopSize) this.hopSize = options.hopSize;
-        if (options.instrument) this.instrument = options.instrument;
-        if (options.harshnessThreshold) this.harshnessThreshold = options.harshnessThreshold;
-        if (options.wolfToneThreshold) this.wolfToneThreshold = options.wolfToneThreshold;
+        if (options.sampleRate !== undefined) this.sampleRate = options.sampleRate;
+        if (options.fftSize !== undefined) this.fftSize = options.fftSize;
+        if (options.instrument !== undefined) this.instrument = options.instrument;
+        if (options.harshnessThreshold !== undefined) this.harshnessThreshold = options.harshnessThreshold;
+        if (options.wolfToneThreshold !== undefined) this.wolfToneThreshold = options.wolfToneThreshold;
+
+        // Pre-compute frequency bins
+        this.frequencyBins = this.computeFrequencyBins();
+    }
+
+    /**
+     * Compute frequency values for each FFT bin
+     */
+    computeFrequencyBins() {
+        const numBins = this.fftSize / 2;
+        const frequencies = new Float32Array(numBins);
+
+        for (let i = 0; i < numBins; i++) {
+            frequencies[i] = i * this.sampleRate / this.fftSize;
+        }
+
+        return frequencies;
     }
 
     /**
      * Analyze audio buffer for tone quality
-     * @param {Float32Array} buffer - Audio samples
+     * @param {Float32Array} buffer - Audio samples (time domain)
      * @param {number} fundamentalFrequency - Detected fundamental frequency
+     * @param {Float32Array} frequencyData - Optional pre-computed frequency data from AnalyserNode
      * @returns {Object} Tone quality analysis results
      */
-    analyze(buffer, fundamentalFrequency) {
-        if (!buffer || buffer.length < this.bufferSize) {
-            return this.getDefaultResult();
-        }
+    analyze(buffer, fundamentalFrequency, frequencyData) {
+        // Use provided frequency data if available (from AnalyserNode)
+        // Otherwise compute from buffer
+        let fft, frequencies;
 
-        // Compute FFT
-        const fft = this.computeFFT(buffer);
-        const frequencies = this.computeFrequencyBins();
+        if (frequencyData && frequencyData.length > 0) {
+            // Convert Uint8Array to Float32Array if needed
+            fft = new Float32Array(frequencyData.length);
+            for (let i = 0; i < frequencyData.length; i++) {
+                fft[i] = frequencyData[i] / 255;
+            }
+            frequencies = this.frequencyBins || this.computeFrequencyBins();
+        } else if (!buffer || buffer.length < 1024) {
+            return this.getDefaultResult();
+        } else {
+            // Fall back to simplified DFT for smaller buffers
+            fft = this.computeSimplifiedFFT(buffer);
+            frequencies = this.frequencyBins || this.computeFrequencyBins();
+        }
 
         // Get frequency range for current instrument
         const range = this.instrumentRanges[this.instrument] || this.instrumentRanges.violin;
@@ -116,6 +141,11 @@ class ToneQualityAnalyzer {
         // Calculate overall tone quality score
         const qualityScore = this.calculateToneQualityScore(purityScore, harshnessResult.score, wolfToneResult.detected);
 
+        // Handle NaN from purity score
+        if (!Number.isFinite(qualityScore)) {
+            return this.getDefaultResult();
+        }
+
         // Update history for smoothing
         this.qualityHistory.push(qualityScore);
         if (this.qualityHistory.length > this.maxHistorySize) {
@@ -140,9 +170,10 @@ class ToneQualityAnalyzer {
     }
 
     /**
-     * Compute FFT of audio buffer using Web Audio API style
+     * Compute simplified FFT using a more efficient approach
+     * Uses reduced complexity for real-time performance
      */
-    computeFFT(buffer) {
+    computeSimplifiedFFT(buffer) {
         const numBins = this.fftSize / 2;
         const fftData = new Float32Array(numBins);
 
@@ -153,39 +184,39 @@ class ToneQualityAnalyzer {
             windowed[i] = buffer[i] * window;
         }
 
-        // Compute DFT for relevant frequency bins
-        const minBin = Math.floor(20 * this.fftSize / this.sampleRate);  // 20 Hz
-        const maxBin = Math.floor(5000 * this.fftSize / this.sampleRate); // 5 kHz
+        // Use a simpler approach - compute only essential frequency bins
+        // Use Goertzel-like approach for specific harmonic frequencies
+        const minFreq = 50;
+        const maxFreq = 8000;
+        const minBin = Math.floor(minFreq * this.fftSize / this.sampleRate);
+        const maxBin = Math.floor(maxFreq * this.fftSize / this.sampleRate);
 
-        for (let k = minBin; k < maxBin && k < numBins; k++) {
+        // Use smaller DFT for performance - sample every Nth bin
+        const step = Math.max(1, Math.floor((maxBin - minBin) / 200));
+
+        for (let k = minBin; k < maxBin && k < numBins; k += step) {
             let real = 0;
             let imag = 0;
 
-            for (let n = 0; n < windowed.length; n++) {
-                const angle = (2 * Math.PI * k * n) / this.fftSize;
+            // Use only a portion of the buffer for speed
+            const samplesToUse = Math.min(1024, windowed.length);
+            const angleStep = (2 * Math.PI * k) / this.fftSize;
+
+            for (let n = 0; n < samplesToUse; n++) {
+                const angle = angleStep * n;
                 real += windowed[n] * Math.cos(angle);
                 imag -= windowed[n] * Math.sin(angle);
             }
 
-            // Return magnitude spectrum
-            fftData[k] = Math.sqrt(real * real + imag * imag) / windowed.length;
+            const magnitude = Math.sqrt(real * real + imag * imag) / samplesToUse;
+
+            // Fill in neighboring bins with interpolated values
+            for (let i = 0; i < step && k + i < numBins; i++) {
+                fftData[k + i] = magnitude * (1 - Math.abs(i - step / 2) / step);
+            }
         }
 
         return fftData;
-    }
-
-    /**
-     * Compute frequency values for each FFT bin
-     */
-    computeFrequencyBins() {
-        const numBins = this.fftSize / 2;
-        const frequencies = new Float32Array(numBins);
-
-        for (let i = 0; i < numBins; i++) {
-            frequencies[i] = i * this.sampleRate / this.fftSize;
-        }
-
-        return frequencies;
     }
 
     /**
@@ -216,7 +247,13 @@ class ToneQualityAnalyzer {
             const beta = fft[fundamentalBin];
             const gamma = fft[fundamentalBin + 1];
 
-            const p = 0.5 * (alpha - gamma) / (alpha - 2 * beta + gamma);
+            // Guard against division by zero
+            const denom = alpha - 2 * beta + gamma;
+            if (Math.abs(denom) < 1e-10) {
+                return frequencies[fundamentalBin];
+            }
+
+            const p = 0.5 * (alpha - gamma) / denom;
             return (fundamentalBin + p) * this.sampleRate / this.fftSize;
         }
 
@@ -241,12 +278,12 @@ class ToneQualityAnalyzer {
             const harmonicBin = Math.floor(harmonicFreq * this.fftSize / this.sampleRate);
 
             if (harmonicBin >= 0 && harmonicBin < fft.length) {
-                // Get amplitude with some tolerance
-                const tolerance = 0.1 * h;  // Wider tolerance for higher harmonics
-                let maxAmp = fft[harmonicBin];
+                // Get amplitude with some tolerance - search neighborhood
+                const tolerance = Math.max(2, Math.ceil(0.05 * harmonicBin));
+                let maxAmp = 0;
                 let peakBin = harmonicBin;
 
-                for (let i = -Math.ceil(tolerance); i <= Math.ceil(tolerance); i++) {
+                for (let i = -tolerance; i <= tolerance; i++) {
                     const idx = harmonicBin + i;
                     if (idx >= 0 && idx < fft.length && fft[idx] > maxAmp) {
                         maxAmp = fft[idx];
@@ -260,15 +297,20 @@ class ToneQualityAnalyzer {
                     const alpha = fft[peakBin - 1];
                     const beta = fft[peakBin];
                     const gamma = fft[peakBin + 1];
-                    const p = 0.5 * (alpha - gamma) / (alpha - 2 * beta + gamma);
-                    actualFreq = (peakBin + p) * this.sampleRate / this.fftSize;
+
+                    // Guard against division by zero
+                    const denom = alpha - 2 * beta + gamma;
+                    if (Math.abs(denom) > 1e-10) {
+                        const p = 0.5 * (alpha - gamma) / denom;
+                        actualFreq = (peakBin + p) * this.sampleRate / this.fftSize;
+                    }
                 }
 
                 harmonics.push({
                     harmonic: h,
                     frequency: actualFreq,
                     amplitude: maxAmp,
-                    idealRatio: 1 / h  // Ideal amplitude ratio (decreasing)
+                    idealRatio: 1 / h
                 });
 
                 ratios.push(maxAmp);
@@ -277,7 +319,9 @@ class ToneQualityAnalyzer {
 
         // Calculate ratio to fundamental
         const fundamentalAmp = harmonics.length > 0 ? harmonics[0].amplitude : 1;
-        const normalizedRatios = harmonics.map(h => h.amplitude / fundamentalAmp);
+        const normalizedRatios = harmonics.map(h =>
+            fundamentalAmp > 0 ? h.amplitude / fundamentalAmp : 0
+        );
 
         return {
             harmonics,
@@ -289,61 +333,55 @@ class ToneQualityAnalyzer {
     /**
      * Calculate tone purity score (0-100%)
      * Based on harmonic balance - ideal is strong fundamental with smoothly decreasing harmonics
+     * Removed the incorrect even/odd penalty as it penalizes good bowing technique
      */
     calculatePurityScore(harmonicAnalysis) {
-        const { harmonics, ratios } = harmonicAnalysis;
+        const { harmonics, fundamentalAmplitude } = harmonicAnalysis;
 
-        if (harmonics.length < 2) {
+        if (harmonics.length < 2 || fundamentalAmplitude <= 0) {
             return 75; // Default if not enough harmonics detected
         }
 
         // Ideal harmonic series has smoothly decreasing amplitudes
         // Calculate deviation from ideal
         let deviation = 0;
-        let evenOddRatio = 0;
-        let evenSum = 0;
-        let oddSum = 0;
 
         for (let i = 0; i < harmonics.length; i++) {
             const h = harmonics[i].harmonic;
             const amplitude = harmonics[i].amplitude;
 
             // Ideal amplitude decreases as 1/h
-            const idealAmplitude = harmonics[0].amplitude / h;
+            const idealAmplitude = fundamentalAmplitude / h;
+
+            // Guard against division by zero
+            if (idealAmplitude <= 0) continue;
+
             const amplitudeDeviation = Math.abs(amplitude - idealAmplitude) / idealAmplitude;
             deviation += amplitudeDeviation;
-
-            // Track even vs odd harmonic balance
-            if (h % 2 === 0) {
-                evenSum += amplitude;
-            } else {
-                oddSum += amplitude;
-            }
         }
 
         // Calculate average deviation
         const avgDeviation = deviation / harmonics.length;
 
-        // Calculate even-odd balance (good tone has balanced harmonics)
-        const totalHarmonicEnergy = evenSum + oddSum;
-        evenOddRatio = totalHarmonicEnergy > 0 ? Math.abs(evenSum - oddSum) / totalHarmonicEnergy : 0.5;
-
         // Purity score: lower deviation = higher purity
-        // Also penalize unbalanced even/odd ratio
-        let purityScore = Math.max(0, 100 - (avgDeviation * 50) - (evenOddRatio * 30));
+        // Removed even/odd penalty as it's acoustically incorrect
+        let purityScore = Math.max(0, 100 - (avgDeviation * 50));
 
         return Math.round(purityScore);
     }
 
     /**
      * Detect harsh/scratchy bowing based on high-frequency energy
+     * Extended range to 3-8 kHz for actual bow harshness detection
      */
     detectHarshness(fft, frequencies, range) {
         // Calculate energy in different frequency bands
-        const lowMidStart = Math.floor(range.min * this.fftSize / this.sampleRate);
-        const lowMidEnd = Math.floor(range.max * 0.5 * this.fftSize / this.sampleRate);
-        const highStart = Math.floor(range.max * 0.5 * this.fftSize / this.sampleRate);
-        const highEnd = Math.floor(range.max * this.fftSize / this.sampleRate);
+        // Low-mid: instrument range up to 2 kHz
+        // High: 2-8 kHz (where bow noise actually appears)
+        const lowMidStart = Math.floor(50 * this.fftSize / this.sampleRate);
+        const lowMidEnd = Math.floor(2000 * this.fftSize / this.sampleRate);
+        const highStart = Math.floor(2000 * this.fftSize / this.sampleRate);
+        const highEnd = Math.floor(8000 * this.fftSize / this.sampleRate);
 
         let lowMidEnergy = 0;
         let highEnergy = 0;
@@ -396,26 +434,39 @@ class ToneQualityAnalyzer {
             const deviation = Math.abs(fundamentalFrequency - wolfFreq);
             const percentDeviation = deviation / wolfFreq;
 
-            if (percentDeviation < 0.05) { // Within 5% of wolf tone
-                // Check for narrow peak (high Q factor)
+            // Within 3% of wolf tone (tighter tolerance)
+            if (percentDeviation < 0.03) {
+                // Find the actual peak in the region
                 const wolfBin = Math.floor(wolfFreq * this.fftSize / this.sampleRate);
+                const searchRange = Math.max(5, Math.floor(0.05 * wolfBin));
 
-                if (wolfBin > 0 && wolfBin < fft.length - 1) {
-                    const peakAmplitude = fft[wolfBin];
+                let peakAmplitude = 0;
+                let peakBin = wolfBin;
+
+                // Search neighborhood for actual peak
+                for (let i = -searchRange; i <= searchRange; i++) {
+                    const idx = wolfBin + i;
+                    if (idx >= 0 && idx < fft.length && fft[idx] > peakAmplitude) {
+                        peakAmplitude = fft[idx];
+                        peakBin = idx;
+                    }
+                }
+
+                if (peakAmplitude > this.wolfToneThreshold) {
                     let bandwidth = 0;
 
                     // Measure bandwidth (bins above half amplitude)
-                    for (let i = wolfBin - 1; i >= 0 && fft[i] > peakAmplitude * 0.5; i--) {
+                    for (let i = peakBin - 1; i >= 0 && fft[i] > peakAmplitude * 0.5; i--) {
                         bandwidth++;
                     }
-                    for (let i = wolfBin + 1; i < fft.length && fft[i] > peakAmplitude * 0.5; i++) {
+                    for (let i = peakBin + 1; i < fft.length && fft[i] > peakAmplitude * 0.5; i++) {
                         bandwidth++;
                     }
 
                     // Narrow bandwidth indicates wolf tone
                     const qFactor = bandwidth < 5;
 
-                    if (qFactor && peakAmplitude > this.wolfToneThreshold) {
+                    if (qFactor) {
                         return {
                             detected: true,
                             frequency: wolfFreq,
@@ -437,6 +488,10 @@ class ToneQualityAnalyzer {
      * Calculate overall tone quality score
      */
     calculateToneQualityScore(purityScore, harshnessScore, wolfToneDetected) {
+        // Guard against NaN
+        if (!Number.isFinite(purityScore)) purityScore = 50;
+        if (!Number.isFinite(harshnessScore)) harshnessScore = 50;
+
         let score = (purityScore * 0.5) + (harshnessScore * 0.5);
 
         // Penalize wolf tones significantly
@@ -448,12 +503,16 @@ class ToneQualityAnalyzer {
     }
 
     /**
-     * Get smoothed score from history
+     * Get smoothed score from history, filtering out NaN
      */
     getSmoothedScore() {
         if (this.qualityHistory.length === 0) return 0;
-        const sum = this.qualityHistory.reduce((a, b) => a + b, 0);
-        return Math.round(sum / this.qualityHistory.length);
+
+        const validScores = this.qualityHistory.filter(s => Number.isFinite(s));
+        if (validScores.length === 0) return 0;
+
+        const sum = validScores.reduce((a, b) => a + b, 0);
+        return Math.round(sum / validScores.length);
     }
 
     /**
@@ -461,8 +520,8 @@ class ToneQualityAnalyzer {
      */
     getDefaultResult() {
         return {
-            qualityScore: 50,
-            purityScore: 50,
+            qualityScore: 0,
+            purityScore: 0,
             harshnessScore: 50,
             harshnessLevel: 'unknown',
             wolfToneDetected: false,
@@ -484,7 +543,7 @@ class ToneQualityAnalyzer {
 
         return {
             qualityScore: this.getSmoothedScore(),
-            purityScore: this.currentPurityScore,
+            purityScore: this.currentPurityScore || 0,
             harshnessScore: this.currentHarshnessScore,
             harshnessLevel: this.getHarshnessLevel(),
             wolfToneDetected: this.wolfToneDetected,
@@ -511,10 +570,9 @@ class ToneQualityAnalyzer {
      * Get color for tone quality (emerald=good, crimson=harsh)
      */
     static getQualityColor(score) {
-        if (score >= 80) return '#10b981'; // emerald - excellent
-        if (score >= 60) return '#10b981'; // emerald - good
-        if (score >= 40) return '#f59e0b'; // amber - acceptable
-        return '#dc2626'; // crimson - harsh
+        if (score >= 60) return '#10b981'; // emerald
+        if (score >= 40) return '#f59e0b'; // amber
+        return '#dc2626'; // crimson
     }
 
     /**
@@ -546,7 +604,7 @@ class ToneQualityAnalyzer {
     getState() {
         return {
             qualityScore: this.getSmoothedScore(),
-            purityScore: this.currentPurityScore,
+            purityScore: this.currentPurityScore || 0,
             harshnessScore: this.currentHarshnessScore,
             harshnessLevel: this.getHarshnessLevel(),
             wolfToneDetected: this.wolfToneDetected,

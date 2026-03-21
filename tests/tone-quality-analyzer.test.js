@@ -27,7 +27,7 @@ describe('ToneQualityAnalyzer', () => {
 
     beforeEach(() => {
         analyzer = new ToneQualityAnalyzer();
-        analyzer.configure({ sampleRate: 44100, fftSize: 4096, bufferSize: 2048, instrument: 'violin' });
+        analyzer.configure({ sampleRate: 44100, fftSize: 4096, instrument: 'violin' });
     });
 
     test('should have default values', () => {
@@ -53,16 +53,23 @@ describe('ToneQualityAnalyzer', () => {
         assert.strictEqual(frequencies.length, analyzer.fftSize / 2);
     });
 
-    test('should handle empty buffer', () => {
+    test('should handle null buffer', () => {
         const result = analyzer.analyze(null, 440);
-        assert.strictEqual(result.qualityScore, 50);
-        assert.strictEqual(result.purityScore, 50);
+        assert.strictEqual(result.qualityScore, 0);
+        assert.strictEqual(result.purityScore, 0);
     });
 
     test('should handle small buffer', () => {
         const smallBuffer = new Float32Array(100);
         const result = analyzer.analyze(smallBuffer, 440);
-        assert.strictEqual(result.qualityScore, 50);
+        assert.strictEqual(result.qualityScore, 0);
+    });
+
+    test('should handle zero-filled buffer gracefully', () => {
+        const zeroBuffer = new Float32Array(4096);
+        const result = analyzer.analyze(zeroBuffer, 440);
+        // Should not return NaN
+        assert.ok(Number.isFinite(result.qualityScore));
     });
 
     test('should calculate purity score from harmonics', () => {
@@ -81,20 +88,18 @@ describe('ToneQualityAnalyzer', () => {
         assert.ok(purityScore > 50, 'Good harmonic series should have high purity');
     });
 
-    test('should penalize unbalanced harmonics', () => {
+    test('should handle zero amplitude in purity score', () => {
         const harmonicAnalysis = {
             harmonics: [
-                { harmonic: 1, amplitude: 0.3 },
-                { harmonic: 2, amplitude: 1.0 },
-                { harmonic: 3, amplitude: 0.2 },
-                { harmonic: 4, amplitude: 0.8 }
+                { harmonic: 1, amplitude: 0 },
+                { harmonic: 2, amplitude: 0 }
             ],
-            ratios: [0.3, 1.0, 0.2, 0.8],
-            fundamentalAmplitude: 0.3
+            fundamentalAmplitude: 0
         };
 
         const purityScore = analyzer.calculatePurityScore(harmonicAnalysis);
-        assert.ok(purityScore < 80, 'Unbalanced harmonics should have lower purity');
+        // Should not return NaN, should return default
+        assert.ok(Number.isFinite(purityScore));
     });
 
     test('should detect good tone', () => {
@@ -102,13 +107,16 @@ describe('ToneQualityAnalyzer', () => {
         const frequencies = analyzer.computeFrequencyBins();
 
         const violinRange = analyzer.instrumentRanges.violin;
-        const lowMidStart = Math.floor(violinRange.min * analyzer.fftSize / analyzer.sampleRate);
-        const highStart = Math.floor(violinRange.max * 0.5 * analyzer.fftSize / analyzer.sampleRate);
+        const lowMidStart = Math.floor(50 * analyzer.fftSize / analyzer.sampleRate);
+        const lowMidEnd = Math.floor(2000 * analyzer.fftSize / analyzer.sampleRate);
+        const highStart = Math.floor(2000 * analyzer.fftSize / analyzer.sampleRate);
+        const highEnd = Math.floor(8000 * analyzer.fftSize / analyzer.sampleRate);
 
-        for (let i = lowMidStart; i < highStart; i++) {
+        // Strong low-mid, weak high = good tone
+        for (let i = lowMidStart; i < lowMidEnd && i < fft.length; i++) {
             fft[i] = 0.5;
         }
-        for (let i = highStart; i < fft.length; i++) {
+        for (let i = highStart; i < highEnd && i < fft.length; i++) {
             fft[i] = 0.05;
         }
 
@@ -122,13 +130,16 @@ describe('ToneQualityAnalyzer', () => {
         const frequencies = analyzer.computeFrequencyBins();
 
         const violinRange = analyzer.instrumentRanges.violin;
-        const lowMidStart = Math.floor(violinRange.min * analyzer.fftSize / analyzer.sampleRate);
-        const highStart = Math.floor(violinRange.max * 0.5 * analyzer.fftSize / analyzer.sampleRate);
+        const lowMidStart = Math.floor(50 * analyzer.fftSize / analyzer.sampleRate);
+        const lowMidEnd = Math.floor(2000 * analyzer.fftSize / analyzer.sampleRate);
+        const highStart = Math.floor(2000 * analyzer.fftSize / analyzer.sampleRate);
+        const highEnd = Math.floor(8000 * analyzer.fftSize / analyzer.sampleRate);
 
-        for (let i = lowMidStart; i < highStart; i++) {
+        // Weak low-mid, strong high = harsh tone
+        for (let i = lowMidStart; i < lowMidEnd && i < fft.length; i++) {
             fft[i] = 0.2;
         }
-        for (let i = highStart; i < fft.length; i++) {
+        for (let i = highStart; i < highEnd && i < fft.length; i++) {
             fft[i] = 0.8;
         }
 
@@ -180,8 +191,9 @@ describe('ToneQualityAnalyzer', () => {
             analyzer.configure({ instrument });
             assert.strictEqual(analyzer.instrument, instrument);
 
+            // Test with empty buffer - should not produce NaN
             const result = analyzer.analyze(new Float32Array(2048), 440);
-            assert.ok(result.qualityScore !== undefined);
+            assert.ok(typeof result.qualityScore === 'number' && !isNaN(result.qualityScore));
         });
     });
 
@@ -195,5 +207,63 @@ describe('ToneQualityAnalyzer', () => {
         const scoreWithWolf = analyzer.calculateToneQualityScore(purityScore, harshnessScore, true);
 
         assert.ok(scoreWithWolf < scoreWithoutWolf, 'Wolf tone should reduce quality score');
+    });
+
+    test('should handle NaN in calculateToneQualityScore', () => {
+        const score = analyzer.calculateToneQualityScore(NaN, 50, false);
+        assert.ok(Number.isFinite(score));
+    });
+
+    test('should detect wolf tone when frequency matches', () => {
+        analyzer.configure({ instrument: 'violin' });
+
+        const fft = new Float32Array(2048);
+        const frequencies = analyzer.computeFrequencyBins();
+        const violinRange = analyzer.instrumentRanges.violin;
+
+        // Create a strong narrow peak near a wolf tone frequency (659 Hz - E5)
+        const wolfFreq = 659;
+        const wolfBin = Math.floor(wolfFreq * analyzer.fftSize / analyzer.sampleRate);
+
+        // Create narrow peak
+        fft[wolfBin] = 0.5;
+        fft[wolfBin - 1] = 0.25;
+        fft[wolfBin + 1] = 0.25;
+        fft[wolfBin - 2] = 0.1;
+        fft[wolfBin + 2] = 0.1;
+
+        // Also set fundamental close to wolf tone
+        const result = analyzer.detectWolfTones(fft, frequencies, 658, violinRange);
+        assert.strictEqual(result.detected, true);
+    });
+
+    test('should not detect wolf tone when frequency is far', () => {
+        analyzer.configure({ instrument: 'violin' });
+
+        const fft = new Float32Array(2048);
+        const frequencies = analyzer.computeFrequencyBins();
+        const violinRange = analyzer.instrumentRanges.violin;
+
+        // Create spectrum without wolf tone
+        for (let i = 0; i < fft.length; i++) {
+            fft[i] = 0.1 + Math.random() * 0.1;
+        }
+
+        // Play a note far from any wolf tone
+        const result = analyzer.detectWolfTones(fft, frequencies, 440, violinRange);
+        assert.strictEqual(result.detected, false);
+    });
+
+    test('should filter out NaN in getSmoothedScore', () => {
+        analyzer.qualityHistory = [80, NaN, 85, 90, NaN];
+        const score = analyzer.getSmoothedScore();
+        assert.ok(Number.isFinite(score));
+        assert.strictEqual(score, 85);
+    });
+
+    test('should use pre-computed frequency bins', () => {
+        analyzer.configure({ sampleRate: 48000, fftSize: 2048 });
+        assert.ok(analyzer.frequencyBins !== null);
+        assert.strictEqual(analyzer.frequencyBins.length, 1024);
     });
 });

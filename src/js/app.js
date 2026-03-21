@@ -26,6 +26,7 @@ class ConcertmasterApp {
         this.dynamicsComparator = null;
         this.sessionLogger = null;
         this.toneQualityAnalyzer = null;
+        this.aiSummaryGenerator = null;
 
         // UI Components
         this.sheetMusicRenderer = null;
@@ -104,6 +105,7 @@ class ConcertmasterApp {
         this.dynamicsComparator = new DynamicsComparator();
         this.sessionLogger = new SessionLogger();
         this.toneQualityAnalyzer = new ToneQualityAnalyzer();
+        this.aiSummaryGenerator = new AISummaryGenerator();
 
         // Get DOM elements
         this.views = {
@@ -969,6 +971,11 @@ class ConcertmasterApp {
             this.toneQualityAnalyzer.reset();
         }
 
+        // Start AI summary generator session
+        if (this.aiSummaryGenerator && this.currentScore) {
+            this.aiSummaryGenerator.startSession(this.currentScore.id);
+        }
+
         this.showToast('Practice started - play your instrument', 'success');
     }
 
@@ -1025,11 +1032,29 @@ class ConcertmasterApp {
             // Analyze tone quality (independent of pitch matching)
             let toneQualityResult = null;
             if (this.toneQualityAnalyzer) {
-                toneQualityResult = this.toneQualityAnalyzer.analyze(data.timeData, result.frequency);
+                // Pass frequency data from AudioEngine if available
+                toneQualityResult = this.toneQualityAnalyzer.analyze(
+                    data.timeData,
+                    result.frequency,
+                    data.frequencyData
+                );
 
                 // Store in session data
                 if (this.sessionData && toneQualityResult) {
                     this.sessionData.toneQuality.push(toneQualityResult.qualityScore);
+                }
+
+                // Log to session logger for AI summary
+                if (this.aiSummaryGenerator && toneQualityResult) {
+                    this.aiSummaryGenerator.logToneQualityDeviation({
+                        measure: result.measure || 1,
+                        note: result.name + result.octave,
+                        qualityScore: toneQualityResult.qualityScore,
+                        purityScore: toneQualityResult.purityScore,
+                        harshnessScore: toneQualityResult.harshnessScore,
+                        wolfToneDetected: toneQualityResult.wolfToneDetected,
+                        wolfToneFrequency: toneQualityResult.wolfToneFrequency
+                    });
                 }
 
                 // Update tone quality display
@@ -1313,6 +1338,9 @@ class ConcertmasterApp {
         if (toneQualityResult.wolfToneDetected && toneQualityStatus) {
             toneQualityStatus.textContent = 'Wolf Tone!';
             toneQualityStatus.style.color = '#dc2626';
+        } else if (toneQualityStatus) {
+            // Reset color when wolf tone is not detected
+            toneQualityStatus.style.color = '';
         }
     }
 
