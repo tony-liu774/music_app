@@ -116,12 +116,13 @@ class AnnotationCanvas {
     onPointerDown(e) {
         const { x, y } = this.clampCoordinates(e.offsetX, e.offsetY);
 
+        this.isDrawing = true;
+
         if (this.currentTool === 'eraser') {
             this.eraseAt(x, y);
             return;
         }
 
-        this.isDrawing = true;
         this.currentStroke = [{ x, y, pressure: e.pressure || 1 }];
     }
 
@@ -209,6 +210,9 @@ class AnnotationCanvas {
     }
 
     placeSymbol(x, y, tool = null, value = null) {
+        // Clamp coordinates to canvas bounds
+        const { x: clampedX, y: clampedY } = this.clampCoordinates(x, y);
+
         const t = tool || this.currentTool;
         const ctx = this.ctx;
 
@@ -219,16 +223,16 @@ class AnnotationCanvas {
         if (t === 'upbow') {
             // Draw up-bow symbol (∩)
             ctx.beginPath();
-            ctx.arc(x, y, 8, Math.PI, 0, false);
+            ctx.arc(clampedX, clampedY, 8, Math.PI, 0, false);
             ctx.stroke();
         } else if (t === 'downbow') {
             // Draw down-bow symbol (□)
-            ctx.strokeRect(x - 6, y - 6, 12, 12);
+            ctx.strokeRect(clampedX - 6, clampedY - 6, 12, 12);
         } else if (t === 'fingering') {
             // Draw fingering number in circle
             const digit = value || this.currentFingering;
             ctx.beginPath();
-            ctx.arc(x, y, 8, 0, 2 * Math.PI);
+            ctx.arc(clampedX, clampedY, 8, 0, 2 * Math.PI);
             ctx.stroke();
             ctx.fill();
 
@@ -236,7 +240,7 @@ class AnnotationCanvas {
             ctx.font = 'bold 10px monospace';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(digit, x, y);
+            ctx.fillText(digit, clampedX, clampedY);
         }
 
         // Create annotation for symbol
@@ -245,8 +249,8 @@ class AnnotationCanvas {
             type: 'symbol',
             tool: t,
             color: this.currentColor,
-            x: x / this.canvas.width,
-            y: y / this.canvas.height,
+            x: clampedX / this.canvas.width,
+            y: clampedY / this.canvas.height,
             value: value || this.currentFingering,
             timestamp: Date.now(),
             layerId: 'my'

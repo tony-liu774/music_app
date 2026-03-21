@@ -75,7 +75,8 @@ class AnnotationService {
         this.scoreId = this.sanitizeScoreId(id);
 
         if (this.firebaseEnabled) {
-            this.dbRef = this.db.ref(`annotations/${id}`);
+            // Use sanitized scoreId to prevent path injection
+            this.dbRef = this.db.ref(`annotations/${this.scoreId}`);
 
             // Subscribe to remote changes
             this.listener = this.dbRef.on('value', snapshot => {
