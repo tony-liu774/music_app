@@ -411,12 +411,14 @@ class ToneQualityAnalyzer {
         const harshnessRatio = totalEnergy > 0 ? highEnergy / totalEnergy : 0;
 
         // Determine harshness level and score using a continuous linear function
-        // Score = 100 * (1 - harshnessRatio / 0.333)
+        // Score = 100 * (1 - harshnessRatio / maxPenaltyRatio)
+        // maxPenaltyRatio = harshnessThreshold * 0.951 (default ~0.333)
         // At ratio=0 (perfect): score = 100
-        // At ratio=0.333: score = 0
-        // At ratio=0.2 (harshnessThreshold): score = 40 (boundary acceptable/harsh)
+        // At ratio=maxPenaltyRatio (~0.333): score = 0
+        // At ratio=0.2: score = 40 (boundary acceptable/harsh)
         // At ratio=0.017 (typical good tone): score ≈ 95
-        let score = Math.max(0, 100 * (1 - harshnessRatio / 0.333));
+        const maxPenaltyRatio = this.harshnessThreshold * 0.951;
+        let score = Math.max(0, 100 * (1 - harshnessRatio / maxPenaltyRatio));
         score = Math.min(100, score);
 
         // Determine level label based on score ranges (matching getQualityStatus() thresholds)
