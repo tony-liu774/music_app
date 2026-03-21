@@ -326,4 +326,10 @@ class IntegrationController {
     }
 }
 
-window.IntegrationController = IntegrationController;
+if (typeof window !== 'undefined') {
+    window.IntegrationController = IntegrationController;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = IntegrationController;
+}

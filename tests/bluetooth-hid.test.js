@@ -667,7 +667,11 @@ describe('BluetoothHIDListener', () => {
     });
 });
 
+// Require the real IntegrationController class
+const IntegrationController = require('../src/js/components/integration-controller.js');
+
 describe('IntegrationController - Bluetooth Pedal Wiring', () => {
+    let controller;
     let mockApp;
     let mockListener;
     let mockFollowTheBall;
@@ -697,49 +701,17 @@ describe('IntegrationController - Bluetooth Pedal Wiring', () => {
 
         mockListener = new BluetoothHIDListener();
         mockListener.totalMeasures = 16;
+
+        controller = new IntegrationController(mockApp);
+        controller.setBluetoothHIDListener(mockListener);
+        controller.setFollowTheBall(mockFollowTheBall);
     });
 
     afterEach(() => {
         mockListener.destroy();
     });
 
-    it('should wire navigation callbacks when setBluetoothHIDListener is called', () => {
-        // Minimal IntegrationController mock that tests the actual wiring logic
-        const controller = {
-            app: mockApp,
-            followTheBall: mockFollowTheBall,
-            bluetoothHIDListener: mockListener,
-            setupBluetoothPedalIntegration: function() {
-                if (!this.bluetoothHIDListener) return;
-
-                const self = this;
-                const handleNavigation = (measure) => {
-                    if (self.followTheBall) {
-                        const progress = self.bluetoothHIDListener.getMeasureProgress();
-                        self.followTheBall.setTargetPosition(progress);
-                    }
-                    if (self.app && self.app.sheetMusicRenderer) {
-                        self.app.sheetMusicRenderer.setCursorPosition(measure);
-                    }
-                };
-
-                this.bluetoothHIDListener.onNextMeasure = handleNavigation;
-                this.bluetoothHIDListener.onPrevMeasure = handleNavigation;
-                this.bluetoothHIDListener.onNextPage = handleNavigation;
-                this.bluetoothHIDListener.onPrevPage = handleNavigation;
-
-                this.bluetoothHIDListener.onToggleLoop = () => {
-                    if (self.app && self.app.practiceLoopController) {
-                        if (self.app.practiceLoopController.isActive) {
-                            self.app.practiceLoopController.stop();
-                        } else {
-                            self.app.practiceLoopController.start();
-                        }
-                    }
-                };
-            }
-        };
-
+    it('should wire navigation callbacks via setupBluetoothPedalIntegration', () => {
         controller.setupBluetoothPedalIntegration();
 
         assert.ok(mockListener.onNextMeasure, 'onNextMeasure should be set');
@@ -750,23 +722,7 @@ describe('IntegrationController - Bluetooth Pedal Wiring', () => {
     });
 
     it('should update Follow-the-Ball and renderer on nextMeasure', () => {
-        const controller = {
-            app: mockApp,
-            followTheBall: mockFollowTheBall,
-            bluetoothHIDListener: mockListener,
-        };
-
-        // Wire up using the same logic as IntegrationController
-        const handleNavigation = (measure) => {
-            if (controller.followTheBall) {
-                const progress = controller.bluetoothHIDListener.getMeasureProgress();
-                controller.followTheBall.setTargetPosition(progress);
-            }
-            if (controller.app && controller.app.sheetMusicRenderer) {
-                controller.app.sheetMusicRenderer.setCursorPosition(measure);
-            }
-        };
-        mockListener.onNextMeasure = handleNavigation;
+        controller.setupBluetoothPedalIntegration();
 
         // Simulate advancing to measure 4
         mockListener.currentMeasure = 4;
@@ -779,20 +735,7 @@ describe('IntegrationController - Bluetooth Pedal Wiring', () => {
     });
 
     it('should toggle practice loop on toggleLoop', () => {
-        const controller = {
-            app: mockApp,
-            bluetoothHIDListener: mockListener,
-        };
-
-        mockListener.onToggleLoop = () => {
-            if (controller.app && controller.app.practiceLoopController) {
-                if (controller.app.practiceLoopController.isActive) {
-                    controller.app.practiceLoopController.stop();
-                } else {
-                    controller.app.practiceLoopController.start();
-                }
-            }
-        };
+        controller.setupBluetoothPedalIntegration();
 
         // First toggle: start
         assert.strictEqual(mockApp.practiceLoopController.isActive, false);
@@ -805,22 +748,8 @@ describe('IntegrationController - Bluetooth Pedal Wiring', () => {
     });
 
     it('should handle missing followTheBall gracefully', () => {
-        const controller = {
-            app: mockApp,
-            followTheBall: null,
-            bluetoothHIDListener: mockListener,
-        };
-
-        const handleNavigation = (measure) => {
-            if (controller.followTheBall) {
-                const progress = controller.bluetoothHIDListener.getMeasureProgress();
-                controller.followTheBall.setTargetPosition(progress);
-            }
-            if (controller.app && controller.app.sheetMusicRenderer) {
-                controller.app.sheetMusicRenderer.setCursorPosition(measure);
-            }
-        };
-        mockListener.onNextMeasure = handleNavigation;
+        controller.followTheBall = null;
+        controller.setupBluetoothPedalIntegration();
 
         // Should not throw
         mockListener.currentMeasure = 2;
@@ -832,19 +761,15 @@ describe('IntegrationController - Bluetooth Pedal Wiring', () => {
 
     it('should handle missing practiceLoopController gracefully', () => {
         mockApp.practiceLoopController = null;
-
-        const controller = { app: mockApp };
-        mockListener.onToggleLoop = () => {
-            if (controller.app && controller.app.practiceLoopController) {
-                if (controller.app.practiceLoopController.isActive) {
-                    controller.app.practiceLoopController.stop();
-                } else {
-                    controller.app.practiceLoopController.start();
-                }
-            }
-        };
+        controller.setupBluetoothPedalIntegration();
 
         // Should not throw
         mockListener.onToggleLoop();
+    });
+
+    it('should skip wiring when no bluetoothHIDListener is set', () => {
+        const controller2 = new IntegrationController(mockApp);
+        // No listener set - should not throw
+        controller2.setupBluetoothPedalIntegration();
     });
 });
