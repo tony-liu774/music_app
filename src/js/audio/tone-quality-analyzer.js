@@ -545,7 +545,7 @@ class ToneQualityAnalyzer {
             qualityScore: 0,
             purityScore: 0,
             harshnessScore: 50,
-            harshnessLevel: 'unknown',
+            harshnessLevel: 'acceptable',  // Matches getHarshnessLevel() for score 50
             wolfToneDetected: false,
             wolfToneFrequency: null,
             harmonicRatios: [],

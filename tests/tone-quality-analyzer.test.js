@@ -147,6 +147,20 @@ describe('ToneQualityAnalyzer', () => {
         assert.ok(result.score < 60, 'Harsh tone should have lower score');
     });
 
+    test('should return correct harshness level labels at boundaries', () => {
+        // Test via getQualityStatus static method (same thresholds as detectHarshness)
+        assert.strictEqual(ToneQualityAnalyzer.getQualityStatus(100), 'excellent', 'Score 100 = excellent');
+        assert.strictEqual(ToneQualityAnalyzer.getQualityStatus(80), 'excellent', 'Score 80 = excellent');
+        assert.strictEqual(ToneQualityAnalyzer.getQualityStatus(79), 'good', 'Score 79 = good');
+        assert.strictEqual(ToneQualityAnalyzer.getQualityStatus(60), 'good', 'Score 60 = good');
+        assert.strictEqual(ToneQualityAnalyzer.getQualityStatus(59), 'acceptable', 'Score 59 = acceptable');
+        assert.strictEqual(ToneQualityAnalyzer.getQualityStatus(40), 'acceptable', 'Score 40 = acceptable');
+        assert.strictEqual(ToneQualityAnalyzer.getQualityStatus(39), 'harsh', 'Score 39 = harsh');
+        assert.strictEqual(ToneQualityAnalyzer.getQualityStatus(20), 'harsh', 'Score 20 = harsh');
+        assert.strictEqual(ToneQualityAnalyzer.getQualityStatus(19), 'very_harsh', 'Score 19 = very_harsh');
+        assert.strictEqual(ToneQualityAnalyzer.getQualityStatus(0), 'very_harsh', 'Score 0 = very_harsh');
+    });
+
     test('should return emerald color for good tone', () => {
         const color = ToneQualityAnalyzer.getQualityColor(80);
         assert.strictEqual(color, '#10b981');
