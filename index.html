@@ -12,6 +12,7 @@
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@600;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="src/css/themes/midnight-conservatory.css">
     <link rel="stylesheet" href="src/css/styles.css">
+    <link rel="stylesheet" href="src/css/scale-engine.css">
 </head>
 <body>
     <div id="app">
@@ -1347,6 +1348,9 @@
                     </div>
                 </div>
 
+                <!-- Scale Engine Warm-Up Generator -->
+                <div id="scale-engine-container"></div>
+
                 <div class="sheet-music-container" id="sheet-music-container">
                     <div class="zoom-controls" id="zoom-controls">
                         <button class="zoom-btn" id="zoom-out-btn" title="Zoom Out">
@@ -1777,6 +1781,10 @@
     <script src="src/js/metrics/rhythm-analyzer.js"></script>
     <script src="src/js/analysis/intonation-analyzer.js"></script>
     <script src="src/js/utils/animations.js"></script>
+    <script src="src/js/models/scale-data.js"></script>
+    <script src="src/js/parsers/musicxml-generator.js"></script>
+    <script src="src/js/audio/scale-engine.js"></script>
+    <script src="src/js/components/scale-engine-ui.js"></script>
     <script src="src/js/app.js"></script>
 
     <!-- Onboarding Modal -->
