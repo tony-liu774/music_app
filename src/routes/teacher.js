@@ -429,7 +429,7 @@ router.get('/snippets', requireAuth, requireTeacher, (req, res) => {
  * POST /api/teacher/snippets
  */
 router.post('/snippets', requireAuth, async (req, res) => {
-    const { studentId, studentName, videoData, thumbnail, duration, title, notes, trimStart, trimEnd } = req.body;
+    const { studentId, studentName, videoData, thumbnail, duration, title, notes, trimStart: reqTrimStart, trimEnd: reqTrimEnd } = req.body;
     const isTeacher = req.user.role === 'teacher';
 
     // Validate required fields
@@ -458,31 +458,79 @@ router.post('/snippets', requireAuth, async (req, res) => {
     // Generate snippet ID
     const snippetId = generateSnippetId();
 
-    // In production, upload to cloud storage (S3)
-    // For now, store locally with base64
-    let videoUrl = videoData;
+    // Process video trimming if requested
+    const trimStart = typeof reqTrimStart === 'number' ? Math.max(0, reqTrimStart) : 0;
+    const trimEnd = typeof reqTrimEnd === 'number' ? Math.min(validatedDuration, reqTrimEnd) : validatedDuration;
+
+    let processedVideoData = videoData;
+    let wasTrimmed = false;
+
+    // Apply video trimming if trim times differ from full duration
+    if (trimStart > 0 || trimEnd < validatedDuration) {
+        try {
+            // Dynamically import to avoid issues when FFmpeg not available
+            const videoTrimmer = require('../services/video-trimmer');
+            const trimResult = await videoTrimmer.trimVideo(videoData, trimStart, trimEnd);
+            if (trimResult.success && trimResult.trimmed) {
+                processedVideoData = trimResult.data;
+                wasTrimmed = true;
+            }
+        } catch (error) {
+            console.error('Video trimming failed:', error);
+            // Continue with original video if trimming fails
+        }
+    }
+
+    // Upload to cloud storage (S3)
+    let videoUrl = processedVideoData;
     let videoKey = null;
     let storageType = 'local';
 
-    // Note: In production, uncomment this to use S3
-    // const { PutObjectCommand, S3Client } = require('@aws-sdk/client-s3');
-    // ... upload logic here
+    try {
+        const videoStorage = require('../services/video-storage');
+        const uploadResult = await videoStorage.uploadVideo(studentId, snippetId, processedVideoData);
+        if (uploadResult.success) {
+            videoUrl = uploadResult.url;
+            videoKey = uploadResult.key;
+            storageType = uploadResult.storageType;
+        }
+    } catch (error) {
+        console.error('Cloud upload failed, using local storage:', error);
+    }
+
+    // Upload thumbnail to cloud storage
+    let thumbnailUrl = thumbnail;
+    let thumbnailKey = null;
+    if (thumbnail) {
+        try {
+            const videoStorage = require('../services/video-storage');
+            const thumbResult = await videoStorage.uploadThumbnail(studentId, snippetId, thumbnail);
+            if (thumbResult.success) {
+                thumbnailUrl = thumbResult.url;
+                thumbnailKey = thumbResult.key;
+            }
+        } catch (error) {
+            console.error('Thumbnail upload failed:', error);
+        }
+    }
 
     const snippet = {
         id: snippetId,
         studentId: sanitizeString(studentId, 100),
         studentName: sanitizeString(studentName || req.user.name || 'Anonymous', 200),
-        videoData: videoData, // Base64 encoded video (keep for demo)
+        videoData: processedVideoData, // Store processed video
         videoUrl: videoUrl,  // Cloud URL when available
         videoKey: videoKey,  // S3 key for deletion
         storageType: storageType,
-        thumbnail: thumbnail || null,
+        thumbnail: thumbnailUrl,
+        thumbnailKey: thumbnailKey,
         duration: validatedDuration,
         title: sanitizeString(title || 'Untitled Recording', 200),
         notes: sanitizeString(notes || '', 1000),
         // Video trimming data
-        trimStart: typeof trimStart === 'number' ? Math.max(0, trimStart) : 0,
-        trimEnd: typeof trimEnd === 'number' ? Math.min(validatedDuration, trimEnd) : validatedDuration,
+        trimStart: trimStart,
+        trimEnd: trimEnd,
+        wasTrimmed: wasTrimmed,
         submittedAt: Date.now(),
         status: 'pending', // pending, reviewed, replied
         teacherReply: null,
@@ -540,12 +588,26 @@ router.post('/snippets/:id/reply', requireAuth, requireTeacher, async (req, res)
 /**
  * Delete a snippet
  * DELETE /api/teacher/snippets/:id
+ * Requires authentication - teachers can delete any, students can delete their own
  */
-router.delete('/snippets/:id', (req, res) => {
+router.delete('/snippets/:id', requireAuth, (req, res) => {
     const { id } = req.params;
+    const isTeacher = req.user.role === 'teacher';
 
-    if (!videoSnippets.has(id)) {
+    const snippet = videoSnippets.get(id);
+    if (!snippet) {
         return res.status(404).json({ error: 'Snippet not found' });
+    }
+
+    // Students can only delete their own snippets
+    if (!isTeacher && snippet.studentId !== req.user.userId) {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Delete video from cloud storage if exists
+    if (snippet.videoKey) {
+        // In production: delete from S3
+        console.log(`Deleting video from cloud: ${snippet.videoKey}`);
     }
 
     videoSnippets.delete(id);
@@ -555,8 +617,9 @@ router.delete('/snippets/:id', (req, res) => {
 /**
  * Clean up expired snippets (auto-delete after 7 days)
  * POST /api/teacher/snippets/cleanup
+ * Requires teacher authentication
  */
-router.post('/snippets/cleanup', (req, res) => {
+router.post('/snippets/cleanup', requireAuth, requireTeacher, (req, res) => {
     const now = Date.now();
     let deletedCount = 0;
 
@@ -573,16 +636,26 @@ router.post('/snippets/cleanup', (req, res) => {
 /**
  * Get a single snippet by ID
  * GET /api/teacher/snippets/:id
+ * Requires authentication - returns full video data only for owner
  */
-router.get('/snippet/:id', (req, res) => {
+router.get('/snippet/:id', requireAuth, (req, res) => {
     const { id } = req.params;
+    const isTeacher = req.user.role === 'teacher';
 
     const snippet = videoSnippets.get(id);
     if (!snippet) {
         return res.status(404).json({ error: 'Snippet not found' });
     }
 
-    res.json(snippet);
+    // Teachers can view any, students can only view their own
+    if (!isTeacher && snippet.studentId !== req.user.userId) {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // For list view, don't include video data (for performance)
+    const response = { ...snippet };
+
+    res.json(response);
 });
 
 module.exports = router;

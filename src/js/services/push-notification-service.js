@@ -1,15 +1,53 @@
 /**
- * Push Notification Service
+ * Push Notification Service (Frontend - Browser)
  * Handles push notifications for new video clips and teacher replies
  */
 
 class PushNotificationService {
     constructor() {
-        this.vapidPublicKey = process.env.VAPID_PUBLIC_KEY || '';
-        this.vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || '';
-        this.subscriptionEndpoint = '/api/notifications/subscribe';
+        this.vapidPublicKey = '';
         this.isSupported = typeof window !== 'undefined' && 'PushManager' in window;
         this.currentSubscription = null;
+        this.serviceWorkerRegistration = null;
+    }
+
+    /**
+     * Initialize and get VAPID public key from server
+     */
+    async initialize() {
+        if (!this.isSupported()) {
+            console.log('Push notifications not supported');
+            return false;
+        }
+
+        try {
+            // Get VAPID key from server
+            const response = await fetch('/api/notifications/vapid-key');
+            if (response.ok) {
+                const data = await response.json();
+                this.vapidPublicKey = data.publicKey;
+            }
+            return true;
+        } catch (error) {
+            console.error('Failed to initialize push notifications:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Register the service worker
+     */
+    async registerServiceWorker() {
+        if (!this.isSupported()) return null;
+
+        try {
+            this.serviceWorkerRegistration = await navigator.serviceWorker.register('/push-notification-worker.js');
+            console.log('Service Worker registered');
+            return this.serviceWorkerRegistration;
+        } catch (error) {
+            console.error('Service Worker registration failed:', error);
+            return null;
+        }
     }
 
     /**
@@ -48,6 +86,14 @@ class PushNotificationService {
         }
 
         try {
+            // Ensure service worker is registered
+            if (!this.serviceWorkerRegistration) {
+                await this.registerServiceWorker();
+            }
+
+            // Get VAPID key
+            await this.initialize();
+
             // Check current permission
             const permission = await Notification.requestPermission();
             if (permission !== 'granted') {
@@ -65,10 +111,14 @@ class PushNotificationService {
             });
 
             // Send subscription to server
+            const userId = localStorage.getItem('user_id') || 'anonymous';
             const response = await fetch('/api/notifications/subscribe', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(subscription)
+                body: JSON.stringify({
+                    subscription,
+                    userId
+                })
             });
 
             if (response.ok) {
@@ -219,8 +269,3 @@ class PushNotificationService {
 
 // Export singleton
 window.pushNotificationService = new PushNotificationService();
-
-// Also export for Node.js
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = PushNotificationService;
-}

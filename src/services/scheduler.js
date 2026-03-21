@@ -97,7 +97,7 @@ class SchedulerService {
     async cleanupExpiredSnippets() {
         console.log('Running expired snippet cleanup...');
 
-        // Import here to avoid circular dependencies
+        // Access videoSnippets from teacher routes module
         const teacherRoutes = require('../routes/teacher');
         const videoSnippets = teacherRoutes.videoSnippets;
 
@@ -115,7 +115,7 @@ class SchedulerService {
                 // Delete associated video from storage
                 if (snippet.videoKey) {
                     try {
-                        const storageService = require('../js/services/video-storage-service');
+                        const storageService = require('./video-storage');
                         if (storageService && storageService.deleteVideo) {
                             await storageService.deleteVideo(snippet.videoKey);
                         }
