@@ -1689,3 +1689,365 @@ h1, h2, h3, h4, h5, h6 {
         transition-duration: 0.01ms !important;
     }
 }
+
+/* ========================================
+   ONBOARDING MODAL STYLES
+   ======================================== */
+
+.onboarding-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(10, 10, 18, 0.95);
+    z-index: 1000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(10px);
+}
+
+.onboarding-modal.active {
+    display: flex;
+}
+
+.onboarding-container {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 16px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+    box-shadow:
+        0 0 60px rgba(201, 162, 39, 0.1),
+        0 25px 50px rgba(0, 0, 0, 0.5);
+}
+
+.onboarding-progress-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--border-subtle);
+    border-radius: 16px 16px 0 0;
+    overflow: hidden;
+}
+
+.onboarding-progress {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent), var(--accent-glow));
+    transition: width 0.5s ease;
+    box-shadow: 0 0 10px var(--accent);
+}
+
+.onboarding-content {
+    padding: 48px 40px;
+    min-height: 400px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Welcome Step */
+.welcome-step {
+    text-align: center;
+}
+
+.welcome-step .onboarding-icon {
+    width: 120px;
+    height: 120px;
+    margin-bottom: 24px;
+    animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+    0%, 100% {
+        filter: drop-shadow(0 0 10px rgba(201, 162, 39, 0.3));
+    }
+    50% {
+        filter: drop-shadow(0 0 25px rgba(201, 162, 39, 0.6));
+    }
+}
+
+.welcome-step h2 {
+    font-family: var(--font-heading);
+    font-size: 2rem;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+}
+
+.welcome-step p {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    max-width: 400px;
+    margin-bottom: 32px;
+}
+
+/* Permissions Step */
+.permissions-step {
+    text-align: center;
+    width: 100%;
+}
+
+.permissions-step h2 {
+    font-family: var(--font-heading);
+    font-size: 1.75rem;
+    margin-bottom: 12px;
+}
+
+.permissions-step > p {
+    color: var(--text-secondary);
+    margin-bottom: 32px;
+}
+
+.permission-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 32px;
+}
+
+.permission-card {
+    background: var(--bg-deep);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.permission-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+}
+
+.permission-card.granted {
+    border-color: var(--success);
+    background: rgba(16, 185, 129, 0.1);
+}
+
+.permission-card .permission-icon {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 16px;
+    color: var(--accent);
+}
+
+.permission-card h3 {
+    font-size: 1.1rem;
+    margin-bottom: 8px;
+}
+
+.permission-card p {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+}
+
+/* Instrument Selection Step */
+.instrument-step {
+    text-align: center;
+    width: 100%;
+}
+
+.instrument-step h2 {
+    font-family: var(--font-heading);
+    font-size: 1.75rem;
+    margin-bottom: 12px;
+}
+
+.instrument-step > p {
+    color: var(--text-secondary);
+    margin-bottom: 32px;
+}
+
+.instrument-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    margin-bottom: 32px;
+}
+
+.instrument-card {
+    background: var(--bg-deep);
+    border: 2px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 24px 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.instrument-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.instrument-card.selected {
+    border-color: var(--accent);
+    background: rgba(201, 162, 39, 0.1);
+    box-shadow:
+        0 0 20px rgba(201, 162, 39, 0.2),
+        inset 0 0 20px rgba(201, 162, 39, 0.05);
+}
+
+.instrument-card .instrument-icon {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 12px;
+    color: var(--accent);
+}
+
+.instrument-card h3 {
+    font-size: 1.1rem;
+    margin-bottom: 8px;
+}
+
+.instrument-card p {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+    line-height: 1.4;
+}
+
+.instrument-card .instrument-range {
+    display: inline-block;
+    font-size: 0.8rem;
+    color: var(--accent);
+    background: rgba(201, 162, 39, 0.1);
+    padding: 4px 12px;
+    border-radius: 20px;
+}
+
+/* Calibration Step */
+.calibration-step {
+    text-align: center;
+    width: 100%;
+}
+
+.calibration-step h2 {
+    font-family: var(--font-heading);
+    font-size: 1.75rem;
+    margin-bottom: 12px;
+}
+
+.calibration-step p {
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+}
+
+.calibration-info {
+    background: var(--bg-deep);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+    text-align: left;
+}
+
+.calibration-range,
+.calibration-filters {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+}
+
+.calibration-range:not(:last-child),
+.calibration-filters:not(:last-child) {
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.calibration-info .label {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.calibration-info .value {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.calibration-status {
+    margin-bottom: 24px;
+}
+
+.calibration-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: var(--text-secondary);
+}
+
+.spinner {
+    width: 24px;
+    height: 24px;
+    border: 2px solid var(--border-subtle);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Complete Step */
+.complete-step {
+    text-align: center;
+}
+
+.complete-step .onboarding-icon.success {
+    width: 120px;
+    height: 120px;
+    margin-bottom: 24px;
+}
+
+.complete-step h2 {
+    font-family: var(--font-heading);
+    font-size: 2rem;
+    color: var(--success);
+    margin-bottom: 16px;
+}
+
+.complete-step p {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    margin-bottom: 32px;
+}
+
+/* Onboarding Actions */
+.onboarding-actions {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    margin-top: auto;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+    .onboarding-content {
+        padding: 32px 20px;
+    }
+
+    .permission-cards,
+    .instrument-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .onboarding-actions {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .onboarding-actions .btn {
+        width: 100%;
+    }
+}
