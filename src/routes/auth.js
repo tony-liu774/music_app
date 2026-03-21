@@ -15,10 +15,10 @@ const JWT_SECRET = config.jwt.secret;
 const JWT_EXPIRES_IN = config.jwt.expiresIn;
 const REFRESH_EXPIRES_IN = config.jwt.refreshExpiresIn;
 
-// Auth-specific rate limiter: 10 attempts per 15 minutes
+// Auth-specific rate limiter: 10 attempts per 15 minutes (relaxed in test)
 const authRateLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 10,
+    max: config.nodeEnv === 'test' ? 1000 : 10,
     message: { error: 'Too many authentication attempts, please try again later.' },
     standardHeaders: true,
     legacyHeaders: false
@@ -28,6 +28,7 @@ const authRateLimiter = rateLimit({
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_EMAIL_LENGTH = 254;
 const MAX_PASSWORD_LENGTH = 128;
+const MAX_DISPLAY_NAME_LENGTH = 100;
 
 /**
  * Generate JWT tokens
@@ -94,6 +95,13 @@ router.post('/register', authRateLimiter, async (req, res) => {
         // Validate password length
         if (typeof password !== 'string' || password.length < 8 || password.length > MAX_PASSWORD_LENGTH) {
             return res.status(400).json({ error: 'Password must be between 8 and 128 characters' });
+        }
+
+        // Validate displayName if provided
+        if (displayName !== undefined && displayName !== null) {
+            if (typeof displayName !== 'string' || displayName.length > MAX_DISPLAY_NAME_LENGTH) {
+                return res.status(400).json({ error: `Display name must be a string of at most ${MAX_DISPLAY_NAME_LENGTH} characters` });
+            }
         }
 
         // Check if user already exists

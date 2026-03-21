@@ -226,12 +226,12 @@ describe('AuthService', () => {
 
         let fetchCallCount = 0;
         const newToken = createMockJWT({ id: 'user1' }, 3600);
-        fetchMockFn = async () => {
+        // Use a custom fetch setup that counts calls
+        setupFetch({ token: newToken, refreshToken: 'new-refresh' });
+        const originalFetchMock = fetchMockFn;
+        fetchMockFn = async (...args) => {
             fetchCallCount++;
-            return {
-                ok: true,
-                json: async () => ({ token: newToken, refreshToken: 'new-refresh' })
-            };
+            return originalFetchMock(...args);
         };
 
         // Make concurrent getToken calls

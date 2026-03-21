@@ -9,7 +9,7 @@ const http = require('node:http');
 const jwt = require('jsonwebtoken');
 
 const config = require('../src/config');
-const { userDataStore, getUserStore, ALLOWED_SYNC_TYPES } = require('../src/routes/sync');
+const { userDataStore, getUserStore, ALLOWED_SYNC_TYPES, ALLOWED_ACTIONS } = require('../src/routes/sync');
 const { users, generateTokens, refreshTokens } = require('../src/routes/auth');
 const app = require('../src/index');
 
@@ -63,6 +63,19 @@ describe('Sync Routes - Unit Tests', () => {
             assert.ok(!ALLOWED_SYNC_TYPES.includes('__proto__'));
             assert.ok(!ALLOWED_SYNC_TYPES.includes('constructor'));
             assert.ok(!ALLOWED_SYNC_TYPES.includes('prototype'));
+        });
+    });
+
+    describe('ALLOWED_ACTIONS', () => {
+        it('should include create, update, delete', () => {
+            assert.ok(ALLOWED_ACTIONS.includes('create'));
+            assert.ok(ALLOWED_ACTIONS.includes('update'));
+            assert.ok(ALLOWED_ACTIONS.includes('delete'));
+        });
+
+        it('should NOT include dangerous actions', () => {
+            assert.ok(!ALLOWED_ACTIONS.includes('drop'));
+            assert.ok(!ALLOWED_ACTIONS.includes('eval'));
         });
     });
 
@@ -255,6 +268,33 @@ describe('Sync Routes - HTTP Endpoint Tests', () => {
 
         assert.strictEqual(res.status, 200);
         assert.strictEqual(res.body.status, 'ok');
+    });
+
+    it('should sync library data via POST /api/sync', async () => {
+        const res = await makeRequest(server, 'POST', '/api/sync', {
+            lastSync: null,
+            data: {
+                sessions: [],
+                library: [{ id: 'lib1', title: 'Bach Suite', updatedAt: Date.now() }],
+                preferences: {},
+                progress: []
+            }
+        }, { Authorization: `Bearer ${authToken}` });
+
+        assert.strictEqual(res.status, 200);
+        assert.ok(res.body.pushed >= 1);
+        assert.ok(res.body.serverData.library.length >= 1);
+    });
+
+    it('should reject queue request with invalid action via POST /api/sync/queue', async () => {
+        const res = await makeRequest(server, 'POST', '/api/sync/queue', {
+            type: 'sessions',
+            action: 'drop',
+            data: { id: 's1' }
+        }, { Authorization: `Bearer ${authToken}` });
+
+        assert.strictEqual(res.status, 400);
+        assert.strictEqual(res.body.error, 'Invalid action: drop');
     });
 
     it('should return sync status via GET /api/sync/status', async () => {

@@ -309,6 +309,28 @@ describe('Auth Routes - HTTP Endpoint Tests', () => {
         assert.strictEqual(res.body.error, 'Invalid credentials');
     });
 
+    it('should reject registration with too-long displayName', async () => {
+        const res = await makeRequest(server, 'POST', '/api/auth/register', {
+            email: 'test@example.com',
+            password: 'securepass123',
+            displayName: 'A'.repeat(101)
+        });
+
+        assert.strictEqual(res.status, 400);
+        assert.ok(res.body.error.includes('Display name'));
+    });
+
+    it('should reject registration with non-string displayName', async () => {
+        const res = await makeRequest(server, 'POST', '/api/auth/register', {
+            email: 'test@example.com',
+            password: 'securepass123',
+            displayName: 12345
+        });
+
+        assert.strictEqual(res.status, 400);
+        assert.ok(res.body.error.includes('Display name'));
+    });
+
     it('should reject login for non-existent user', async () => {
         const res = await makeRequest(server, 'POST', '/api/auth/login', {
             email: 'nobody@example.com',

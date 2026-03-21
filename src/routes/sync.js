@@ -6,6 +6,25 @@ const router = express.Router();
 // Allowed data types for sync - whitelist to prevent prototype pollution
 const ALLOWED_SYNC_TYPES = ['sessions', 'library', 'preferences', 'progress'];
 
+// Allowed actions for queue endpoint
+const ALLOWED_ACTIONS = ['create', 'update', 'delete'];
+
+// Dangerous keys that must never be merged from client data
+const BLOCKED_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+/**
+ * Safely merge client-supplied fields into an existing object.
+ * Strips prototype-polluting keys from the source.
+ */
+function safeMerge(target, source) {
+    for (const key of Object.keys(source)) {
+        if (!BLOCKED_KEYS.has(key)) {
+            target[key] = source[key];
+        }
+    }
+    return target;
+}
+
 // In-memory data store per user (in production, use a database)
 const userDataStore = new Map();
 
@@ -47,13 +66,31 @@ router.post('/', authMiddleware, (req, res) => {
                 if (existing) {
                     if ((session.updatedAt || 0) > (existing.updatedAt || 0)) {
                         // Client version is newer
-                        Object.assign(existing, session);
+                        safeMerge(existing, session);
                         pushed++;
                     } else if ((session.updatedAt || 0) < (existing.updatedAt || 0)) {
                         conflicts.push({ type: 'sessions', local: session, server: existing });
                     }
                 } else {
                     store.sessions.push(session);
+                    pushed++;
+                }
+            }
+        }
+
+        // Merge library
+        if (data && data.library) {
+            for (const item of data.library) {
+                const existing = store.library.find(l => l.id === item.id);
+                if (existing) {
+                    if ((item.updatedAt || 0) > (existing.updatedAt || 0)) {
+                        safeMerge(existing, item);
+                        pushed++;
+                    } else if ((item.updatedAt || 0) < (existing.updatedAt || 0)) {
+                        conflicts.push({ type: 'library', local: item, server: existing });
+                    }
+                } else {
+                    store.library.push(item);
                     pushed++;
                 }
             }
@@ -82,7 +119,7 @@ router.post('/', authMiddleware, (req, res) => {
                 const existing = store.progress.find(p => p.id === progress.id);
                 if (existing) {
                     if ((progress.updatedAt || 0) > (existing.updatedAt || 0)) {
-                        Object.assign(existing, progress);
+                        safeMerge(existing, progress);
                         pushed++;
                     } else if ((progress.updatedAt || 0) < (existing.updatedAt || 0)) {
                         conflicts.push({ type: 'progress', local: progress, server: existing });
@@ -98,11 +135,14 @@ router.post('/', authMiddleware, (req, res) => {
         const serverSessions = lastSync
             ? store.sessions.filter(s => (s.updatedAt || 0) > lastSync)
             : store.sessions;
+        const serverLibrary = lastSync
+            ? store.library.filter(l => (l.updatedAt || 0) > lastSync)
+            : store.library;
         const serverProgress = lastSync
             ? store.progress.filter(p => (p.updatedAt || 0) > lastSync)
             : store.progress;
 
-        pulled = serverSessions.length + serverProgress.length;
+        pulled = serverSessions.length + serverLibrary.length + serverProgress.length;
 
         store.lastUpdated = Date.now();
 
@@ -112,7 +152,7 @@ router.post('/', authMiddleware, (req, res) => {
             conflicts,
             serverData: {
                 sessions: serverSessions,
-                library: store.library,
+                library: serverLibrary,
                 preferences: store.preferences,
                 progress: serverProgress
             },
@@ -142,41 +182,36 @@ router.post('/queue', authMiddleware, (req, res) => {
             return res.status(400).json({ error: `Invalid data type: ${type}` });
         }
 
+        if (!ALLOWED_ACTIONS.includes(action)) {
+            return res.status(400).json({ error: `Invalid action: ${action}` });
+        }
+
         const collection = store[type];
 
-        switch (action) {
-            case 'create':
-                if (type === 'preferences') {
-                    store.preferences = { ...store.preferences, ...data };
-                } else if (Array.isArray(collection)) {
+        if (action === 'create') {
+            if (type === 'preferences') {
+                store.preferences = { ...store.preferences, ...data };
+            } else if (Array.isArray(collection)) {
+                collection.push(data);
+            }
+        } else if (action === 'update') {
+            if (type === 'preferences') {
+                store.preferences = { ...store.preferences, ...data };
+            } else if (Array.isArray(collection)) {
+                const idx = collection.findIndex(item => item.id === data.id);
+                if (idx >= 0) {
+                    collection[idx] = { ...collection[idx], ...data };
+                } else {
                     collection.push(data);
                 }
-                break;
-
-            case 'update':
-                if (type === 'preferences') {
-                    store.preferences = { ...store.preferences, ...data };
-                } else if (Array.isArray(collection)) {
-                    const idx = collection.findIndex(item => item.id === data.id);
-                    if (idx >= 0) {
-                        collection[idx] = { ...collection[idx], ...data };
-                    } else {
-                        collection.push(data);
-                    }
+            }
+        } else if (action === 'delete') {
+            if (Array.isArray(collection)) {
+                const deleteIdx = collection.findIndex(item => item.id === data.id);
+                if (deleteIdx >= 0) {
+                    collection.splice(deleteIdx, 1);
                 }
-                break;
-
-            case 'delete':
-                if (Array.isArray(collection)) {
-                    const deleteIdx = collection.findIndex(item => item.id === data.id);
-                    if (deleteIdx >= 0) {
-                        collection.splice(deleteIdx, 1);
-                    }
-                }
-                break;
-
-            default:
-                return res.status(400).json({ error: `Invalid action: ${action}` });
+            }
         }
 
         store.lastUpdated = Date.now();
@@ -207,3 +242,4 @@ module.exports = router;
 module.exports.userDataStore = userDataStore;
 module.exports.getUserStore = getUserStore;
 module.exports.ALLOWED_SYNC_TYPES = ALLOWED_SYNC_TYPES;
+module.exports.ALLOWED_ACTIONS = ALLOWED_ACTIONS;
