@@ -33,6 +33,10 @@ class ConcertmasterApp {
         this.scaleEngine = null;
         this.scaleEngineUI = null;
 
+        // Annotations
+        this.annotationCanvas = null;
+        this.annotationService = null;
+
         // Onboarding
         this.onboardingService = null;
         this.onboardingUI = null;
@@ -131,6 +135,9 @@ class ConcertmasterApp {
         // Initialize renderers
         this.initRenderers();
 
+        // Initialize annotations
+        this.initAnnotations();
+
         // Initialize scale engine
         this.initScaleEngine();
     }
@@ -167,6 +174,107 @@ class ConcertmasterApp {
         this.integrationController.setFollowTheBall(this.followTheBall);
         this.integrationController.setBluetoothHIDListener(this.bluetoothHIDListener);
         this.integrationController.init();
+    }
+
+    /**
+     * Initialize Annotation Canvas and Service
+     */
+    initAnnotations() {
+        const sheetWrapper = document.getElementById('sheet-music-wrapper');
+        if (sheetWrapper && typeof AnnotationCanvas !== 'undefined') {
+            this.annotationCanvas = new AnnotationCanvas(sheetWrapper);
+            this.annotationCanvas.init();
+
+            if (typeof AnnotationService !== 'undefined') {
+                this.annotationService = new AnnotationService();
+                this.annotationService.init(this.annotationCanvas, null);
+
+                this.setupAnnotationToolbar();
+            }
+        }
+    }
+
+    /**
+     * Setup annotation toolbar event handlers
+     */
+    setupAnnotationToolbar() {
+        if (!this.annotationCanvas) return;
+
+        // Tool buttons
+        document.querySelectorAll('.annotation-tool-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.annotation-tool-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.annotationCanvas.setTool(btn.dataset.tool);
+            });
+        });
+
+        // Color picker
+        const colorPicker = document.getElementById('annotation-color');
+        if (colorPicker) {
+            colorPicker.addEventListener('input', e => {
+                this.annotationCanvas.setColor(e.target.value);
+            });
+        }
+
+        // Line width
+        const lineWidthSlider = document.getElementById('annotation-line-width');
+        if (lineWidthSlider) {
+            lineWidthSlider.addEventListener('input', e => {
+                this.annotationCanvas.setLineWidth(parseInt(e.target.value));
+            });
+        }
+
+        // Undo/Redo
+        const undoBtn = document.getElementById('annotation-undo-btn');
+        if (undoBtn) {
+            undoBtn.addEventListener('click', () => this.annotationCanvas.undo());
+        }
+
+        const redoBtn = document.getElementById('annotation-redo-btn');
+        if (redoBtn) {
+            redoBtn.addEventListener('click', () => this.annotationCanvas.redo());
+        }
+
+        const clearBtn = document.getElementById('annotation-clear-btn');
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+                this.annotationCanvas.clearAll();
+                if (this.annotationService) {
+                    this.annotationService.clearAll();
+                }
+            });
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', e => {
+            if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                this.annotationCanvas.undo();
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey) {
+                e.preventDefault();
+                this.annotationCanvas.redo();
+            }
+        });
+
+        // Layer toggles
+        document.querySelectorAll('#annotation-layers input[data-layer]').forEach(cb => {
+            cb.addEventListener('change', () => {
+                this.annotationCanvas.setLayerVisible(cb.dataset.layer, cb.checked);
+            });
+        });
+
+        // Sync status from AnnotationService
+        if (this.annotationService) {
+            this.annotationService.on('syncStatus', status => {
+                const el = document.getElementById('annotation-sync-status');
+                if (el) {
+                    el.style.color = status === 'synced' ? '#00d4ff' : '#c9a227';
+                    el.title = status === 'synced' ? 'Synced' : 'Syncing...';
+                }
+            });
+        }
     }
 
     /**
@@ -1233,6 +1341,11 @@ class ConcertmasterApp {
         const sheetContainer = document.getElementById('sheet-music-container');
         if (sheetContainer) {
             sheetContainer.classList.remove('session-ended');
+        }
+
+        // Set annotation score ID for cloud sync
+        if (this.annotationService) {
+            this.annotationService.setScoreId(score.id || score.title);
         }
 
         // Set up performance comparator with the score

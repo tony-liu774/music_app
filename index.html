@@ -13,6 +13,15 @@
     <link rel="stylesheet" href="src/css/themes/midnight-conservatory.css">
     <link rel="stylesheet" href="src/css/styles.css">
     <link rel="stylesheet" href="src/css/scale-engine.css">
+    <link rel="stylesheet" href="src/css/annotation-toolbar.css">
+
+    <!-- Firebase Realtime Database (compat SDK - no bundler needed) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <!-- Optional: populate with real config for cloud sync; omit for local-only mode -->
+    <script>
+      window.FIREBASE_CONFIG = null; // Set to { apiKey, databaseURL, ... } to enable sync
+    </script>
 </head>
 <body>
     <div id="app">
@@ -162,6 +171,30 @@
 
                 <!-- Scale Engine Warm-Up Generator -->
                 <div id="scale-engine-container"></div>
+
+                <!-- Annotation Toolbar -->
+                <div id="annotation-toolbar-wrapper">
+                    <div id="annotation-toolbar" aria-label="Annotation Tools">
+                        <button class="annotation-tool-btn active" data-tool="pen" title="Pen">✏️</button>
+                        <button class="annotation-tool-btn" data-tool="eraser" title="Eraser">⌫</button>
+                        <button class="annotation-tool-btn" data-tool="upbow" title="Up Bow">∩</button>
+                        <button class="annotation-tool-btn" data-tool="downbow" title="Down Bow">□</button>
+                        <button class="annotation-tool-btn" data-tool="fingering" title="Fingering 1-4">1</button>
+                        <div class="annotation-separator"></div>
+                        <input type="color" id="annotation-color" value="#00d4ff" title="Color">
+                        <input type="range" id="annotation-line-width" min="1" max="8" value="2" title="Line Width">
+                        <div class="annotation-separator"></div>
+                        <button id="annotation-undo-btn" title="Undo (Ctrl+Z)">↩</button>
+                        <button id="annotation-redo-btn" title="Redo (Ctrl+Shift+Z)">↪</button>
+                        <button id="annotation-clear-btn" title="Clear All">🗑</button>
+                        <div class="annotation-separator"></div>
+                        <span class="annotation-sync-status" id="annotation-sync-status">●</span>
+                    </div>
+                    <div id="annotation-layers" class="annotation-layers">
+                        <label><input type="checkbox" checked data-layer="my"> My Annotations</label>
+                        <label><input type="checkbox" checked data-layer="shared"> Shared</label>
+                    </div>
+                </div>
 
                 <div class="sheet-music-container" id="sheet-music-container">
                     <div class="zoom-controls" id="zoom-controls">
@@ -913,6 +946,8 @@
     <script src="src/js/components/scale-engine-ui.js"></script>
     <script src="src/js/services/teacher-service.js"></script>
     <script src="src/js/components/studio-dashboard.js"></script>
+    <script src="src/js/services/annotation-service.js"></script>
+    <script src="src/js/components/annotation-canvas.js"></script>
     <script src="src/js/app.js"></script>
 
     <!-- Onboarding Modal -->
