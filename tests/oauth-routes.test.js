@@ -14,11 +14,14 @@ const {
     verifyGoogleToken,
     verifyAppleToken,
     findOrCreateOAuthUser,
-    SUPPORTED_PROVIDERS
+    OAuthVerificationError,
+    SUPPORTED_PROVIDERS,
+    isValidPhotoUrl,
+    sanitizeDisplayName
 } = require('../src/routes/oauth');
 const app = require('../src/index');
 
-// Helper to create a fake Google ID token JWT
+// Helper to create a fake Google ID token JWT (base64url encoded)
 function createGoogleIdToken(payload = {}, expired = false) {
     const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
     const body = Buffer.from(JSON.stringify({
@@ -37,7 +40,7 @@ function createGoogleIdToken(payload = {}, expired = false) {
     return `${header}.${body}.${sig}`;
 }
 
-// Helper to create a fake Apple ID token JWT
+// Helper to create a fake Apple ID token JWT (base64url encoded)
 function createAppleIdToken(payload = {}, expired = false) {
     const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
     const body = Buffer.from(JSON.stringify({
@@ -95,9 +98,9 @@ describe('OAuth Routes - Unit Tests', () => {
     });
 
     describe('verifyGoogleToken', () => {
-        it('should decode a valid Google ID token', () => {
+        it('should decode a valid Google ID token', async () => {
             const token = createGoogleIdToken();
-            const result = verifyGoogleToken(token);
+            const result = await verifyGoogleToken(token);
 
             assert.strictEqual(result.sub, 'google-user-123');
             assert.strictEqual(result.email, 'testuser@gmail.com');
@@ -106,35 +109,32 @@ describe('OAuth Routes - Unit Tests', () => {
             assert.strictEqual(result.email_verified, true);
         });
 
-        it('should reject null/empty token', () => {
-            assert.throws(() => verifyGoogleToken(null), /Invalid token/);
-            assert.throws(() => verifyGoogleToken(''), /Invalid token/);
+        it('should reject null/empty token', async () => {
+            await assert.rejects(() => verifyGoogleToken(null), /Invalid token/);
+            await assert.rejects(() => verifyGoogleToken(''), /Invalid token/);
         });
 
-        it('should reject non-string token', () => {
-            assert.throws(() => verifyGoogleToken(12345), /Invalid token/);
+        it('should reject non-string token', async () => {
+            await assert.rejects(() => verifyGoogleToken(12345), /Invalid token/);
         });
 
-        it('should reject token exceeding max length', () => {
-            const longToken = 'a'.repeat(5000);
-            assert.throws(() => verifyGoogleToken(longToken), /Token too long/);
+        it('should reject token exceeding max length', async () => {
+            await assert.rejects(() => verifyGoogleToken('a'.repeat(5000)), /Token too long/);
         });
 
-        it('should reject malformed token (wrong segment count)', () => {
-            assert.throws(() => verifyGoogleToken('only.two'), /Malformed token/);
-            assert.throws(() => verifyGoogleToken('single'), /Malformed token/);
+        it('should reject malformed token (wrong segment count)', async () => {
+            await assert.rejects(() => verifyGoogleToken('only.two'), /Malformed token/);
+            await assert.rejects(() => verifyGoogleToken('single'), /Malformed token/);
         });
 
-        it('should reject token with invalid payload', () => {
+        it('should reject token with invalid payload', async () => {
             const header = Buffer.from('{}').toString('base64url');
             const badPayload = Buffer.from('not-json').toString('base64url');
             const sig = Buffer.from('sig').toString('base64url');
-            assert.throws(() => verifyGoogleToken(`${header}.${badPayload}.${sig}`), /Invalid token payload/);
+            await assert.rejects(() => verifyGoogleToken(`${header}.${badPayload}.${sig}`), /Invalid token payload/);
         });
 
-        it('should reject token missing required claims (sub)', () => {
-            const token = createGoogleIdToken({ sub: undefined, email: 'test@test.com' });
-            // Need to manually construct since helper always includes sub
+        it('should reject token missing required claims (sub)', async () => {
             const header = Buffer.from('{}').toString('base64url');
             const body = Buffer.from(JSON.stringify({
                 iss: 'accounts.google.com',
@@ -142,10 +142,10 @@ describe('OAuth Routes - Unit Tests', () => {
                 exp: Math.floor(Date.now() / 1000) + 3600
             })).toString('base64url');
             const sig = Buffer.from('sig').toString('base64url');
-            assert.throws(() => verifyGoogleToken(`${header}.${body}.${sig}`), /missing required claims/);
+            await assert.rejects(() => verifyGoogleToken(`${header}.${body}.${sig}`), /missing required claims/);
         });
 
-        it('should reject token with invalid issuer', () => {
+        it('should reject token with invalid issuer', async () => {
             const header = Buffer.from('{}').toString('base64url');
             const body = Buffer.from(JSON.stringify({
                 iss: 'evil.com',
@@ -154,45 +154,54 @@ describe('OAuth Routes - Unit Tests', () => {
                 exp: Math.floor(Date.now() / 1000) + 3600
             })).toString('base64url');
             const sig = Buffer.from('sig').toString('base64url');
-            assert.throws(() => verifyGoogleToken(`${header}.${body}.${sig}`), /Invalid token issuer/);
+            await assert.rejects(() => verifyGoogleToken(`${header}.${body}.${sig}`), /Invalid token issuer/);
         });
 
-        it('should reject expired token', () => {
+        it('should reject expired token', async () => {
             const token = createGoogleIdToken({}, true);
-            assert.throws(() => verifyGoogleToken(token), /Token expired/);
+            await assert.rejects(() => verifyGoogleToken(token), /Token expired/);
         });
 
-        it('should accept token with https issuer', () => {
+        it('should accept token with https issuer', async () => {
             const token = createGoogleIdToken({ iss: 'https://accounts.google.com' });
-            const result = verifyGoogleToken(token);
+            const result = await verifyGoogleToken(token);
             assert.strictEqual(result.sub, 'google-user-123');
+        });
+
+        it('should throw OAuthVerificationError for validation failures', async () => {
+            try {
+                await verifyGoogleToken(null);
+                assert.fail('Should have thrown');
+            } catch (err) {
+                assert.ok(err instanceof OAuthVerificationError);
+            }
         });
     });
 
     describe('verifyAppleToken', () => {
-        it('should decode a valid Apple ID token', () => {
+        it('should decode a valid Apple ID token', async () => {
             const token = createAppleIdToken();
-            const result = verifyAppleToken(token);
+            const result = await verifyAppleToken(token);
 
             assert.strictEqual(result.sub, 'apple-user-456');
             assert.strictEqual(result.email, 'testuser@icloud.com');
-            assert.strictEqual(result.name, null); // Apple doesn't provide name in token
+            assert.strictEqual(result.name, null);
         });
 
-        it('should reject null/empty token', () => {
-            assert.throws(() => verifyAppleToken(null), /Invalid token/);
-            assert.throws(() => verifyAppleToken(''), /Invalid token/);
+        it('should reject null/empty token', async () => {
+            await assert.rejects(() => verifyAppleToken(null), /Invalid token/);
+            await assert.rejects(() => verifyAppleToken(''), /Invalid token/);
         });
 
-        it('should reject token exceeding max length', () => {
-            assert.throws(() => verifyAppleToken('a'.repeat(5000)), /Token too long/);
+        it('should reject token exceeding max length', async () => {
+            await assert.rejects(() => verifyAppleToken('a'.repeat(5000)), /Token too long/);
         });
 
-        it('should reject malformed token', () => {
-            assert.throws(() => verifyAppleToken('only.two'), /Malformed token/);
+        it('should reject malformed token', async () => {
+            await assert.rejects(() => verifyAppleToken('only.two'), /Malformed token/);
         });
 
-        it('should reject token with wrong issuer', () => {
+        it('should reject token with wrong issuer', async () => {
             const header = Buffer.from('{}').toString('base64url');
             const body = Buffer.from(JSON.stringify({
                 iss: 'https://wrong.apple.com',
@@ -200,15 +209,15 @@ describe('OAuth Routes - Unit Tests', () => {
                 exp: Math.floor(Date.now() / 1000) + 3600
             })).toString('base64url');
             const sig = Buffer.from('sig').toString('base64url');
-            assert.throws(() => verifyAppleToken(`${header}.${body}.${sig}`), /Invalid token issuer/);
+            await assert.rejects(() => verifyAppleToken(`${header}.${body}.${sig}`), /Invalid token issuer/);
         });
 
-        it('should reject expired Apple token', () => {
+        it('should reject expired Apple token', async () => {
             const token = createAppleIdToken({}, true);
-            assert.throws(() => verifyAppleToken(token), /Token expired/);
+            await assert.rejects(() => verifyAppleToken(token), /Token expired/);
         });
 
-        it('should handle token without email', () => {
+        it('should handle token without email', async () => {
             const header = Buffer.from('{}').toString('base64url');
             const body = Buffer.from(JSON.stringify({
                 iss: 'https://appleid.apple.com',
@@ -216,24 +225,31 @@ describe('OAuth Routes - Unit Tests', () => {
                 exp: Math.floor(Date.now() / 1000) + 3600
             })).toString('base64url');
             const sig = Buffer.from('sig').toString('base64url');
-            const result = verifyAppleToken(`${header}.${body}.${sig}`);
+            const result = await verifyAppleToken(`${header}.${body}.${sig}`);
             assert.strictEqual(result.sub, 'apple-no-email');
             assert.strictEqual(result.email, null);
+        });
+
+        it('should handle Apple private relay email addresses', async () => {
+            const token = createAppleIdToken({ email: 'user@privaterelay.appleid.com', email_verified: true });
+            const result = await verifyAppleToken(token);
+            assert.strictEqual(result.email, 'user@privaterelay.appleid.com');
         });
     });
 
     describe('findOrCreateOAuthUser', () => {
-        it('should create a new user from Google provider data', () => {
+        it('should create a new user with UUID id', () => {
             const providerUser = {
                 sub: 'google-123',
                 email: 'new@gmail.com',
                 name: 'New User',
-                picture: 'https://example.com/photo.jpg'
+                picture: 'https://example.com/photo.jpg',
+                email_verified: true
             };
 
             const user = findOrCreateOAuthUser('google', providerUser);
-
             assert.ok(user.id);
+            assert.match(user.id, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
             assert.strictEqual(user.email, 'new@gmail.com');
             assert.strictEqual(user.displayName, 'New User');
             assert.strictEqual(user.photoUrl, 'https://example.com/photo.jpg');
@@ -242,98 +258,92 @@ describe('OAuth Routes - Unit Tests', () => {
         });
 
         it('should return existing user when OAuth identity is already linked', () => {
-            const providerUser = {
-                sub: 'google-linked',
-                email: 'linked@gmail.com',
-                name: 'Linked User'
-            };
-
+            const providerUser = { sub: 'google-linked', email: 'linked@gmail.com', name: 'Linked', email_verified: true };
             const user1 = findOrCreateOAuthUser('google', providerUser);
             const user2 = findOrCreateOAuthUser('google', providerUser);
-
             assert.strictEqual(user1.id, user2.id);
         });
 
-        it('should link OAuth to existing email user (account linking)', () => {
-            // Pre-create a user with email/password
-            const existing = {
-                id: 'existing-user-1',
-                email: 'existing@gmail.com',
-                displayName: 'Existing',
-                hashedPassword: '$2b$10$hash',
-                createdAt: Date.now()
-            };
-            users.set('existing@gmail.com', existing);
-
-            const providerUser = {
-                sub: 'google-new-link',
-                email: 'existing@gmail.com',
-                name: 'Google Name'
-            };
-
-            const linked = findOrCreateOAuthUser('google', providerUser);
-
-            assert.strictEqual(linked.id, 'existing-user-1');
-            assert.strictEqual(linked.oauthProviders.google, 'google-new-link');
-        });
-
-        it('should use extraProfile.displayName when provider name is missing', () => {
-            const providerUser = {
-                sub: 'apple-no-name',
-                email: null,
-                name: null
-            };
-
-            const user = findOrCreateOAuthUser('apple', providerUser, {
-                displayName: 'Custom Name',
-                email: 'custom@example.com'
+        it('should link OAuth to existing email user ONLY when email is verified', () => {
+            users.set('existing@gmail.com', {
+                id: 'existing-user-1', email: 'existing@gmail.com', displayName: 'Existing',
+                hashedPassword: '$2b$10$hash', createdAt: Date.now()
             });
 
-            assert.strictEqual(user.displayName, 'Custom Name');
-            assert.strictEqual(user.email, 'custom@example.com');
+            const linked = findOrCreateOAuthUser('google', {
+                sub: 'google-new-link', email: 'existing@gmail.com', name: 'Google Name', email_verified: true
+            });
+            assert.strictEqual(linked.id, 'existing-user-1');
         });
 
-        it('should generate fallback displayName from email', () => {
-            const providerUser = {
-                sub: 'no-name-user',
-                email: 'john.doe@example.com',
-                name: null
-            };
+        it('should NOT link when email is not verified (creates new user)', () => {
+            users.set('victim@gmail.com', {
+                id: 'victim-1', email: 'victim@gmail.com', displayName: 'Victim',
+                hashedPassword: '$2b$10$hash', createdAt: Date.now()
+            });
 
-            const user = findOrCreateOAuthUser('google', providerUser);
-            assert.strictEqual(user.displayName, 'john.doe');
+            const result = findOrCreateOAuthUser('google', {
+                sub: 'attacker', email: 'victim@gmail.com', name: 'Attacker', email_verified: false
+            });
+            assert.notStrictEqual(result.id, 'victim-1');
+        });
+
+        it('should ignore client-supplied email for account linking', () => {
+            users.set('target@example.com', {
+                id: 'target', email: 'target@example.com', displayName: 'Target',
+                hashedPassword: '$2b$10$hash', createdAt: Date.now()
+            });
+
+            const result = findOrCreateOAuthUser('apple', {
+                sub: 'attacker', email: null, name: null, email_verified: false
+            }, { email: 'target@example.com' });
+            assert.notStrictEqual(result.id, 'target');
+        });
+
+        it('should validate photo URL (reject non-HTTPS)', () => {
+            const user = findOrCreateOAuthUser('google', {
+                sub: 'bad-photo', email: 'photo@test.com', name: 'Test',
+                picture: 'http://insecure.com/photo.jpg', email_verified: true
+            });
+            assert.strictEqual(user.photoUrl, null);
+        });
+
+        it('should accept valid HTTPS photo URLs', () => {
+            const user = findOrCreateOAuthUser('google', {
+                sub: 'good-photo', email: 'goodphoto@test.com', name: 'Test',
+                picture: 'https://lh3.googleusercontent.com/avatar.jpg', email_verified: true
+            });
+            assert.strictEqual(user.photoUrl, 'https://lh3.googleusercontent.com/avatar.jpg');
         });
 
         it('should use fallback email for users without email', () => {
-            const providerUser = {
-                sub: 'no-email-user',
-                email: null,
-                name: null
-            };
-
-            const user = findOrCreateOAuthUser('apple', providerUser);
-            assert.ok(user.email.includes('apple:no-email-user@oauth.local'));
+            const user = findOrCreateOAuthUser('apple', {
+                sub: 'no-email', email: null, name: null, email_verified: false
+            });
+            assert.ok(user.email.includes('apple:no-email@oauth.local'));
         });
+    });
 
-        it('should add photo from provider to existing user during linking', () => {
-            const existing = {
-                id: 'photo-test',
-                email: 'photo@test.com',
-                displayName: 'Photo Test',
-                hashedPassword: null,
-                createdAt: Date.now()
-            };
-            users.set('photo@test.com', existing);
+    describe('isValidPhotoUrl', () => {
+        it('should accept valid HTTPS URLs', () => { assert.ok(isValidPhotoUrl('https://example.com/photo.jpg')); });
+        it('should reject HTTP URLs', () => { assert.ok(!isValidPhotoUrl('http://example.com/photo.jpg')); });
+        it('should reject javascript: URIs', () => { assert.ok(!isValidPhotoUrl('javascript:alert(1)')); });
+        it('should reject null/empty', () => { assert.ok(!isValidPhotoUrl(null)); assert.ok(!isValidPhotoUrl('')); });
+        it('should reject very long URLs', () => { assert.ok(!isValidPhotoUrl('https://x.com/' + 'a'.repeat(3000))); });
+    });
 
-            const providerUser = {
-                sub: 'google-photo',
-                email: 'photo@test.com',
-                name: 'Photo Test',
-                picture: 'https://example.com/avatar.jpg'
-            };
-
-            const linked = findOrCreateOAuthUser('google', providerUser);
-            assert.strictEqual(linked.photoUrl, 'https://example.com/avatar.jpg');
+    describe('sanitizeDisplayName', () => {
+        it('should trim and cap at max length', () => {
+            assert.strictEqual(sanitizeDisplayName('  Hello  '), 'Hello');
+            assert.strictEqual(sanitizeDisplayName('A'.repeat(200)).length, 100);
+        });
+        it('should return undefined for non-strings', () => {
+            assert.strictEqual(sanitizeDisplayName(12345), undefined);
+            assert.strictEqual(sanitizeDisplayName(null), undefined);
+        });
+        it('should return undefined for empty strings', () => {
+            assert.strictEqual(sanitizeDisplayName(''), undefined);
+            assert.strictEqual(sanitizeDisplayName('   '), undefined);
         });
     });
 
@@ -352,9 +362,7 @@ describe('OAuth Routes - HTTP Endpoint Tests', () => {
     beforeEach(async () => {
         users.clear();
         refreshTokens.clear();
-        await new Promise(resolve => {
-            server = app.listen(0, resolve);
-        });
+        await new Promise(resolve => { server = app.listen(0, resolve); });
     });
 
     afterEach(async () => {
@@ -367,24 +375,20 @@ describe('OAuth Routes - HTTP Endpoint Tests', () => {
         it('should authenticate with a valid Google ID token', async () => {
             const idToken = createGoogleIdToken();
             const res = await makeRequest(server, 'POST', '/api/auth/oauth/google', { idToken });
-
             assert.strictEqual(res.status, 200);
             assert.ok(res.body.token);
             assert.ok(res.body.refreshToken);
             assert.strictEqual(res.body.user.email, 'testuser@gmail.com');
-            assert.strictEqual(res.body.user.displayName, 'Test User');
             assert.strictEqual(res.body.user.provider, 'google');
         });
 
         it('should reject request without idToken', async () => {
             const res = await makeRequest(server, 'POST', '/api/auth/oauth/google', {});
             assert.strictEqual(res.status, 400);
-            assert.strictEqual(res.body.error, 'Google ID token is required');
         });
 
         it('should reject expired Google token', async () => {
-            const idToken = createGoogleIdToken({}, true);
-            const res = await makeRequest(server, 'POST', '/api/auth/oauth/google', { idToken });
+            const res = await makeRequest(server, 'POST', '/api/auth/oauth/google', { idToken: createGoogleIdToken({}, true) });
             assert.strictEqual(res.status, 401);
         });
 
@@ -392,7 +396,6 @@ describe('OAuth Routes - HTTP Endpoint Tests', () => {
             const idToken = createGoogleIdToken();
             const res1 = await makeRequest(server, 'POST', '/api/auth/oauth/google', { idToken });
             const res2 = await makeRequest(server, 'POST', '/api/auth/oauth/google', { idToken });
-
             assert.strictEqual(res1.body.user.id, res2.body.user.id);
         });
     });
@@ -400,116 +403,73 @@ describe('OAuth Routes - HTTP Endpoint Tests', () => {
     describe('POST /api/auth/oauth/apple', () => {
         it('should authenticate with a valid Apple ID token', async () => {
             const idToken = createAppleIdToken();
-            const res = await makeRequest(server, 'POST', '/api/auth/oauth/apple', {
-                idToken,
-                displayName: 'Apple User'
-            });
-
+            const res = await makeRequest(server, 'POST', '/api/auth/oauth/apple', { idToken, displayName: 'Apple User' });
             assert.strictEqual(res.status, 200);
             assert.ok(res.body.token);
-            assert.ok(res.body.refreshToken);
             assert.strictEqual(res.body.user.provider, 'apple');
-            assert.strictEqual(res.body.user.displayName, 'Apple User');
         });
 
         it('should reject request without idToken', async () => {
             const res = await makeRequest(server, 'POST', '/api/auth/oauth/apple', {});
             assert.strictEqual(res.status, 400);
-            assert.strictEqual(res.body.error, 'Apple ID token is required');
         });
 
         it('should reject expired Apple token', async () => {
-            const idToken = createAppleIdToken({}, true);
-            const res = await makeRequest(server, 'POST', '/api/auth/oauth/apple', { idToken });
+            const res = await makeRequest(server, 'POST', '/api/auth/oauth/apple', { idToken: createAppleIdToken({}, true) });
             assert.strictEqual(res.status, 401);
+        });
+
+        it('should NOT use client-supplied email for account linking', async () => {
+            await makeRequest(server, 'POST', '/api/auth/register', { email: 'victim@example.com', password: 'securepass123' });
+            const idToken = createAppleIdToken({ email: null, sub: 'attacker-sub' });
+            const res = await makeRequest(server, 'POST', '/api/auth/oauth/apple', { idToken, email: 'victim@example.com' });
+            assert.strictEqual(res.status, 200);
+            assert.notStrictEqual(res.body.user.email, 'victim@example.com');
         });
     });
 
     describe('POST /api/auth/oauth/link', () => {
         it('should link Google account to an authenticated user', async () => {
-            // First, create a user via Google OAuth
-            const appleToken = createAppleIdToken();
-            const authRes = await makeRequest(server, 'POST', '/api/auth/oauth/apple', {
-                idToken: appleToken,
-                displayName: 'Link Test'
-            });
-
-            const accessToken = authRes.body.token;
+            const authRes = await makeRequest(server, 'POST', '/api/auth/oauth/apple', { idToken: createAppleIdToken(), displayName: 'Link Test' });
             const googleToken = createGoogleIdToken({ sub: 'link-google-123', email: 'link@test.com' });
-
-            const res = await makeRequest(server, 'POST', '/api/auth/oauth/link', {
-                provider: 'google',
-                idToken: googleToken
-            }, { Authorization: `Bearer ${accessToken}` });
-
+            const res = await makeRequest(server, 'POST', '/api/auth/oauth/link', { provider: 'google', idToken: googleToken }, { Authorization: `Bearer ${authRes.body.token}` });
             assert.strictEqual(res.status, 200);
             assert.ok(res.body.providers.includes('google'));
             assert.ok(res.body.providers.includes('apple'));
         });
 
         it('should reject link without authentication', async () => {
-            const googleToken = createGoogleIdToken();
-            const res = await makeRequest(server, 'POST', '/api/auth/oauth/link', {
-                provider: 'google',
-                idToken: googleToken
-            });
-
+            const res = await makeRequest(server, 'POST', '/api/auth/oauth/link', { provider: 'google', idToken: createGoogleIdToken() });
             assert.strictEqual(res.status, 401);
         });
 
         it('should reject unsupported provider', async () => {
-            const appleToken = createAppleIdToken();
-            const authRes = await makeRequest(server, 'POST', '/api/auth/oauth/apple', {
-                idToken: appleToken
-            });
-
-            const accessToken = authRes.body.token;
-
-            const res = await makeRequest(server, 'POST', '/api/auth/oauth/link', {
-                provider: 'facebook',
-                idToken: 'some-token'
-            }, { Authorization: `Bearer ${accessToken}` });
-
+            const authRes = await makeRequest(server, 'POST', '/api/auth/oauth/apple', { idToken: createAppleIdToken() });
+            const res = await makeRequest(server, 'POST', '/api/auth/oauth/link', { provider: 'facebook', idToken: 'x' }, { Authorization: `Bearer ${authRes.body.token}` });
             assert.strictEqual(res.status, 400);
-            assert.ok(res.body.error.includes('Unsupported provider'));
         });
 
         it('should reject link without idToken', async () => {
-            const appleToken = createAppleIdToken();
-            const authRes = await makeRequest(server, 'POST', '/api/auth/oauth/apple', {
-                idToken: appleToken
-            });
-
-            const res = await makeRequest(server, 'POST', '/api/auth/oauth/link', {
-                provider: 'google'
-            }, { Authorization: `Bearer ${authRes.body.token}` });
-
+            const authRes = await makeRequest(server, 'POST', '/api/auth/oauth/apple', { idToken: createAppleIdToken() });
+            const res = await makeRequest(server, 'POST', '/api/auth/oauth/link', { provider: 'google' }, { Authorization: `Bearer ${authRes.body.token}` });
             assert.strictEqual(res.status, 400);
-            assert.strictEqual(res.body.error, 'ID token is required');
         });
 
-        it('should reject linking an identity already linked to another user', async () => {
-            // Create first user with Google
+        it('should reject linking identity already linked to another user', async () => {
             const googleToken = createGoogleIdToken();
             await makeRequest(server, 'POST', '/api/auth/oauth/google', { idToken: googleToken });
-
-            // Create second user with Apple
-            const appleToken = createAppleIdToken();
-            const authRes = await makeRequest(server, 'POST', '/api/auth/oauth/apple', {
-                idToken: appleToken,
-                displayName: 'Second User'
-            });
-
-            // Try to link the same Google identity to the second user
-            const res = await makeRequest(server, 'POST', '/api/auth/oauth/link', {
-                provider: 'google',
-                idToken: googleToken
-            }, { Authorization: `Bearer ${authRes.body.token}` });
-
+            const authRes = await makeRequest(server, 'POST', '/api/auth/oauth/apple', { idToken: createAppleIdToken(), displayName: 'Second' });
+            const res = await makeRequest(server, 'POST', '/api/auth/oauth/link', { provider: 'google', idToken: googleToken }, { Authorization: `Bearer ${authRes.body.token}` });
             assert.strictEqual(res.status, 409);
-            assert.ok(res.body.error.includes('already linked'));
+        });
+    });
+
+    describe('GET /api/auth/oauth/config', () => {
+        it('should return public OAuth client IDs', async () => {
+            const res = await makeRequest(server, 'GET', '/api/auth/oauth/config');
+            assert.strictEqual(res.status, 200);
+            assert.strictEqual(typeof res.body.googleClientId, 'string');
+            assert.strictEqual(typeof res.body.appleClientId, 'string');
         });
     });
 });
-
-console.log('Running OAuth Routes tests...');

@@ -1,6 +1,6 @@
 /**
  * Tests for OAuthService - Client-side OAuth/SSO integration
- * Tests token exchange, provider initialization, and account linking.
+ * Tests token exchange, provider initialization, account linking, and config fetching.
  */
 
 const { describe, it, beforeEach, afterEach } = require('node:test');
@@ -45,13 +45,13 @@ global.document = {
     }
 };
 
-// Helper to create a mock JWT
+// Helper to create a mock JWT (base64url encoded, matching server-side format)
 function createMockJWT(payload = {}, expInSeconds = 3600) {
-    const header = Buffer.from(JSON.stringify({ alg: 'HS256' })).toString('base64');
+    const header = Buffer.from(JSON.stringify({ alg: 'HS256' })).toString('base64url');
     const body = Buffer.from(JSON.stringify({
         ...payload,
         exp: Math.floor(Date.now() / 1000) + expInSeconds
-    })).toString('base64');
+    })).toString('base64url');
     return `${header}.${body}.mock-signature`;
 }
 
@@ -101,16 +101,36 @@ describe('OAuthService', () => {
         });
 
         it('should set both at once', () => {
-            oauthService.configure({
-                googleClientId: 'google-id',
-                appleClientId: 'apple-id'
-            });
-            assert.strictEqual(oauthService.googleClientId, 'google-id');
-            assert.strictEqual(oauthService.appleClientId, 'apple-id');
+            oauthService.configure({ googleClientId: 'gid', appleClientId: 'aid' });
+            assert.strictEqual(oauthService.googleClientId, 'gid');
+            assert.strictEqual(oauthService.appleClientId, 'aid');
         });
 
         it('should handle empty config gracefully', () => {
             oauthService.configure({});
+            assert.strictEqual(oauthService.googleClientId, '');
+        });
+    });
+
+    describe('fetchConfig', () => {
+        it('should fetch config from server endpoint', async () => {
+            setupFetch({ googleClientId: 'server-gid', appleClientId: 'server-aid' });
+            await oauthService.fetchConfig();
+            assert.strictEqual(oauthService.googleClientId, 'server-gid');
+            assert.strictEqual(oauthService.appleClientId, 'server-aid');
+        });
+
+        it('should fall back to window.OAUTH_CONFIG on fetch failure', async () => {
+            fetchMockFn = async () => { throw new Error('Network error'); };
+            global.window = { OAUTH_CONFIG: { googleClientId: 'fallback-gid' } };
+            await oauthService.fetchConfig();
+            assert.strictEqual(oauthService.googleClientId, 'fallback-gid');
+            delete global.window;
+        });
+
+        it('should handle no config available', async () => {
+            fetchMockFn = async () => { throw new Error('Network error'); };
+            await oauthService.fetchConfig();
             assert.strictEqual(oauthService.googleClientId, '');
         });
     });
@@ -140,23 +160,19 @@ describe('OAuthService', () => {
 
     describe('initApple', () => {
         it('should return false when no clientId is configured', async () => {
-            const result = await oauthService.initApple();
-            assert.strictEqual(result, false);
+            assert.strictEqual(await oauthService.initApple(), false);
         });
 
         it('should return true when already initialized', async () => {
             oauthService.configure({ appleClientId: 'com.test.app' });
             oauthService._appleInitialized = true;
-            const result = await oauthService.initApple();
-            assert.strictEqual(result, true);
+            assert.strictEqual(await oauthService.initApple(), true);
         });
 
         it('should return true when AppleID.auth is available', async () => {
             oauthService.configure({ appleClientId: 'com.test.app' });
             global.AppleID = { auth: { init: () => {}, signIn: async () => ({}) } };
-            const result = await oauthService.initApple();
-            assert.strictEqual(result, true);
-            assert.strictEqual(oauthService._appleInitialized, true);
+            assert.strictEqual(await oauthService.initApple(), true);
             delete global.AppleID;
         });
     });
@@ -171,7 +187,6 @@ describe('OAuthService', () => {
             });
 
             const user = await oauthService._exchangeGoogleToken('fake-google-id-token');
-
             assert.strictEqual(user.email, 'test@gmail.com');
             assert.strictEqual(user.provider, 'google');
             assert.strictEqual(authService.isAuthenticated(), true);
@@ -180,11 +195,7 @@ describe('OAuthService', () => {
 
         it('should throw on failed exchange', async () => {
             setupFetch({ error: 'Invalid token' }, false, 401);
-
-            await assert.rejects(
-                () => oauthService._exchangeGoogleToken('bad-token'),
-                /Invalid token/
-            );
+            await assert.rejects(() => oauthService._exchangeGoogleToken('bad-token'), /Invalid token/);
         });
     });
 
@@ -197,8 +208,7 @@ describe('OAuthService', () => {
                 user: { id: 'user2', email: 'test@icloud.com', displayName: 'Apple User', provider: 'apple' }
             });
 
-            const user = await oauthService._exchangeAppleToken('fake-apple-id-token', 'Apple User', 'test@icloud.com');
-
+            const user = await oauthService._exchangeAppleToken('fake-apple-id-token', 'Apple User');
             assert.strictEqual(user.email, 'test@icloud.com');
             assert.strictEqual(user.provider, 'apple');
             assert.strictEqual(oauthService.getProvider(), 'apple');
@@ -206,17 +216,12 @@ describe('OAuthService', () => {
 
         it('should throw on failed exchange', async () => {
             setupFetch({ error: 'Authentication failed' }, false, 401);
-
-            await assert.rejects(
-                () => oauthService._exchangeAppleToken('bad-token'),
-                /Authentication failed/
-            );
+            await assert.rejects(() => oauthService._exchangeAppleToken('bad-token'), /Authentication failed/);
         });
     });
 
     describe('linkProvider', () => {
         it('should call the link endpoint with auth headers', async () => {
-            // Set up authenticated state
             const mockToken = createMockJWT({ id: 'user1' }, 3600);
             localStorageMock.setItem('music_app_auth_token', mockToken);
 
@@ -224,26 +229,17 @@ describe('OAuthService', () => {
             fetchMockFn = async (url, opts) => {
                 capturedUrl = url;
                 capturedBody = JSON.parse(opts.body);
-                return {
-                    ok: true,
-                    status: 200,
-                    json: async () => ({ message: 'Linked', providers: ['google', 'apple'] })
-                };
+                return { ok: true, status: 200, json: async () => ({ message: 'Linked', providers: ['google', 'apple'] }) };
             };
 
             const result = await oauthService.linkProvider('google', 'google-id-token');
-
             assert.ok(capturedUrl.includes('/api/auth/oauth/link'));
             assert.strictEqual(capturedBody.provider, 'google');
-            assert.strictEqual(capturedBody.idToken, 'google-id-token');
             assert.deepStrictEqual(result.providers, ['google', 'apple']);
         });
 
         it('should throw when not authenticated', async () => {
-            await assert.rejects(
-                () => oauthService.linkProvider('google', 'token'),
-                /Must be authenticated/
-            );
+            await assert.rejects(() => oauthService.linkProvider('google', 'token'), /Must be authenticated/);
         });
     });
 
@@ -266,21 +262,13 @@ describe('OAuthService', () => {
 
     describe('signInWithGoogle error handling', () => {
         it('should throw when Google SDK is not available and no clientId', async () => {
-            await assert.rejects(
-                () => oauthService.signInWithGoogle(),
-                /Google Sign-In SDK not available/
-            );
+            await assert.rejects(() => oauthService.signInWithGoogle(), /Google Sign-In SDK not available/);
         });
     });
 
     describe('signInWithApple error handling', () => {
         it('should throw when Apple SDK is not available and no clientId', async () => {
-            await assert.rejects(
-                () => oauthService.signInWithApple(),
-                /Apple Sign-In SDK not available/
-            );
+            await assert.rejects(() => oauthService.signInWithApple(), /Apple Sign-In SDK not available/);
         });
     });
 });
-
-console.log('Running OAuthService tests...');

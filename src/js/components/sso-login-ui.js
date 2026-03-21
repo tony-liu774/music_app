@@ -18,6 +18,7 @@ class SSOLoginUI {
         this._onSuccess = null;
         this._onError = null;
         this._loading = false;
+        this._abortController = null;
     }
 
     /**
@@ -126,18 +127,22 @@ class SSOLoginUI {
      * @private
      */
     _bindEvents() {
+        // Use AbortController so destroy() can remove all listeners at once
+        this._abortController = new AbortController();
+        const opts = { signal: this._abortController.signal };
+
         const googleBtn = this.container.querySelector('#sso-google-btn');
         const appleBtn = this.container.querySelector('#sso-apple-btn');
         const skipBtn = this.container.querySelector('#sso-skip-btn');
 
         if (googleBtn) {
-            googleBtn.addEventListener('click', () => this._handleGoogleSignIn());
+            googleBtn.addEventListener('click', () => this._handleGoogleSignIn(), opts);
         }
         if (appleBtn) {
-            appleBtn.addEventListener('click', () => this._handleAppleSignIn());
+            appleBtn.addEventListener('click', () => this._handleAppleSignIn(), opts);
         }
         if (skipBtn) {
-            skipBtn.addEventListener('click', () => this._handleSkip());
+            skipBtn.addEventListener('click', () => this._handleSkip(), opts);
         }
     }
 
@@ -239,6 +244,10 @@ class SSOLoginUI {
      * Destroy and clean up.
      */
     destroy() {
+        if (this._abortController) {
+            this._abortController.abort();
+            this._abortController = null;
+        }
         if (this.container) {
             this.container.innerHTML = '';
         }

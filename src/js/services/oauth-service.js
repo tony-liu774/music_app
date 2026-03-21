@@ -32,6 +32,28 @@ class OAuthService {
     }
 
     /**
+     * Fetch OAuth config (public client IDs) from the server.
+     * Falls back to window.OAUTH_CONFIG if the fetch fails.
+     * @returns {Promise<void>}
+     */
+    async fetchConfig() {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/api/auth/oauth/config`);
+            if (response.ok) {
+                const config = await response.json();
+                this.configure(config);
+                return;
+            }
+        } catch {
+            // Fetch failed, fall through to window config
+        }
+        // Fallback to global config
+        if (typeof window !== 'undefined' && window.OAUTH_CONFIG) {
+            this.configure(window.OAUTH_CONFIG);
+        }
+    }
+
+    /**
      * Initialize the Google Sign-In SDK.
      * Loads the GSI client library and configures the client.
      * @returns {Promise<boolean>} true if initialized
@@ -49,7 +71,6 @@ class OAuthService {
         // Otherwise, dynamically load the GSI script
         return new Promise((resolve) => {
             if (document.querySelector('script[src*="accounts.google.com/gsi/client"]')) {
-                // Script already loading, wait for it
                 const interval = setInterval(() => {
                     if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
                         this._googleInitialized = true;
@@ -57,7 +78,6 @@ class OAuthService {
                         resolve(true);
                     }
                 }, 100);
-                // Timeout after 5 seconds
                 setTimeout(() => {
                     clearInterval(interval);
                     resolve(false);
@@ -122,7 +142,7 @@ class OAuthService {
 
     /**
      * Sign in with Google.
-     * Triggers the Google One Tap or popup flow and exchanges the token with our backend.
+     * Uses a settled-once pattern to avoid the race between callback and prompt notification.
      * @returns {Promise<Object>} User object
      */
     async signInWithGoogle() {
@@ -134,9 +154,13 @@ class OAuthService {
         }
 
         return new Promise((resolve, reject) => {
+            let settled = false;
+
             google.accounts.id.initialize({
                 client_id: this.googleClientId,
                 callback: async (response) => {
+                    if (settled) return;
+                    settled = true;
                     try {
                         const user = await this._exchangeGoogleToken(response.credential);
                         resolve(user);
@@ -146,11 +170,10 @@ class OAuthService {
                 }
             });
 
-            // Show the Google sign-in popup
             google.accounts.id.prompt((notification) => {
+                if (settled) return;
                 if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-                    // Fallback to the explicit button flow (trigger a click)
-                    // The sign-in popup was blocked or skipped
+                    settled = true;
                     reject(new Error('Google Sign-In was dismissed'));
                 }
             });
@@ -159,7 +182,6 @@ class OAuthService {
 
     /**
      * Sign in with Apple.
-     * Triggers the Apple Sign-In popup and exchanges the token with our backend.
      * @returns {Promise<Object>} User object
      */
     async signInWithApple() {
@@ -189,10 +211,11 @@ class OAuthService {
             ? `${appleUser.name.firstName || ''} ${appleUser.name.lastName || ''}`.trim()
             : undefined;
 
+        // Only send displayName to backend, NOT email
+        // (email comes from the verified token on the server side)
         return this._exchangeAppleToken(
             response.authorization.id_token,
-            displayName,
-            appleUser.email
+            displayName
         );
     }
 
@@ -225,15 +248,14 @@ class OAuthService {
      * Exchange an Apple ID token with our backend for app tokens.
      * @param {string} idToken - Apple ID token JWT
      * @param {string} [displayName] - User display name (first auth only)
-     * @param {string} [email] - User email (first auth only)
      * @returns {Promise<Object>} User object
      * @private
      */
-    async _exchangeAppleToken(idToken, displayName, email) {
+    async _exchangeAppleToken(idToken, displayName) {
         const response = await fetch(`${this.apiBaseUrl}/api/auth/oauth/apple`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ idToken, displayName, email })
+            body: JSON.stringify({ idToken, displayName })
         });
 
         if (!response.ok) {

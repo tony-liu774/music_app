@@ -30,14 +30,14 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-eval'", "https://cdnjs.cloudflare.com"], // Required for AudioWorklet + jsPDF CDN
+      scriptSrc: ["'self'", "'unsafe-eval'", "https://cdnjs.cloudflare.com", "https://accounts.google.com", "https://appleid.cdn-apple.com"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", 'data:', 'https:'],
-      connectSrc: ["'self'", 'blob:'],
+      connectSrc: ["'self'", 'blob:', "https://accounts.google.com", "https://appleid.apple.com", "https://oauth2.googleapis.com"],
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
       mediaSrc: ["'self'", 'blob:', 'mediastream:'],
-      frameSrc: ["'none'"],
+      frameSrc: ["https://accounts.google.com"],
       workerSrc: ["'self'", 'blob:'],
     },
   },

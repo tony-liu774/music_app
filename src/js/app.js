@@ -78,7 +78,7 @@ class ConcertmasterApp {
 
         try {
             // Initialize SSO / OAuth
-            this.initSSO();
+            await this.initSSO();
 
             // Initialize components
             this.initializeComponents();
@@ -409,7 +409,7 @@ class ConcertmasterApp {
     /**
      * Initialize SSO / OAuth services and show login screen if needed.
      */
-    initSSO() {
+    async initSSO() {
         if (typeof AuthService === 'undefined' || typeof OAuthService === 'undefined') {
             return;
         }
@@ -417,12 +417,8 @@ class ConcertmasterApp {
         this.authService = new AuthService();
         this.oauthService = new OAuthService(this.authService);
 
-        // Configure with env-provided client IDs (set via global config)
-        const oauthConfig = window.OAUTH_CONFIG || {};
-        this.oauthService.configure({
-            googleClientId: oauthConfig.googleClientId || '',
-            appleClientId: oauthConfig.appleClientId || ''
-        });
+        // Fetch OAuth client IDs from the server endpoint
+        await this.oauthService.fetchConfig();
 
         // Listen for logout events to clear OAuth provider
         this.authService.onAuthStateChange((event) => {
