@@ -6,11 +6,8 @@ class HeatMapRenderer {
     constructor(container) {
         this.container = container;
         this.measureData = [];
-        this.noteData = []; // Store note-level data for detail view
         this.canvas = null;
         this.ctx = null;
-        this.onMeasureClick = null; // Callback for measure click
-        this.barRects = []; // Store bar positions for click detection
     }
 
     init() {
@@ -21,40 +18,6 @@ class HeatMapRenderer {
 
         this.ctx = this.canvas.getContext('2d');
         this.resize();
-
-        // Add click handler
-        this.canvas.addEventListener('click', (e) => this.handleClick(e));
-        this.canvas.style.cursor = 'pointer';
-    }
-
-    handleClick(event) {
-        if (!this.barRects.length) return;
-
-        const rect = this.canvas.getBoundingClientRect();
-        const x = event.clientX - rect.left;
-        const y = event.clientY - rect.top;
-
-        // Find which bar was clicked
-        for (const barRect of this.barRects) {
-            if (x >= barRect.x && x <= barRect.x + barRect.width &&
-                y >= barRect.y && y <= barRect.y + barRect.height) {
-                // Show detail for this measure
-                if (this.onMeasureClick) {
-                    const noteDetails = this.getNoteDetailsForMeasure(barRect.measure);
-                    this.onMeasureClick(barRect.measure, barRect.score, noteDetails);
-                }
-                return;
-            }
-        }
-    }
-
-    getNoteDetailsForMeasure(measure) {
-        return this.noteData.filter(n => n.measure === measure).map(n => ({
-            note: n.noteName || '?',
-            accuracy: n.accuracy,
-            centsDeviation: n.centsDeviation || 0,
-            timestamp: n.timestamp
-        }));
     }
 
     resize() {
@@ -67,23 +30,6 @@ class HeatMapRenderer {
     setData(sessionData) {
         // Convert session data to measure-level scores
         this.measureData = this.calculateMeasureScores(sessionData);
-
-        // Store note-level data for detail view
-        this.noteData = [];
-        if (sessionData && sessionData.notes) {
-            for (const noteData of sessionData.notes) {
-                if (noteData.note && noteData.measure) {
-                    this.noteData.push({
-                        measure: noteData.measure,
-                        noteName: noteData.note.name + noteData.note.octave,
-                        accuracy: noteData.accuracy || 0,
-                        centsDeviation: noteData.note.centsDeviation || 0,
-                        timestamp: noteData.timestamp,
-                        matched: noteData.matched
-                    });
-                }
-            }
-        }
     }
 
     calculateMeasureScores(sessionData) {
@@ -126,9 +72,6 @@ class HeatMapRenderer {
         // Clear
         ctx.clearRect(0, 0, width, height);
 
-        // Reset bar rectangles for click detection
-        this.barRects = [];
-
         if (this.measureData.length === 0) {
             // Show placeholder
             ctx.fillStyle = '#6a6a7a';
@@ -148,21 +91,11 @@ class HeatMapRenderer {
             const barHeight = (data.score / 100) * maxBarHeight;
             const y = height - 20 - barHeight;
 
-            // Store bar rectangle for click detection
-            this.barRects.push({
-                measure: data.measure,
-                score: data.score,
-                x: x,
-                y: y,
-                width: barWidth - 4,
-                height: barHeight
-            });
-
             // Get color based on score
             ctx.fillStyle = this.getColorForScore(data.score);
 
-            // Draw bar with rounded top
-            this.drawRoundedBar(ctx, x, y, barWidth - 4, barHeight, 4);
+            // Draw bar
+            ctx.fillRect(x, y, barWidth - 4, barHeight);
 
             // Draw measure number
             ctx.fillStyle = '#a0a0b0';
@@ -174,19 +107,6 @@ class HeatMapRenderer {
             ctx.fillStyle = '#f5f5dc';
             ctx.fillText(Math.round(data.score) + '%', x + barWidth / 2, y - 5);
         });
-    }
-
-    drawRoundedBar(ctx, x, y, width, height, radius) {
-        ctx.beginPath();
-        ctx.moveTo(x + radius, y);
-        ctx.lineTo(x + width - radius, y);
-        ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-        ctx.lineTo(x + width, y + height);
-        ctx.lineTo(x, y + height);
-        ctx.lineTo(x, y + radius);
-        ctx.quadraticCurveTo(x, y, x + radius, y);
-        ctx.closePath();
-        ctx.fill();
     }
 
     getColorForScore(score) {
