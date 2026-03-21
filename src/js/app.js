@@ -36,6 +36,7 @@ class ConcertmasterApp {
         // Annotations
         this.annotationCanvas = null;
         this.annotationService = null;
+        this.annotationCanvasClickHandler = null;
 
         // Onboarding
         this.onboardingService = null;
@@ -200,28 +201,43 @@ class ConcertmasterApp {
     setupAnnotationToolbar() {
         if (!this.annotationCanvas) return;
 
-        // Tool buttons
+        // Tool buttons with symbol placement support
         document.querySelectorAll('.annotation-tool-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.annotation-tool-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-                this.annotationCanvas.setTool(btn.dataset.tool);
+                const tool = btn.dataset.tool;
+                this.annotationCanvas.setTool(tool);
+
+                // For symbol tools, set up click handler on canvas for placement
+                if (['upbow', 'downbow', 'fingering'].includes(tool)) {
+                    this.enableSymbolPlacement(tool);
+                } else {
+                    this.disableSymbolPlacement();
+                }
             });
         });
 
-        // Color picker
+        // Color picker with validation
         const colorPicker = document.getElementById('annotation-color');
         if (colorPicker) {
             colorPicker.addEventListener('input', e => {
-                this.annotationCanvas.setColor(e.target.value);
+                const color = e.target.value;
+                // Color input type already validates format, but validate anyway
+                if (/^#[0-9a-fA-F]{6}$/.test(color)) {
+                    this.annotationCanvas.setColor(color);
+                }
             });
         }
 
-        // Line width
+        // Line width with bounds checking
         const lineWidthSlider = document.getElementById('annotation-line-width');
         if (lineWidthSlider) {
             lineWidthSlider.addEventListener('input', e => {
-                this.annotationCanvas.setLineWidth(parseInt(e.target.value));
+                const width = parseInt(e.target.value);
+                if (!isNaN(width) && width >= 1 && width <= 8) {
+                    this.annotationCanvas.setLineWidth(width);
+                }
             });
         }
 
@@ -246,8 +262,13 @@ class ConcertmasterApp {
             });
         }
 
-        // Keyboard shortcuts
+        // Keyboard shortcuts (don't trigger in input fields)
         document.addEventListener('keydown', e => {
+            // Check if user is typing in an input/textarea
+            if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+                return;
+            }
+
             if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
                 e.preventDefault();
                 this.annotationCanvas.undo();
@@ -274,6 +295,37 @@ class ConcertmasterApp {
                     el.title = status === 'synced' ? 'Synced' : 'Syncing...';
                 }
             });
+
+            this.annotationService.on('quotaExceeded', data => {
+                this.showToast(data.message, 'error');
+            });
+        }
+    }
+
+    enableSymbolPlacement(tool) {
+        if (!this.annotationCanvas || !this.annotationCanvas.canvas) return;
+
+        const canvas = this.annotationCanvas.canvas;
+        const handler = (e) => {
+            if (this.annotationCanvas.currentTool !== tool) {
+                canvas.removeEventListener('click', handler);
+                return;
+            }
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            this.annotationCanvas.placeSymbol(x, y, tool);
+        };
+
+        canvas.addEventListener('click', handler);
+        this.annotationCanvasClickHandler = handler;
+    }
+
+    disableSymbolPlacement() {
+        if (!this.annotationCanvas || !this.annotationCanvas.canvas) return;
+        if (this.annotationCanvasClickHandler) {
+            this.annotationCanvas.canvas.removeEventListener('click', this.annotationCanvasClickHandler);
+            this.annotationCanvasClickHandler = null;
         }
     }
 

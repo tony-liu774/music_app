@@ -40,6 +40,15 @@ class AnnotationService {
         });
     }
 
+    sanitizeScoreId(id) {
+        if (!id || typeof id !== 'string') {
+            console.warn('Invalid scoreId provided');
+            return 'default-score';
+        }
+        // Remove special characters and path traversal attempts
+        return id.replace(/[^a-zA-Z0-9_\-]/g, '_').slice(0, 100);
+    }
+
     init(canvas, scoreId) {
         this.canvas = canvas;
         if (scoreId) {
@@ -47,10 +56,12 @@ class AnnotationService {
         }
 
         // Listen for canvas changes
-        this.canvas.on('change', data => {
-            if (this._remoteUpdate) return;
-            this.onCanvasChange(data);
-        });
+        if (this.canvas && this.canvas.on) {
+            this.canvas.on('change', data => {
+                if (this._remoteUpdate) return;
+                this.onCanvasChange(data);
+            });
+        }
     }
 
     setScoreId(id) {
@@ -60,7 +71,8 @@ class AnnotationService {
             this.listener = null;
         }
 
-        this.scoreId = id;
+        // Sanitize the score ID to prevent path injection
+        this.scoreId = this.sanitizeScoreId(id);
 
         if (this.firebaseEnabled) {
             this.dbRef = this.db.ref(`annotations/${id}`);
@@ -198,20 +210,42 @@ class AnnotationService {
             this.localAnnotations[ann.id] = ann;
         });
 
-        localStorage.setItem(
-            `annotations_${this.scoreId}`,
-            JSON.stringify(annotations)
-        );
+        try {
+            localStorage.setItem(
+                `annotations_${this.scoreId}`,
+                JSON.stringify(annotations)
+            );
+        } catch (e) {
+            if (e.name === 'QuotaExceededError') {
+                console.error('localStorage quota exceeded - annotations not saved');
+                this.emit('syncStatus', 'error');
+                this.emit('quotaExceeded', { message: 'Storage quota exceeded. Please clear some annotations.' });
+            } else {
+                console.error('localStorage error:', e);
+                this.emit('syncStatus', 'error');
+            }
+        }
     }
 
     saveToLocal() {
         if (!this.scoreId) return;
 
         const annotations = Object.values(this.localAnnotations);
-        localStorage.setItem(
-            `annotations_${this.scoreId}`,
-            JSON.stringify(annotations)
-        );
+        try {
+            localStorage.setItem(
+                `annotations_${this.scoreId}`,
+                JSON.stringify(annotations)
+            );
+        } catch (e) {
+            if (e.name === 'QuotaExceededError') {
+                console.error('localStorage quota exceeded - annotations not saved');
+                this.emit('syncStatus', 'error');
+                this.emit('quotaExceeded', { message: 'Storage quota exceeded. Please clear some annotations.' });
+            } else {
+                console.error('localStorage error:', e);
+                this.emit('syncStatus', 'error');
+            }
+        }
     }
 
     loadFromLocal() {

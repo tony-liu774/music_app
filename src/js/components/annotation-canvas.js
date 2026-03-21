@@ -75,39 +75,68 @@ class AnnotationCanvas {
     }
 
     setColor(color) {
-        this.currentColor = color;
-    }
-
-    setLineWidth(width) {
-        this.currentLineWidth = width;
-    }
-
-    setFingering(digit) {
-        if (['1', '2', '3', '4'].includes(digit)) {
-            this.currentFingering = digit;
+        // Validate color - must be valid hex or rgb format
+        if (typeof color === 'string' && /^(#[0-9a-fA-F]{6}|rgb\(\d+,\s*\d+,\s*\d+\))$/.test(color)) {
+            this.currentColor = color;
         }
     }
 
+    setLineWidth(width) {
+        // Clamp line width to 1-20 pixels
+        const w = parseInt(width);
+        if (!isNaN(w) && w >= 1 && w <= 20) {
+            this.currentLineWidth = w;
+        }
+    }
+
+    setFingering(digit) {
+        if (['1', '2', '3', '4'].includes(String(digit))) {
+            this.currentFingering = String(digit);
+        }
+    }
+
+    validateAnnotation(ann) {
+        // Validate annotation object structure
+        if (!ann || typeof ann !== 'object') return false;
+        if (!['stroke', 'symbol'].includes(ann.type)) return false;
+        if (typeof ann.id !== 'string' || !ann.id) return false;
+        if (!Array.isArray(ann.points) && ann.type === 'stroke') return false;
+        if (typeof ann.color !== 'string' || !ann.color) return false;
+        if (typeof ann.layerId !== 'string') return false;
+        return true;
+    }
+
+    clampCoordinates(x, y) {
+        // Clamp coordinates to canvas bounds
+        const clampedX = Math.max(0, Math.min(x, this.canvas?.width || 800));
+        const clampedY = Math.max(0, Math.min(y, this.canvas?.height || 600));
+        return { x: clampedX, y: clampedY };
+    }
+
     onPointerDown(e) {
+        const { x, y } = this.clampCoordinates(e.offsetX, e.offsetY);
+
         if (this.currentTool === 'eraser') {
-            this.eraseAt(e.offsetX, e.offsetY);
+            this.eraseAt(x, y);
             return;
         }
 
         this.isDrawing = true;
-        this.currentStroke = [{ x: e.offsetX, y: e.offsetY, pressure: e.pressure || 1 }];
+        this.currentStroke = [{ x, y, pressure: e.pressure || 1 }];
     }
 
     onPointerMove(e) {
         if (!this.isDrawing) return;
 
+        const { x, y } = this.clampCoordinates(e.offsetX, e.offsetY);
+
         if (this.currentTool === 'eraser') {
-            this.eraseAt(e.offsetX, e.offsetY);
+            this.eraseAt(x, y);
             return;
         }
 
         // Add point to current stroke
-        this.currentStroke.push({ x: e.offsetX, y: e.offsetY, pressure: e.pressure || 1 });
+        this.currentStroke.push({ x, y, pressure: e.pressure || 1 });
 
         // Draw live
         this.drawStroke(this.currentStroke);
@@ -117,6 +146,13 @@ class AnnotationCanvas {
         if (!this.isDrawing) return;
 
         this.isDrawing = false;
+
+        if (this.currentTool === 'eraser') {
+            // Save eraser history on completion
+            this.saveHistory();
+            this.emit('change', { annotations: this.annotations });
+            return;
+        }
 
         if (this.currentStroke.length === 0) return;
 
@@ -219,7 +255,7 @@ class AnnotationCanvas {
         this.addAnnotation(annotation);
     }
 
-    eraseAt(x, y, radius = 15) {
+    eraseAt(x, y, radius = 15, saveToHistory = false) {
         const ctx = this.ctx;
         ctx.clearRect(x - radius, y - radius, radius * 2, radius * 2);
 
@@ -239,7 +275,10 @@ class AnnotationCanvas {
             return true;
         });
 
-        this.saveHistory();
+        // Only save history on completion (saveToHistory=true), not on every move
+        if (saveToHistory) {
+            this.saveHistory();
+        }
         this.emit('change', { annotations: this.annotations });
         this.markDirty();
     }
@@ -302,7 +341,24 @@ class AnnotationCanvas {
     }
 
     loadAnnotations(annotations) {
-        this.annotations = JSON.parse(JSON.stringify(annotations));
+        if (!Array.isArray(annotations)) {
+            console.warn('loadAnnotations: Invalid annotations - not an array');
+            return;
+        }
+
+        // Filter and validate all annotations
+        const validAnnotations = annotations.filter(ann => {
+            const isValid = this.validateAnnotation(ann);
+            if (!isValid) {
+                console.warn('loadAnnotations: Skipping invalid annotation', ann);
+            }
+            return isValid;
+        });
+
+        this.annotations = JSON.parse(JSON.stringify(validAnnotations));
+        // Clear prior history to avoid confusing undo stack
+        this.history = [];
+        this.historyIndex = -1;
         this.saveHistory();
         this.markDirty();
     }
