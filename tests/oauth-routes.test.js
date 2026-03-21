@@ -6,6 +6,7 @@
 const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert');
 const http = require('node:http');
+const crypto = require('node:crypto');
 const jwt = require('jsonwebtoken');
 
 const JWT_SECRET = require('../src/config').jwt.secret;
@@ -17,9 +18,22 @@ const {
     OAuthVerificationError,
     SUPPORTED_PROVIDERS,
     isValidPhotoUrl,
-    sanitizeDisplayName
+    sanitizeDisplayName,
+    _setGoogleJwksCache,
+    _setAppleJwksCache
 } = require('../src/routes/oauth');
 const app = require('../src/index');
+
+// Generate RSA key pair for JWKS signature verification tests
+const { privateKey: rsaPrivateKey, publicKey: rsaPublicKey } = crypto.generateKeyPairSync('rsa', {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: 'spki', format: 'pem' },
+    privateKeyEncoding: { type: 'pkcs8', format: 'pem' }
+});
+const rsaPublicJwk = crypto.createPublicKey(rsaPublicKey).export({ format: 'jwk' });
+rsaPublicJwk.kid = 'test-key-1';
+rsaPublicJwk.use = 'sig';
+rsaPublicJwk.alg = 'RS256';
 
 // Helper to create a fake Google ID token JWT (base64url encoded)
 function createGoogleIdToken(payload = {}, expired = false) {
@@ -374,6 +388,220 @@ describe('OAuth Routes - Unit Tests', () => {
             assert.ok(SUPPORTED_PROVIDERS.includes('google'));
             assert.ok(SUPPORTED_PROVIDERS.includes('apple'));
             assert.strictEqual(SUPPORTED_PROVIDERS.length, 2);
+        });
+    });
+});
+
+describe('JWKS Signature Verification', () => {
+    const TEST_GOOGLE_CLIENT_ID = 'test-google-client-id.apps.googleusercontent.com';
+    const TEST_APPLE_CLIENT_ID = 'com.test.musicapp';
+
+    beforeEach(() => {
+        users.clear();
+        refreshTokens.clear();
+    });
+
+    afterEach(() => {
+        users.clear();
+        refreshTokens.clear();
+        delete process.env.GOOGLE_CLIENT_ID;
+        delete process.env.APPLE_CLIENT_ID;
+        _setGoogleJwksCache(null, 0);
+        _setAppleJwksCache(null, 0);
+    });
+
+    describe('Google JWKS verification', () => {
+        it('should accept a correctly-signed token with matching kid', async () => {
+            process.env.GOOGLE_CLIENT_ID = TEST_GOOGLE_CLIENT_ID;
+            _setGoogleJwksCache([rsaPublicJwk], Date.now() + 3600000);
+
+            const token = jwt.sign({
+                iss: 'accounts.google.com',
+                sub: 'google-jwks-user',
+                email: 'jwks@gmail.com',
+                email_verified: true,
+                aud: TEST_GOOGLE_CLIENT_ID,
+                exp: Math.floor(Date.now() / 1000) + 3600
+            }, rsaPrivateKey, { algorithm: 'RS256', header: { kid: 'test-key-1' } });
+
+            const result = await verifyGoogleToken(token);
+            assert.strictEqual(result.sub, 'google-jwks-user');
+            assert.strictEqual(result.email, 'jwks@gmail.com');
+        });
+
+        it('should reject a token with mismatched kid', async () => {
+            process.env.GOOGLE_CLIENT_ID = TEST_GOOGLE_CLIENT_ID;
+            _setGoogleJwksCache([rsaPublicJwk], Date.now() + 3600000);
+
+            const token = jwt.sign({
+                iss: 'accounts.google.com',
+                sub: 'google-bad-kid',
+                email: 'badkid@gmail.com',
+                email_verified: true,
+                aud: TEST_GOOGLE_CLIENT_ID,
+                exp: Math.floor(Date.now() / 1000) + 3600
+            }, rsaPrivateKey, { algorithm: 'RS256', header: { kid: 'wrong-key-id' } });
+
+            await assert.rejects(() => verifyGoogleToken(token), /Token signing key not found/);
+        });
+
+        it('should reject a token with tampered payload', async () => {
+            process.env.GOOGLE_CLIENT_ID = TEST_GOOGLE_CLIENT_ID;
+            _setGoogleJwksCache([rsaPublicJwk], Date.now() + 3600000);
+
+            const token = jwt.sign({
+                iss: 'accounts.google.com',
+                sub: 'original-user',
+                email: 'original@gmail.com',
+                email_verified: true,
+                aud: TEST_GOOGLE_CLIENT_ID,
+                exp: Math.floor(Date.now() / 1000) + 3600
+            }, rsaPrivateKey, { algorithm: 'RS256', header: { kid: 'test-key-1' } });
+
+            // Tamper with the payload
+            const parts = token.split('.');
+            const tamperedPayload = Buffer.from(JSON.stringify({
+                iss: 'accounts.google.com',
+                sub: 'attacker',
+                email: 'attacker@gmail.com',
+                email_verified: true,
+                aud: TEST_GOOGLE_CLIENT_ID,
+                exp: Math.floor(Date.now() / 1000) + 3600
+            })).toString('base64url');
+            const tamperedToken = `${parts[0]}.${tamperedPayload}.${parts[2]}`;
+
+            await assert.rejects(() => verifyGoogleToken(tamperedToken), /Token signature verification failed/);
+        });
+
+        it('should reject a token with wrong audience', async () => {
+            process.env.GOOGLE_CLIENT_ID = TEST_GOOGLE_CLIENT_ID;
+            _setGoogleJwksCache([rsaPublicJwk], Date.now() + 3600000);
+
+            const token = jwt.sign({
+                iss: 'accounts.google.com',
+                sub: 'google-wrong-aud',
+                email: 'wrongaud@gmail.com',
+                email_verified: true,
+                aud: 'different-client-id.apps.googleusercontent.com',
+                exp: Math.floor(Date.now() / 1000) + 3600
+            }, rsaPrivateKey, { algorithm: 'RS256', header: { kid: 'test-key-1' } });
+
+            await assert.rejects(() => verifyGoogleToken(token), /Invalid token audience/);
+        });
+
+        it('should reject a token signed with a different key', async () => {
+            process.env.GOOGLE_CLIENT_ID = TEST_GOOGLE_CLIENT_ID;
+            _setGoogleJwksCache([rsaPublicJwk], Date.now() + 3600000);
+
+            // Generate a different key pair
+            const { privateKey: otherKey } = crypto.generateKeyPairSync('rsa', {
+                modulusLength: 2048,
+                privateKeyEncoding: { type: 'pkcs8', format: 'pem' }
+            });
+
+            const token = jwt.sign({
+                iss: 'accounts.google.com',
+                sub: 'google-wrong-key',
+                email: 'wrongkey@gmail.com',
+                email_verified: true,
+                aud: TEST_GOOGLE_CLIENT_ID,
+                exp: Math.floor(Date.now() / 1000) + 3600
+            }, otherKey, { algorithm: 'RS256', header: { kid: 'test-key-1' } });
+
+            await assert.rejects(() => verifyGoogleToken(token), /Token signature verification failed/);
+        });
+    });
+
+    describe('Apple JWKS verification', () => {
+        it('should accept a correctly-signed Apple token', async () => {
+            process.env.APPLE_CLIENT_ID = TEST_APPLE_CLIENT_ID;
+            _setAppleJwksCache([rsaPublicJwk], Date.now() + 3600000);
+
+            const token = jwt.sign({
+                iss: 'https://appleid.apple.com',
+                sub: 'apple-jwks-user',
+                email: 'jwks@icloud.com',
+                email_verified: true,
+                aud: TEST_APPLE_CLIENT_ID,
+                exp: Math.floor(Date.now() / 1000) + 3600
+            }, rsaPrivateKey, { algorithm: 'RS256', header: { kid: 'test-key-1' } });
+
+            const result = await verifyAppleToken(token);
+            assert.strictEqual(result.sub, 'apple-jwks-user');
+            assert.strictEqual(result.email, 'jwks@icloud.com');
+        });
+
+        it('should reject an Apple token with tampered payload', async () => {
+            process.env.APPLE_CLIENT_ID = TEST_APPLE_CLIENT_ID;
+            _setAppleJwksCache([rsaPublicJwk], Date.now() + 3600000);
+
+            const token = jwt.sign({
+                iss: 'https://appleid.apple.com',
+                sub: 'apple-original',
+                email: 'original@icloud.com',
+                email_verified: true,
+                aud: TEST_APPLE_CLIENT_ID,
+                exp: Math.floor(Date.now() / 1000) + 3600
+            }, rsaPrivateKey, { algorithm: 'RS256', header: { kid: 'test-key-1' } });
+
+            const parts = token.split('.');
+            const tamperedPayload = Buffer.from(JSON.stringify({
+                iss: 'https://appleid.apple.com',
+                sub: 'apple-attacker',
+                aud: TEST_APPLE_CLIENT_ID,
+                exp: Math.floor(Date.now() / 1000) + 3600
+            })).toString('base64url');
+            const tamperedToken = `${parts[0]}.${tamperedPayload}.${parts[2]}`;
+
+            await assert.rejects(() => verifyAppleToken(tamperedToken), /Token signature verification failed/);
+        });
+
+        it('should reject Apple token with mismatched kid', async () => {
+            process.env.APPLE_CLIENT_ID = TEST_APPLE_CLIENT_ID;
+            _setAppleJwksCache([rsaPublicJwk], Date.now() + 3600000);
+
+            const token = jwt.sign({
+                iss: 'https://appleid.apple.com',
+                sub: 'apple-bad-kid',
+                aud: TEST_APPLE_CLIENT_ID,
+                exp: Math.floor(Date.now() / 1000) + 3600
+            }, rsaPrivateKey, { algorithm: 'RS256', header: { kid: 'nonexistent-key' } });
+
+            await assert.rejects(() => verifyAppleToken(token), /Token signing key not found/);
+        });
+
+        it('should reject Apple token with wrong audience', async () => {
+            process.env.APPLE_CLIENT_ID = TEST_APPLE_CLIENT_ID;
+            _setAppleJwksCache([rsaPublicJwk], Date.now() + 3600000);
+
+            const token = jwt.sign({
+                iss: 'https://appleid.apple.com',
+                sub: 'apple-wrong-aud',
+                aud: 'com.other.app',
+                exp: Math.floor(Date.now() / 1000) + 3600
+            }, rsaPrivateKey, { algorithm: 'RS256', header: { kid: 'test-key-1' } });
+
+            await assert.rejects(() => verifyAppleToken(token), /Invalid token audience/);
+        });
+    });
+
+    describe('JWKS cache', () => {
+        it('should use cached JWKS when not expired', async () => {
+            process.env.GOOGLE_CLIENT_ID = TEST_GOOGLE_CLIENT_ID;
+            _setGoogleJwksCache([rsaPublicJwk], Date.now() + 3600000);
+
+            const token = jwt.sign({
+                iss: 'accounts.google.com',
+                sub: 'cache-test',
+                email: 'cache@gmail.com',
+                email_verified: true,
+                aud: TEST_GOOGLE_CLIENT_ID,
+                exp: Math.floor(Date.now() / 1000) + 3600
+            }, rsaPrivateKey, { algorithm: 'RS256', header: { kid: 'test-key-1' } });
+
+            // Should succeed using cached JWKS (not fetching from network)
+            const result = await verifyGoogleToken(token);
+            assert.strictEqual(result.sub, 'cache-test');
         });
     });
 });

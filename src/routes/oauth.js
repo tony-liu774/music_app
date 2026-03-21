@@ -10,9 +10,9 @@ const router = express.Router();
 // Re-use shared user store, token infrastructure, and rate limiter from auth.js
 const { users, generateTokens, authRateLimiter } = require('./auth');
 
-// OAuth provider client IDs (public, safe to expose)
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
-const APPLE_CLIENT_ID = process.env.APPLE_CLIENT_ID || '';
+// SKIP_OAUTH_SIG_VERIFY: escape hatch for local development ONLY.
+// Hard-blocked in production — setting this in production has no effect.
+const SKIP_OAUTH_SIG_VERIFY = process.env.SKIP_OAUTH_SIG_VERIFY === 'true' && config.nodeEnv !== 'production';
 
 const SUPPORTED_PROVIDERS = ['google', 'apple'];
 const MAX_OAUTH_TOKEN_LENGTH = 4096;
@@ -194,15 +194,21 @@ async function verifyGoogleToken(idToken) {
         throw new OAuthVerificationError('Token expired or missing expiration');
     }
 
-    // Validate audience (must match our client ID)
-    if (GOOGLE_CLIENT_ID) {
-        if (payload.aud !== GOOGLE_CLIENT_ID) {
+    // Audience validation
+    const googleClientId = process.env.GOOGLE_CLIENT_ID || '';
+    if (googleClientId) {
+        if (payload.aud !== googleClientId) {
             throw new OAuthVerificationError('Invalid token audience');
         }
+    } else if (config.nodeEnv !== 'test') {
+        // Refuse to authenticate when client ID is not configured in non-test environments.
+        // Without a client ID, audience validation is meaningless.
+        throw new OAuthVerificationError('Google OAuth not configured (GOOGLE_CLIENT_ID missing)');
     }
 
-    // Cryptographic signature verification
-    if (GOOGLE_CLIENT_ID && config.nodeEnv === 'production') {
+    // Cryptographic signature verification — always when client ID is set.
+    // Only skipped in test mode (no client ID) or with explicit SKIP_OAUTH_SIG_VERIFY in non-production.
+    if (googleClientId && !SKIP_OAUTH_SIG_VERIFY) {
         const header = decodeJwtHeader(idToken);
         const jwks = await fetchGoogleJwks();
         const jwk = findJwkByKid(jwks, header.kid);
@@ -211,12 +217,14 @@ async function verifyGoogleToken(idToken) {
         }
         const pem = jwkToPem(jwk);
         try {
-            jwt.verify(idToken, pem, { algorithms: ['RS256'] });
+            jwt.verify(idToken, pem, {
+                algorithms: ['RS256'],
+                audience: googleClientId,
+                issuer: ['accounts.google.com', 'https://accounts.google.com']
+            });
         } catch {
             throw new OAuthVerificationError('Token signature verification failed');
         }
-    } else if (config.nodeEnv !== 'test') {
-        console.warn('[OAuth] Google token signature not verified (no GOOGLE_CLIENT_ID or non-production). Set GOOGLE_CLIENT_ID and run in production for full security.');
     }
 
     return {
@@ -251,15 +259,18 @@ async function verifyAppleToken(idToken) {
         throw new OAuthVerificationError('Token expired or missing expiration');
     }
 
-    // Validate audience
-    if (APPLE_CLIENT_ID) {
-        if (payload.aud !== APPLE_CLIENT_ID) {
+    // Audience validation
+    const appleClientId = process.env.APPLE_CLIENT_ID || '';
+    if (appleClientId) {
+        if (payload.aud !== appleClientId) {
             throw new OAuthVerificationError('Invalid token audience');
         }
+    } else if (config.nodeEnv !== 'test') {
+        throw new OAuthVerificationError('Apple OAuth not configured (APPLE_CLIENT_ID missing)');
     }
 
-    // Cryptographic signature verification
-    if (APPLE_CLIENT_ID && config.nodeEnv === 'production') {
+    // Cryptographic signature verification — always when client ID is set.
+    if (appleClientId && !SKIP_OAUTH_SIG_VERIFY) {
         const header = decodeJwtHeader(idToken);
         const jwks = await fetchAppleJwks();
         const jwk = findJwkByKid(jwks, header.kid);
@@ -268,12 +279,14 @@ async function verifyAppleToken(idToken) {
         }
         const pem = jwkToPem(jwk);
         try {
-            jwt.verify(idToken, pem, { algorithms: ['RS256', 'ES256'] });
+            jwt.verify(idToken, pem, {
+                algorithms: ['RS256', 'ES256'],
+                audience: appleClientId,
+                issuer: 'https://appleid.apple.com'
+            });
         } catch {
             throw new OAuthVerificationError('Token signature verification failed');
         }
-    } else if (config.nodeEnv !== 'test') {
-        console.warn('[OAuth] Apple token signature not verified (no APPLE_CLIENT_ID or non-production). Set APPLE_CLIENT_ID and run in production for full security.');
     }
 
     return {
@@ -524,10 +537,10 @@ router.post('/link', authRateLimiter, async (req, res) => {
  * GET /api/auth/oauth/config
  * Return public OAuth client IDs for frontend SDK initialization.
  */
-router.get('/config', (req, res) => {
+router.get('/config', authRateLimiter, (req, res) => {
     res.json({
-        googleClientId: GOOGLE_CLIENT_ID,
-        appleClientId: APPLE_CLIENT_ID
+        googleClientId: process.env.GOOGLE_CLIENT_ID || '',
+        appleClientId: process.env.APPLE_CLIENT_ID || ''
     });
 });
 
@@ -539,9 +552,7 @@ module.exports.OAuthVerificationError = OAuthVerificationError;
 module.exports.SUPPORTED_PROVIDERS = SUPPORTED_PROVIDERS;
 module.exports.isValidPhotoUrl = isValidPhotoUrl;
 module.exports.sanitizeDisplayName = sanitizeDisplayName;
-module.exports.GOOGLE_CLIENT_ID = GOOGLE_CLIENT_ID;
-module.exports.APPLE_CLIENT_ID = APPLE_CLIENT_ID;
-// Expose for testing
+// Test helpers for JWKS signature verification testing
 module.exports._setGoogleJwksCache = (keys, expiry) => {
     googleJwksCache = keys;
     googleJwksCacheExpiry = expiry;
