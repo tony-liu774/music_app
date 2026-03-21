@@ -145,6 +145,19 @@ class ConcertmasterApp {
             this.heatMapRenderer = new HeatMapRenderer(heatmapPreview);
             this.heatMapRenderer.init();
         }
+
+        // Initialize Bluetooth HID listener for foot pedals
+        this.bluetoothHIDListener = new BluetoothHIDListener();
+        this.bluetoothHIDListener.init();
+
+        // Initialize practice loop controller
+        this.practiceLoopController = new PracticeLoopController();
+
+        // Initialize Integration Controller and wire up components
+        this.integrationController = new IntegrationController(this);
+        this.integrationController.setFollowTheBall(this.followTheBall);
+        this.integrationController.setBluetoothHIDListener(this.bluetoothHIDListener);
+        this.integrationController.init();
     }
 
     /**
@@ -1162,6 +1175,13 @@ class ConcertmasterApp {
         // Render sheet music
         if (this.sheetMusicRenderer) {
             this.sheetMusicRenderer.setScore(score);
+        }
+
+        // Sync total measures to Bluetooth pedal listener
+        if (this.bluetoothHIDListener && score.parts && score.parts[0]) {
+            const totalMeasures = score.parts[0].measures ? score.parts[0].measures.length : 1;
+            this.bluetoothHIDListener.setTotalMeasures(totalMeasures);
+            this.bluetoothHIDListener.setCurrentMeasure(0);
         }
 
         // Update UI

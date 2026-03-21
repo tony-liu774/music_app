@@ -2700,3 +2700,154 @@ h1, h2, h3, h4, h5, h6 {
     0%, 100% { opacity: 0.8; transform: translateX(-50%) scale(1); }
     50% { opacity: 1; transform: translateX(-50%) scale(1.1); }
 }
+
+/* ============================
+   Bluetooth Pedal / HID Styles
+   ============================ */
+
+.settings-description {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    margin-bottom: 12px;
+    line-height: 1.4;
+}
+
+.text-input {
+    background: var(--bg-surface);
+    border: 1px solid var(--bg-hover);
+    color: var(--text-primary);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    width: 100%;
+    max-width: 240px;
+    transition: border-color var(--transition-fast);
+}
+
+.text-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px var(--primary-glow);
+}
+
+.text-input::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.6;
+}
+
+/* Pedal Bindings Info */
+.pedal-bindings-info {
+    margin-top: 12px;
+}
+
+.pedal-bindings-info h4 {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.binding-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: var(--bg-surface);
+    border-radius: 6px;
+    margin-bottom: 4px;
+}
+
+.binding-key {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--primary);
+    background: var(--bg-deep);
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--bg-hover);
+}
+
+.binding-action {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+/* Pedal Status Bar (in practice view) */
+.pedal-status-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.pedal-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.pedal-status-dot.disabled {
+    background: var(--text-secondary);
+    opacity: 0.4;
+}
+
+.pedal-status-dot.listening {
+    background: var(--primary);
+    animation: pedal-pulse 2s ease-in-out infinite;
+}
+
+.pedal-status-dot.connected {
+    background: var(--success-light);
+    box-shadow: 0 0 6px var(--success-light);
+}
+
+@keyframes pedal-pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+}
+
+/* Pedal Feedback Indicator (overlay flash) */
+.pedal-feedback-indicator {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 20px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--primary);
+    border-radius: 12px;
+    color: var(--primary);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    font-weight: 500;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 150ms ease, transform 150ms ease;
+    z-index: 1000;
+    box-shadow: var(--shadow-glow);
+}
+
+.pedal-feedback-indicator.active {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.pedal-feedback-icon {
+    width: 20px;
+    height: 20px;
+    stroke: var(--primary);
+}
+
+.pedal-feedback-text {
+    white-space: nowrap;
+}
