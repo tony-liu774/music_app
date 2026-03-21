@@ -36,7 +36,7 @@ class ArticulationDetector {
     }
 
     classifyArticulation(noteEvent) {
-        const scores = { legato: 0, staccato: 0, accent: 0, tenuto: 0, pizzicato: 0 };
+        const scores = { legato: 0, staccato: 0, accent: 0, marcato: 0, tenuto: 0, pizzicato: 0 };
         const { attackTime, peakAmplitude, decayRate, duration, expectedDuration } = noteEvent;
         const durationRatio = (expectedDuration && expectedDuration > 0) ? duration / expectedDuration : 1;
 
@@ -55,6 +55,9 @@ class ArticulationDetector {
 
         if (this.avgPeakAmplitude > 0 && peakAmplitude > this.avgPeakAmplitude * this.config.accentPeakRatio) scores.accent += 50;
         if (attackTime !== undefined && attackTime < this.config.accentAttackTime) scores.accent += 25;
+
+        if (this.avgPeakAmplitude > 0 && peakAmplitude > this.avgPeakAmplitude * this.config.accentPeakRatio && durationRatio < 0.6) scores.marcato += 60;
+        if (attackTime !== undefined && attackTime < this.config.accentAttackTime && durationRatio < 0.7) scores.marcato += 20;
 
         if (durationRatio >= 0.95 && durationRatio <= 1.1) scores.tenuto += 40;
         if (attackTime !== undefined && attackTime > 10 && attackTime < 30) scores.tenuto += 15;
@@ -92,6 +95,7 @@ class ArticulationDetector {
         if (detected === expected) return { match: true, score: 100, feedback: '' };
         const similarity = {
             'legato-tenuto': 70, 'tenuto-legato': 70, 'staccato-accent': 50, 'accent-staccato': 50,
+            'accent-marcato': 70, 'marcato-accent': 70, 'marcato-staccato': 50, 'staccato-marcato': 50,
             'legato-staccato': 20, 'staccato-legato': 20, 'pizzicato-staccato': 30, 'staccato-pizzicato': 30
         };
         const key = `${detected}-${expected}`;
@@ -111,14 +115,18 @@ class ArticulationDetector {
             'staccato-accent': 'Add more weight to the beginning of each note',
             'accent-staccato': 'Lighter, shorter strokes needed — less initial pressure',
             'tenuto-staccato': 'Shorten the notes — the score calls for separated strokes',
-            'staccato-tenuto': 'Hold each note to its full value'
+            'staccato-tenuto': 'Hold each note to its full value',
+            'accent-marcato': 'Shorten the note while keeping the strong attack',
+            'marcato-accent': 'Sustain the note a bit more — keep the weight but hold through',
+            'marcato-staccato': 'Lighten the initial attack — just separate the notes',
+            'staccato-marcato': 'Add more bow weight at the start of each short stroke'
         };
         return feedbackMap[`${detected}-${expected}`] || `Expected ${expected}, detected ${detected}`;
     }
 
     getSummary() {
         const recent = this.noteEvents.slice(-20);
-        const counts = { legato: 0, staccato: 0, accent: 0, tenuto: 0, pizzicato: 0 };
+        const counts = { legato: 0, staccato: 0, accent: 0, marcato: 0, tenuto: 0, pizzicato: 0 };
         for (const event of recent) {
             if (event.articulation && counts[event.articulation.type] !== undefined) counts[event.articulation.type]++;
         }
@@ -355,6 +363,41 @@ function runTests() {
             duration: 250, expectedDuration: 500, measure: 1
         });
         assertEqual(result.durationRatio, 0.5, 'Duration ratio = 0.5');
+    });
+
+    // Test 18: Detect marcato from loud peak + short duration
+    test('should detect marcato from loud peak and short duration', () => {
+        const detector = new ArticulationDetector();
+        // Build up average with moderate notes
+        for (let i = 0; i < 5; i++) {
+            detector.recordNote({
+                timestamp: 1000 + i * 600, attackTime: 15, peakAmplitude: 0.15, decayRate: 0.02,
+                duration: 480, expectedDuration: 500, measure: 1
+            });
+        }
+        // Now play a much louder AND short note (marcato = accent + staccato)
+        const result = detector.recordNote({
+            timestamp: 4000, attackTime: 3, peakAmplitude: 0.50, decayRate: 0.02,
+            duration: 200, expectedDuration: 500, measure: 1
+        });
+        assertEqual(result.type, 'marcato', 'Loud peak + short duration = marcato');
+        assertTrue(result.scores.marcato > 0, 'Marcato score should be positive');
+    });
+
+    // Test 19: Marcato similarity scoring
+    test('should give moderate score for marcato vs accent mismatch', () => {
+        const detector = new ArticulationDetector();
+        const result = detector.compareArticulation('marcato', 'accent');
+        assertEqual(result.score, 70, 'Marcato-accent are similar');
+    });
+
+    // Test 20: Marcato feedback
+    test('should provide marcato-specific feedback', () => {
+        const detector = new ArticulationDetector();
+        const feedback = detector.getArticulationFeedback('accent', 'marcato');
+        assertTrue(feedback.includes('Shorten'), 'accent→marcato feedback');
+        const feedback2 = detector.getArticulationFeedback('marcato', 'accent');
+        assertTrue(feedback2.includes('Sustain'), 'marcato→accent feedback');
     });
 
     console.log(`\n${passed} passed, ${failed} failed`);

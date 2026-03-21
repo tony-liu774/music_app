@@ -6,6 +6,7 @@
 class MusicXMLParser {
     constructor() {
         this.parser = new DOMParser();
+        this.divisions = 1; // ticks per quarter note, updated during parsing
     }
 
     parse(xmlString) {
@@ -52,7 +53,8 @@ class MusicXMLParser {
         const score = new Score(title, composer);
 
         // Get divisions (ticks per quarter note)
-        score.divisions = parseInt(doc.querySelector('divisions')?.textContent) || 1;
+        this.divisions = parseInt(doc.querySelector('divisions')?.textContent) || 1;
+        score.divisions = this.divisions;
 
         // Parse parts
         parts.forEach((partElement, index) => {
@@ -82,9 +84,15 @@ class MusicXMLParser {
     parseMeasure(measureElement, measureNumber) {
         const measure = new Measure(measureNumber);
 
-        // Parse attributes (clef, key, time)
+        // Parse attributes (clef, key, time, divisions)
         const attributes = measureElement.querySelector('attributes');
         if (attributes) {
+            // Update divisions if redefined in this measure
+            const divisionsEl = attributes.querySelector('divisions');
+            if (divisionsEl) {
+                this.divisions = parseInt(divisionsEl.textContent) || this.divisions;
+            }
+
             // Key signature
             const key = attributes.querySelector('key');
             if (key) {
@@ -112,7 +120,7 @@ class MusicXMLParser {
         let currentTechnique = null;
         const directions = measureElement.querySelectorAll('direction');
         directions.forEach(dirElement => {
-            const parsed = this.parseDirection(dirElement, measureNumber);
+            const parsed = this.parseDirection(dirElement, measureNumber, this.divisions);
             if (parsed) {
                 if (parsed.category === 'dynamic') {
                     measure.dynamics.push(parsed);
@@ -270,9 +278,13 @@ class MusicXMLParser {
      * @param {number} measureNumber - Current measure number
      * @returns {Object|null} Parsed direction data
      */
-    parseDirection(dirElement, measureNumber) {
+    parseDirection(dirElement, measureNumber, divisions = 1) {
         const dirType = dirElement.querySelector('direction-type');
         if (!dirType) return null;
+
+        // Compute beat from <offset> element if present (offset is in divisions)
+        const offsetEl = dirElement.querySelector('offset');
+        const beat = offsetEl ? parseInt(offsetEl.textContent) / divisions : 0;
 
         // Parse dynamic markings (p, mp, mf, f, ff, etc.)
         const dynamicsEl = dirType.querySelector('dynamics');
@@ -284,7 +296,7 @@ class MusicXMLParser {
                         category: 'dynamic',
                         type: type,
                         measure: measureNumber,
-                        beat: 0
+                        beat
                     };
                 }
             }
@@ -299,21 +311,21 @@ class MusicXMLParser {
                     category: 'wedge',
                     type: 'crescendo',
                     measure: measureNumber,
-                    beat: 0
+                    beat
                 };
             } else if (wedgeType === 'diminuendo' || wedgeType === 'decrescendo') {
                 return {
                     category: 'wedge',
                     type: 'decrescendo',
                     measure: measureNumber,
-                    beat: 0
+                    beat
                 };
             } else if (wedgeType === 'stop') {
                 return {
                     category: 'wedge',
                     type: 'wedge-stop',
                     measure: measureNumber,
-                    beat: 0
+                    beat
                 };
             }
         }
@@ -323,13 +335,13 @@ class MusicXMLParser {
         if (words) {
             const text = words.textContent.toLowerCase().trim();
             if (text === 'pizz.' || text === 'pizz' || text === 'pizzicato') {
-                return { category: 'technique', type: 'pizzicato', measure: measureNumber, beat: 0 };
+                return { category: 'technique', type: 'pizzicato', measure: measureNumber, beat };
             }
             if (text.startsWith('cresc')) {
-                return { category: 'wedge', type: 'crescendo', measure: measureNumber, beat: 0 };
+                return { category: 'wedge', type: 'crescendo', measure: measureNumber, beat };
             }
             if (text.startsWith('dim') || text.startsWith('decresc')) {
-                return { category: 'wedge', type: 'decrescendo', measure: measureNumber, beat: 0 };
+                return { category: 'wedge', type: 'decrescendo', measure: measureNumber, beat };
             }
         }
 

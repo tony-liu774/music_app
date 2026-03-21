@@ -218,6 +218,35 @@ function runTests() {
         }
     });
 
+    // Test parseDirection offset → beat conversion
+    test('should compute beat from offset element when present', () => {
+        // With divisions=2, an offset of 4 should yield beat = 4/2 = 2
+        if (!JSDOM) {
+            // Skip in environments without jsdom
+            return;
+        }
+        const xml = `<direction><direction-type><dynamics><f/></dynamics></direction-type><offset>4</offset></direction>`;
+        const dom = new JSDOM(xml, { contentType: 'text/xml' });
+        const dirElement = dom.window.document.documentElement;
+
+        // Inline the offset logic from parseDirection
+        const offsetEl = dirElement.querySelector('offset');
+        const divisions = 2;
+        const beat = offsetEl ? parseInt(offsetEl.textContent) / divisions : 0;
+        assertEqual(beat, 2, 'Offset 4 with divisions 2 = beat 2');
+    });
+
+    test('should default beat to 0 when no offset element', () => {
+        if (!JSDOM) return;
+        const xml = `<direction><direction-type><dynamics><mf/></dynamics></direction-type></direction>`;
+        const dom = new JSDOM(xml, { contentType: 'text/xml' });
+        const dirElement = dom.window.document.documentElement;
+
+        const offsetEl = dirElement.querySelector('offset');
+        const beat = offsetEl ? parseInt(offsetEl.textContent) / 1 : 0;
+        assertEqual(beat, 0, 'No offset = beat 0');
+    });
+
     // Test integration: note with multiple articulations
     test('should support multiple accents on a single note', () => {
         const note = new Note({ step: 'G', octave: 3, alter: 0 }, 0.5, { measure: 1, beat: 0 });

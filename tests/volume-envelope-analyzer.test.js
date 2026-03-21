@@ -63,7 +63,7 @@ class VolumeEnvelopeAnalyzer {
         return (n * sumXY - sumX * sumY) / denominator;
     }
 
-    analyzeAttack(audioBuffer) {
+    analyzeAttack(audioBuffer, sampleRate = 44100) {
         if (!audioBuffer || audioBuffer.length === 0) {
             return { attackTime: 0, peakAmplitude: 0, decayRate: 0 };
         }
@@ -77,7 +77,6 @@ class VolumeEnvelopeAnalyzer {
         for (let i = 0; i < peakIndex; i++) {
             if (Math.abs(audioBuffer[i]) > threshold) { attackStart = i; break; }
         }
-        const sampleRate = 44100;
         const attackTime = (peakIndex - attackStart) / sampleRate * 1000;
         let decayEnd = audioBuffer.length - 1;
         const decayThreshold = peakValue * 0.5;
@@ -112,11 +111,14 @@ class VolumeEnvelopeAnalyzer {
     }
 
     getState() {
+        const lastTimestamp = this.rmsHistory.length > 0
+            ? this.rmsHistory[this.rmsHistory.length - 1].timestamp
+            : 0;
         return {
             currentDynamic: this.currentDynamic,
             currentTrend: this.currentTrend,
             smoothedRMS: this.getSmoothedRMS(),
-            trendDuration: this.trendStartTime ? Date.now() - this.trendStartTime : 0,
+            trendDuration: this.trendStartTime ? lastTimestamp - this.trendStartTime : 0,
             dynamicLevel: VolumeEnvelopeAnalyzer.dynamicToLevel(this.currentDynamic),
             historyLength: this.rmsHistory.length
         };
@@ -321,6 +323,34 @@ function runTests() {
         const analyzer = new VolumeEnvelopeAnalyzer();
         analyzer.addSample(-0.5, 1000);
         assertEqual(analyzer.rmsHistory[0].rms, 0, 'Negative RMS clamped to 0');
+    });
+
+    // Test 14: trendDuration uses sample timestamp, not Date.now()
+    test('should compute trendDuration from sample timestamps', () => {
+        const analyzer = new VolumeEnvelopeAnalyzer();
+        // Feed rising values to trigger a crescendo trend change
+        for (let i = 0; i < 10; i++) {
+            analyzer.addSample(0.05 + i * 0.03, 5000 + i * 50);
+        }
+        const state = analyzer.getState();
+        // trendDuration should be based on last sample timestamp minus trendStartTime
+        // Not dependent on Date.now(), so should be a small fixed value
+        assertTrue(state.trendDuration >= 0, 'trendDuration should be >= 0');
+        assertTrue(state.trendDuration <= 500, `trendDuration should be based on sample timestamps, got ${state.trendDuration}`);
+    });
+
+    // Test 15: analyzeAttack accepts custom sampleRate
+    test('should accept custom sampleRate in analyzeAttack', () => {
+        const analyzer = new VolumeEnvelopeAnalyzer();
+        const buffer = new Float32Array(4800); // 0.1s at 48000
+        for (let i = 0; i < buffer.length; i++) {
+            if (i < 100) buffer[i] = i / 100 * 0.8;
+            else buffer[i] = 0.8 * Math.exp(-(i - 100) / 500);
+        }
+        const result44 = analyzer.analyzeAttack(buffer, 44100);
+        const result48 = analyzer.analyzeAttack(buffer, 48000);
+        // Higher sampleRate = shorter attack time for same number of samples
+        assertTrue(result48.attackTime < result44.attackTime, 'Higher sampleRate should yield shorter attack time');
     });
 
     console.log(`\n${passed} passed, ${failed} failed`);
