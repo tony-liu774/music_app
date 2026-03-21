@@ -1,5 +1,5 @@
 module.exports = {
-    testEnvironment: 'jsdom',
+    testEnvironment: 'jest-environment-jsdom',
     testMatch: ['**/tests/**/*.test.js'],
     moduleFileExtensions: ['js', 'html'],
     transform: {},
