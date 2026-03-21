@@ -169,4 +169,5 @@ class AISummaryGenerator {
     }
 }
 
-window.AISummaryGenerator = AISummaryGenerator;
+if (typeof window !== 'undefined') { window.AISummaryGenerator = AISummaryGenerator; }
+if (typeof module !== 'undefined' && module.exports) { module.exports = { AISummaryGenerator }; }

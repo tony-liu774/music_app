@@ -298,4 +298,5 @@ Provide your response as JSON:
     }
 }
 
-window.LLMService = LLMService;
+if (typeof window !== 'undefined') { window.LLMService = LLMService; }
+if (typeof module !== 'undefined' && module.exports) { module.exports = { LLMService }; }

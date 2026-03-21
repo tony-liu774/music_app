@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "test": "node --test tests/session-logger.test.js tests/practice-loop.test.js tests/pitch-detector.test.js tests/llm-service.test.js tests/ai-summary-generator.test.js tests/omr-client.test.js tests/bluetooth-hid.test.js tests/teacher-service.test.js tests/studio-dashboard.test.js tests/teacher-routes.test.js && node tests/scale-engine.test.js && node tests/volume-envelope-analyzer.test.js && node tests/articulation-detector.test.js && node tests/dynamics-comparator.test.js && node tests/musicxml-dynamics.test.js && node tests/intonation-analyzer.test.js && npx jest tests/tuner.test.js"
+    "test": "node --test tests/session-logger.test.js tests/practice-loop.test.js tests/pitch-detector.test.js tests/llm-service.test.js tests/ai-summary-generator.test.js tests/omr-client.test.js tests/bluetooth-hid.test.js tests/teacher-service.test.js tests/studio-dashboard.test.js tests/teacher-routes.test.js tests/library-service.test.js && node tests/scale-engine.test.js && node tests/volume-envelope-analyzer.test.js && node tests/articulation-detector.test.js && node tests/dynamics-comparator.test.js && node tests/musicxml-dynamics.test.js && node tests/intonation-analyzer.test.js && npx jest tests/tuner.test.js tests/onboarding.test.js"
   },
   "keywords": [
     "express",

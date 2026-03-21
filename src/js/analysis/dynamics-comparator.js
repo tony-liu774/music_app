@@ -5,6 +5,12 @@
 
 class DynamicsComparator {
     constructor() {
+        if (typeof VolumeEnvelopeAnalyzer === 'undefined') {
+            throw new Error('DynamicsComparator requires VolumeEnvelopeAnalyzer to be loaded first');
+        }
+        if (typeof ArticulationDetector === 'undefined') {
+            throw new Error('DynamicsComparator requires ArticulationDetector to be loaded first');
+        }
         this.volumeAnalyzer = new VolumeEnvelopeAnalyzer();
         this.articulationDetector = new ArticulationDetector();
 
