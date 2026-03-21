@@ -138,6 +138,10 @@ class ConcertmasterApp {
             this.heatMapRenderer = new HeatMapRenderer(heatmapPreview);
             this.heatMapRenderer.init();
         }
+
+        // Initialize Bluetooth HID listener for foot pedals
+        this.bluetoothHIDListener = new BluetoothHIDListener();
+        this.bluetoothHIDListener.init();
     }
 
     /**

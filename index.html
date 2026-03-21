@@ -224,6 +224,19 @@
                         <span class="score-value" id="accuracy-score">--%</span>
                     </div>
                 </div>
+
+                <!-- Pedal Status & Feedback -->
+                <div class="pedal-status-bar" id="pedal-status">
+                    <span class="pedal-status-dot disabled"></span>
+                    <span class="pedal-status-text">Pedal Disabled</span>
+                </div>
+                <div class="pedal-feedback-indicator" id="pedal-feedback-indicator" role="status" aria-live="polite">
+                    <svg class="pedal-feedback-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="4" y="14" width="16" height="6" rx="2"/>
+                        <path d="M8 14V10a4 4 0 0 1 8 0v4"/>
+                    </svg>
+                    <span class="pedal-feedback-text"></span>
+                </div>
             </section>
 
             <!-- Metronome View -->
@@ -345,6 +358,48 @@
                         <button class="toggle-btn" id="show-cursor-toggle" role="switch" aria-checked="false">
                             <span class="toggle-slider"></span>
                         </button>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <h3>Foot Pedal / Bluetooth</h3>
+                    <p class="settings-description">Connect AirTurn or similar Bluetooth pedals for hands-free page turning</p>
+                    <div class="toggle-setting">
+                        <label for="pedal-enable-toggle">Enable Foot Pedal</label>
+                        <button class="toggle-btn" id="pedal-enable-toggle" role="switch" aria-checked="false">
+                            <span class="toggle-slider"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="settings-group" id="pedal-controls-group" style="display: none;">
+                    <h3>Pedal Controls</h3>
+                    <div class="slider-setting">
+                        <label for="pedal-device-name">Device Name (optional)</label>
+                        <input type="text" id="pedal-device-name" placeholder="e.g. AirTurn PED" class="text-input">
+                    </div>
+                    <div class="pedal-bindings-info">
+                        <h4>Default Key Bindings</h4>
+                        <div class="binding-row">
+                            <span class="binding-key">PageUp / Right Arrow</span>
+                            <span class="binding-action">Next Measure</span>
+                        </div>
+                        <div class="binding-row">
+                            <span class="binding-key">PageDown / Left Arrow</span>
+                            <span class="binding-action">Previous Measure</span>
+                        </div>
+                        <div class="binding-row">
+                            <span class="binding-key">Up Arrow</span>
+                            <span class="binding-action">Next Page</span>
+                        </div>
+                        <div class="binding-row">
+                            <span class="binding-key">Down Arrow</span>
+                            <span class="binding-action">Previous Page</span>
+                        </div>
+                        <div class="binding-row">
+                            <span class="binding-key">Space</span>
+                            <span class="binding-action">Toggle Loop</span>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -823,6 +878,19 @@
                         <span class="score-value" id="accuracy-score">--%</span>
                     </div>
                 </div>
+
+                <!-- Pedal Status & Feedback -->
+                <div class="pedal-status-bar" id="pedal-status">
+                    <span class="pedal-status-dot disabled"></span>
+                    <span class="pedal-status-text">Pedal Disabled</span>
+                </div>
+                <div class="pedal-feedback-indicator" id="pedal-feedback-indicator" role="status" aria-live="polite">
+                    <svg class="pedal-feedback-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="4" y="14" width="16" height="6" rx="2"/>
+                        <path d="M8 14V10a4 4 0 0 1 8 0v4"/>
+                    </svg>
+                    <span class="pedal-feedback-text"></span>
+                </div>
             </section>
 
             <!-- Metronome View -->
@@ -944,6 +1012,48 @@
                         <button class="toggle-btn" id="show-cursor-toggle" role="switch" aria-checked="false">
                             <span class="toggle-slider"></span>
                         </button>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <h3>Foot Pedal / Bluetooth</h3>
+                    <p class="settings-description">Connect AirTurn or similar Bluetooth pedals for hands-free page turning</p>
+                    <div class="toggle-setting">
+                        <label for="pedal-enable-toggle">Enable Foot Pedal</label>
+                        <button class="toggle-btn" id="pedal-enable-toggle" role="switch" aria-checked="false">
+                            <span class="toggle-slider"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="settings-group" id="pedal-controls-group" style="display: none;">
+                    <h3>Pedal Controls</h3>
+                    <div class="slider-setting">
+                        <label for="pedal-device-name">Device Name (optional)</label>
+                        <input type="text" id="pedal-device-name" placeholder="e.g. AirTurn PED" class="text-input">
+                    </div>
+                    <div class="pedal-bindings-info">
+                        <h4>Default Key Bindings</h4>
+                        <div class="binding-row">
+                            <span class="binding-key">PageUp / Right Arrow</span>
+                            <span class="binding-action">Next Measure</span>
+                        </div>
+                        <div class="binding-row">
+                            <span class="binding-key">PageDown / Left Arrow</span>
+                            <span class="binding-action">Previous Measure</span>
+                        </div>
+                        <div class="binding-row">
+                            <span class="binding-key">Up Arrow</span>
+                            <span class="binding-action">Next Page</span>
+                        </div>
+                        <div class="binding-row">
+                            <span class="binding-key">Down Arrow</span>
+                            <span class="binding-action">Previous Page</span>
+                        </div>
+                        <div class="binding-row">
+                            <span class="binding-key">Space</span>
+                            <span class="binding-action">Toggle Loop</span>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -1414,6 +1524,19 @@
                         <span class="score-value" id="accuracy-score">--%</span>
                     </div>
                 </div>
+
+                <!-- Pedal Status & Feedback -->
+                <div class="pedal-status-bar" id="pedal-status">
+                    <span class="pedal-status-dot disabled"></span>
+                    <span class="pedal-status-text">Pedal Disabled</span>
+                </div>
+                <div class="pedal-feedback-indicator" id="pedal-feedback-indicator" role="status" aria-live="polite">
+                    <svg class="pedal-feedback-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="4" y="14" width="16" height="6" rx="2"/>
+                        <path d="M8 14V10a4 4 0 0 1 8 0v4"/>
+                    </svg>
+                    <span class="pedal-feedback-text"></span>
+                </div>
             </section>
 
             <!-- Metronome View -->
@@ -1558,6 +1681,48 @@
                         </svg>
                         Pause Cursor
                     </button>
+                </div>
+
+                <div class="settings-group">
+                    <h3>Foot Pedal / Bluetooth</h3>
+                    <p class="settings-description">Connect AirTurn or similar Bluetooth pedals for hands-free page turning</p>
+                    <div class="toggle-setting">
+                        <label for="pedal-enable-toggle">Enable Foot Pedal</label>
+                        <button class="toggle-btn" id="pedal-enable-toggle" role="switch" aria-checked="false">
+                            <span class="toggle-slider"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="settings-group" id="pedal-controls-group" style="display: none;">
+                    <h3>Pedal Controls</h3>
+                    <div class="slider-setting">
+                        <label for="pedal-device-name">Device Name (optional)</label>
+                        <input type="text" id="pedal-device-name" placeholder="e.g. AirTurn PED" class="text-input">
+                    </div>
+                    <div class="pedal-bindings-info">
+                        <h4>Default Key Bindings</h4>
+                        <div class="binding-row">
+                            <span class="binding-key">PageUp / Right Arrow</span>
+                            <span class="binding-action">Next Measure</span>
+                        </div>
+                        <div class="binding-row">
+                            <span class="binding-key">PageDown / Left Arrow</span>
+                            <span class="binding-action">Previous Measure</span>
+                        </div>
+                        <div class="binding-row">
+                            <span class="binding-key">Up Arrow</span>
+                            <span class="binding-action">Next Page</span>
+                        </div>
+                        <div class="binding-row">
+                            <span class="binding-key">Down Arrow</span>
+                            <span class="binding-action">Previous Page</span>
+                        </div>
+                        <div class="binding-row">
+                            <span class="binding-key">Space</span>
+                            <span class="binding-action">Toggle Loop</span>
+                        </div>
+                    </div>
                 </div>
             </section>
         </main>
@@ -1746,7 +1911,6 @@
         </div>
 
     <!-- Toast Notifications -->
->>>>>>> origin/main
     <div class="toast-container" id="toast-container"></div>
 
     <!-- Scripts -->
@@ -1767,6 +1931,8 @@
     <script src="src/js/components/follow-the-ball.js"></script>
     <script src="src/js/components/zoom-controller.js"></script>
     <script src="src/js/components/practice-loop.js"></script>
+    <!-- Hardware: Bluetooth HID Pedal Support -->
+    <script src="src/js/hardware/bluetooth-hid-listener.js"></script>
     <!-- Task 4: Integration & Polish -->
     <script src="src/js/components/integration-controller.js"></script>
     <script src="src/js/utils/accessibility-manager.js"></script>
