@@ -2293,6 +2293,414 @@ h1, h2, h3, h4, h5, h6 {
     }
 }
 
+/* ==========================================
+   Precision Tuner Styles
+   ========================================== */
+
+/* Tuner View Container */
+.tuner-view {
+    min-height: calc(100vh - var(--nav-height));
+    padding: var(--space-8) var(--space-4);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-6);
+}
+
+.tuner-header {
+    text-align: center;
+}
+
+.tuner-header h1 {
+    font-family: var(--font-heading);
+    font-size: var(--text-3xl);
+    color: var(--text-primary);
+    margin-bottom: var(--space-2);
+}
+
+.tuner-header .subtitle {
+    color: var(--text-secondary);
+    font-size: var(--text-lg);
+}
+
+/* Instrument Selector */
+.tuner-instrument-selector {
+    display: flex;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.tuner-instrument-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-5);
+    background: var(--bg-elevated);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-lg);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+}
+
+.tuner-instrument-btn:hover {
+    border-color: var(--primary);
+    color: var(--text-primary);
+}
+
+.tuner-instrument-btn.active {
+    border-color: var(--primary);
+    background: var(--bg-hover);
+    color: var(--primary);
+    box-shadow: 0 0 15px var(--primary-glow);
+}
+
+.tuner-instrument-btn .instrument-icon {
+    font-size: var(--text-2xl);
+}
+
+/* Tuner Display */
+.tuner-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-4);
+    width: 100%;
+    max-width: 500px;
+}
+
+/* Note Reference */
+.note-reference {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-lg);
+}
+
+.reference-label {
+    color: var(--text-muted);
+}
+
+.reference-note {
+    color: var(--primary);
+    font-family: var(--font-mono);
+    font-weight: 500;
+}
+
+/* Needle Gauge Container */
+.needle-gauge-container {
+    width: 100%;
+    max-width: 400px;
+    height: 200px;
+    position: relative;
+    opacity: 0;
+    transition: opacity var(--transition-normal);
+}
+
+.needle-gauge-container.visible {
+    opacity: 1;
+}
+
+.needle-gauge {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.gauge-arc {
+    position: absolute;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 300px;
+    height: 150px;
+    border: 3px solid var(--border);
+    border-bottom: none;
+    border-radius: 150px 150px 0 0;
+    opacity: 0.5;
+}
+
+.gauge-markings {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 300px;
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+}
+
+.gauge-markings .marking.center {
+    color: var(--success);
+    font-weight: 600;
+}
+
+/* Needle */
+.needle {
+    position: absolute;
+    bottom: 40px;
+    left: 50%;
+    width: 4px;
+    height: 120px;
+    background: linear-gradient(to top, var(--primary-dark), var(--primary));
+    transform-origin: bottom center;
+    transform: rotate(0deg);
+    transition: transform 0.15s ease-out;
+    border-radius: 2px;
+}
+
+.needle-glow {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 20px;
+    height: 20px;
+    background: var(--primary-light);
+    border-radius: 50%;
+    filter: blur(10px);
+    opacity: 0.8;
+    box-shadow: 0 0 20px var(--primary-glow);
+    transition: background var(--transition-normal);
+}
+
+.gauge-center-mark {
+    position: absolute;
+    bottom: 35px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 16px;
+    height: 16px;
+    background: var(--primary);
+    border-radius: 50%;
+    box-shadow: 0 0 10px var(--primary-glow);
+}
+
+/* Current Note Display */
+.current-note-display {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-1);
+}
+
+.current-note {
+    font-family: var(--font-heading);
+    font-size: var(--text-4xl);
+    color: var(--text-primary);
+    font-weight: 700;
+}
+
+.current-octave {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xl);
+    color: var(--text-secondary);
+}
+
+/* Pitch Feedback */
+.pitch-feedback {
+    padding: var(--space-3) var(--space-6);
+    border-radius: var(--radius-full);
+    font-size: var(--text-lg);
+    font-weight: 500;
+    text-align: center;
+    min-width: 150px;
+    transition: all var(--transition-normal);
+}
+
+.pitch-feedback.in-tune {
+    background: var(--success);
+    color: var(--text-primary);
+}
+
+.pitch-feedback.sharp,
+.pitch-feedback.flat {
+    background: var(--error);
+    color: var(--text-primary);
+}
+
+.pitch-feedback.slight-sharp,
+.pitch-feedback.slight-flat {
+    background: var(--warning);
+    color: var(--bg-deep);
+}
+
+.pitch-feedback.waiting {
+    background: var(--bg-elevated);
+    color: var(--text-muted);
+}
+
+/* Cents Display */
+.cents-display {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-1);
+    font-family: var(--font-mono);
+}
+
+.cents-value {
+    font-size: var(--text-2xl);
+    font-weight: 600;
+}
+
+.cents-unit {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+}
+
+.cents-display.emerald {
+    color: var(--success);
+}
+
+.cents-display.crimson {
+    color: var(--error);
+}
+
+.cents-display.amber {
+    color: var(--warning);
+}
+
+/* Frequency Display */
+.frequency-display {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-1);
+    font-family: var(--font-mono);
+}
+
+.frequency-value {
+    font-size: var(--text-xl);
+    color: var(--text-primary);
+}
+
+.frequency-unit {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+}
+
+/* Tuner Controls */
+.tuner-controls {
+    margin-top: var(--space-4);
+}
+
+.tuner-start-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-6);
+    background: var(--primary);
+    color: var(--bg-deep);
+    border: none;
+    border-radius: var(--radius-lg);
+    font-size: var(--text-lg);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    box-shadow: 0 4px 15px var(--primary-glow);
+}
+
+.tuner-start-btn:hover {
+    background: var(--primary-light);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px var(--primary-glow);
+}
+
+.tuner-start-btn.active {
+    background: var(--error);
+    box-shadow: 0 4px 15px var(--error-glow);
+}
+
+.tuner-start-btn .start-icon,
+.tuner-start-btn .stop-icon {
+    width: 20px;
+    height: 20px;
+}
+
+/* Open Strings Display */
+.tuner-open-strings {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    background: var(--bg-elevated);
+    border-radius: var(--radius-md);
+}
+
+.open-strings-label {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+}
+
+.open-strings-list {
+    display: flex;
+    gap: var(--space-2);
+}
+
+.open-string-note {
+    padding: var(--space-1) var(--space-2);
+    background: var(--bg-hover);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: var(--primary);
+}
+
+/* Tuner Status */
+.tuner-status {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+    background: var(--bg-elevated);
+    border-radius: var(--radius-full);
+    font-size: var(--text-sm);
+}
+
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-muted);
+}
+
+.tuner-status.active .status-indicator {
+    background: var(--success);
+    box-shadow: 0 0 10px var(--success-glow);
+    animation: statusPulse 1.5s infinite;
+}
+
+.tuner-status.error .status-indicator {
+    background: var(--error);
+    box-shadow: 0 0 10px var(--error-glow);
+}
+
+.tuner-status.inactive .status-indicator {
+    background: var(--text-muted);
+}
+
+.status-text {
+    color: var(--text-secondary);
+}
+
+@keyframes statusPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Needle glow animation */
+.needle-glow {
+    animation: glowPulse 2s ease-in-out infinite;
+}
+
+@keyframes glowPulse {
+    0%, 100% { opacity: 0.8; transform: translateX(-50%) scale(1); }
+    50% { opacity: 1; transform: translateX(-50%) scale(1.1); }
+}
+
 /* ============================
    Bluetooth Pedal / HID Styles
    ============================ */

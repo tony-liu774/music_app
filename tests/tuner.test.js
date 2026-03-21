@@ -216,22 +216,51 @@ describe('PrecisionTuner', () => {
             expect(feedbackEl.classList.contains('in-tune')).toBe(true);
         });
 
-        it('should show "Sharp" when above threshold', () => {
+        it('should show "Sharp" when above threshold (>30 cents)', () => {
             tuner = new PrecisionTuner(container);
 
-            tuner.updateFeedback(25); // 25 cents sharp
+            tuner.updateFeedback(35); // 35 cents sharp - significant deviation
 
             const feedbackEl = container.querySelector('#pitch-feedback');
             expect(feedbackEl.classList.contains('sharp')).toBe(true);
         });
 
-        it('should show "Flat" when below threshold', () => {
+        it('should show "Flat" when below threshold (>30 cents)', () => {
             tuner = new PrecisionTuner(container);
 
-            tuner.updateFeedback(-25); // 25 cents flat
+            tuner.updateFeedback(-35); // 35 cents flat - significant deviation
 
             const feedbackEl = container.querySelector('#pitch-feedback');
             expect(feedbackEl.classList.contains('flat')).toBe(true);
+        });
+
+        it('should show "Slightly Sharp" for 10-30 cents deviation', () => {
+            tuner = new PrecisionTuner(container);
+
+            tuner.updateFeedback(25); // 25 cents sharp - slight deviation
+
+            const feedbackEl = container.querySelector('#pitch-feedback');
+            expect(feedbackEl.classList.contains('slight-sharp')).toBe(true);
+            expect(feedbackEl.querySelector('.feedback-text').textContent).toBe('Slightly Sharp');
+        });
+
+        it('should show "Slightly Flat" for -10 to -30 cents deviation', () => {
+            tuner = new PrecisionTuner(container);
+
+            tuner.updateFeedback(-25); // 25 cents flat - slight deviation
+
+            const feedbackEl = container.querySelector('#pitch-feedback');
+            expect(feedbackEl.classList.contains('slight-flat')).toBe(true);
+            expect(feedbackEl.querySelector('.feedback-text').textContent).toBe('Slightly Flat');
+        });
+
+        it('should apply amber color for slight deviation', () => {
+            tuner = new PrecisionTuner(container);
+
+            tuner.updateFeedback(20); // 20 cents sharp - slight deviation
+
+            const centsDisplay = container.querySelector('#tuner-cents');
+            expect(centsDisplay.classList.contains('amber')).toBe(true);
         });
 
         it('should hide needle gauge when in tune', () => {
@@ -246,7 +275,16 @@ describe('PrecisionTuner', () => {
         it('should show needle gauge when out of tune', () => {
             tuner = new PrecisionTuner(container);
 
-            tuner.updateFeedback(25); // Outside threshold
+            tuner.updateFeedback(35); // Outside threshold (>30 cents)
+
+            const needleContainer = document.getElementById('needle-gauge-container');
+            expect(needleContainer.classList.contains('visible')).toBe(true);
+        });
+
+        it('should show needle gauge for slight deviation (10-30 cents)', () => {
+            tuner = new PrecisionTuner(container);
+
+            tuner.updateFeedback(25); // Slight deviation
 
             const needleContainer = document.getElementById('needle-gauge-container');
             expect(needleContainer.classList.contains('visible')).toBe(true);

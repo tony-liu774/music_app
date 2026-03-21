@@ -151,14 +151,14 @@ class PrecisionTuner {
         });
 
         // Start/Stop button
-        const startBtn = document.getElementById('tuner-start-btn');
+        const startBtn = this.container.querySelector('#tuner-start-btn');
         if (startBtn) {
             startBtn.addEventListener('click', () => this.toggleTuner());
         }
     }
 
     updateOpenStrings() {
-        const listEl = document.getElementById('open-strings-list');
+        const listEl = this.container.querySelector('#open-strings-list');
         if (!listEl) return;
 
         const strings = this.instrumentTuning[this.selectedInstrument]?.openStrings || [];
@@ -270,7 +270,8 @@ class PrecisionTuner {
             // Smooth the cents value for animation
             this.smoothedCents = this.smoothedCents * 0.7 + this.centsDeviation * 0.3;
 
-            this.updateDisplay(result, this.centsDeviation);
+            // Use raw cents for color/feedback, smoothed cents for needle animation
+            this.updateDisplay(result, this.centsDeviation, this.smoothedCents);
         } else {
             this.showWaitingState();
         }
@@ -292,7 +293,7 @@ class PrecisionTuner {
         };
     }
 
-    updateDisplay(note, cents) {
+    updateDisplay(note, cents, smoothedCents) {
         // Update note display
         const noteEl = this.container.querySelector('#tuner-current-note');
         const octaveEl = this.container.querySelector('#tuner-current-octave');
@@ -304,7 +305,7 @@ class PrecisionTuner {
         const freqEl = this.container.querySelector('.frequency-value');
         if (freqEl) freqEl.textContent = note.frequency ? note.frequency.toFixed(1) : '--';
 
-        // Update cents display
+        // Update cents display (show raw cents)
         const centsEl = this.container.querySelector('.cents-value');
         if (centsEl) centsEl.textContent = cents > 0 ? `+${Math.round(cents)}` : Math.round(cents);
 
@@ -314,25 +315,17 @@ class PrecisionTuner {
             if (refNoteEl) refNoteEl.textContent = `${this.targetNote.name}${this.targetNote.octave}`;
         }
 
-        // Update needle position (only show if deviation > 10 cents)
-        const needleContainer = document.getElementById('needle-gauge-container');
-        const needle = document.getElementById('tuner-needle');
-
-        if (Math.abs(cents) > this.deviationThreshold) {
-            // Show needle gauge
-            if (needleContainer) needleContainer.classList.add('visible');
-            if (needle) {
-                // Clamp cents to -50 to +50 range for display
-                const clampedCents = Math.max(-50, Math.min(50, cents));
-                const rotation = clampedCents * 1.8; // 180 degrees = 100 cents
-                needle.style.transform = `rotate(${rotation}deg)`;
-            }
-        } else {
-            // Hide needle gauge when in tune (within threshold)
-            if (needleContainer) needleContainer.classList.remove('visible');
+        // Update needle rotation using smoothed cents for smoother animation
+        const needle = this.container.querySelector('#tuner-needle');
+        if (needle) {
+            const centsForNeedle = smoothedCents !== undefined ? smoothedCents : cents;
+            // Clamp cents to -50 to +50 range for display
+            const clampedCents = Math.max(-50, Math.min(50, centsForNeedle));
+            const rotation = clampedCents * 1.8; // 180 degrees = 100 cents
+            needle.style.transform = `rotate(${rotation}deg)`;
         }
 
-        // Update feedback colors
+        // Update feedback colors using raw cents for correct state transitions
         this.updateFeedback(cents);
     }
 
@@ -346,8 +339,8 @@ class PrecisionTuner {
         const absCents = Math.abs(cents);
 
         // Remove existing state classes
-        feedbackEl.classList.remove('in-tune', 'sharp', 'flat', 'waiting');
-        if (centsDisplay) centsDisplay.classList.remove('emerald', 'crimson');
+        feedbackEl.classList.remove('in-tune', 'sharp', 'flat', 'slight-sharp', 'slight-flat', 'waiting');
+        if (centsDisplay) centsDisplay.classList.remove('emerald', 'crimson', 'amber');
 
         if (absCents <= 10) {
             // In tune - Emerald
@@ -357,27 +350,42 @@ class PrecisionTuner {
             if (needleGlow) needleGlow.style.background = 'var(--success-light)';
 
             // Hide needle when in tune
-            const needleContainer = document.getElementById('needle-gauge-container');
+            const needleContainer = this.container.querySelector('#needle-gauge-container');
             if (needleContainer) needleContainer.classList.remove('visible');
-        } else if (cents > 10) {
-            // Sharp - Crimson
+        } else if (absCents <= 30) {
+            // Slight deviation - Polished Amber (10-30 cents)
+            if (cents > 0) {
+                feedbackEl.classList.add('slight-sharp');
+                feedbackEl.querySelector('.feedback-text').textContent = 'Slightly Sharp';
+            } else {
+                feedbackEl.classList.add('slight-flat');
+                feedbackEl.querySelector('.feedback-text').textContent = 'Slightly Flat';
+            }
+            if (centsDisplay) centsDisplay.classList.add('amber');
+            if (needleGlow) needleGlow.style.background = 'var(--primary-light)';
+
+            // Show needle gauge for slight deviation
+            const needleContainer = this.container.querySelector('#needle-gauge-container');
+            if (needleContainer) needleContainer.classList.add('visible');
+        } else if (cents > 30) {
+            // Significant sharp - Crimson
             feedbackEl.classList.add('sharp');
             feedbackEl.querySelector('.feedback-text').textContent = 'Sharp';
             if (centsDisplay) centsDisplay.classList.add('crimson');
             if (needleGlow) needleGlow.style.background = 'var(--error-light)';
 
             // Show needle gauge
-            const needleContainer = document.getElementById('needle-gauge-container');
+            const needleContainer = this.container.querySelector('#needle-gauge-container');
             if (needleContainer) needleContainer.classList.add('visible');
         } else {
-            // Flat - Crimson
+            // Significant flat - Crimson
             feedbackEl.classList.add('flat');
             feedbackEl.querySelector('.feedback-text').textContent = 'Flat';
             if (centsDisplay) centsDisplay.classList.add('crimson');
             if (needleGlow) needleGlow.style.background = 'var(--error-light)';
 
             // Show needle gauge
-            const needleContainer = document.getElementById('needle-gauge-container');
+            const needleContainer = this.container.querySelector('#needle-gauge-container');
             if (needleContainer) needleContainer.classList.add('visible');
         }
     }
@@ -385,13 +393,13 @@ class PrecisionTuner {
     showWaitingState() {
         const feedbackEl = this.container.querySelector('#pitch-feedback');
         if (feedbackEl) {
-            feedbackEl.classList.remove('in-tune', 'sharp', 'flat');
+            feedbackEl.classList.remove('in-tune', 'sharp', 'flat', 'slight-sharp', 'slight-flat');
             feedbackEl.classList.add('waiting');
             feedbackEl.querySelector('.feedback-text').textContent = 'Play a note...';
         }
 
         // Hide needle gauge
-        const needleContainer = document.getElementById('needle-gauge-container');
+        const needleContainer = this.container.querySelector('#needle-gauge-container');
         if (needleContainer) needleContainer.classList.remove('visible');
     }
 
@@ -402,8 +410,8 @@ class PrecisionTuner {
         const centsEl = this.container.querySelector('.cents-value');
         const refNoteEl = this.container.querySelector('.reference-note');
         const feedbackEl = this.container.querySelector('#pitch-feedback');
-        const needleContainer = document.getElementById('needle-gauge-container');
-        const needle = document.getElementById('tuner-needle');
+        const needleContainer = this.container.querySelector('#needle-gauge-container');
+        const needle = this.container.querySelector('#tuner-needle');
 
         if (noteEl) noteEl.textContent = '--';
         if (octaveEl) octaveEl.textContent = '';
@@ -412,7 +420,7 @@ class PrecisionTuner {
         if (refNoteEl) refNoteEl.textContent = '--';
 
         if (feedbackEl) {
-            feedbackEl.classList.remove('in-tune', 'sharp', 'flat');
+            feedbackEl.classList.remove('in-tune', 'sharp', 'flat', 'slight-sharp', 'slight-flat');
             feedbackEl.classList.add('waiting');
             feedbackEl.querySelector('.feedback-text').textContent = 'Waiting for input...';
         }
@@ -422,7 +430,7 @@ class PrecisionTuner {
     }
 
     updateUIState(isActive) {
-        const btn = document.getElementById('tuner-start-btn');
+        const btn = this.container.querySelector('#tuner-start-btn');
         if (!btn) return;
 
         const startIcon = btn.querySelector('.start-icon');

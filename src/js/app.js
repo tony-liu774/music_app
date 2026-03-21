@@ -107,10 +107,17 @@ class ConcertmasterApp {
             library: document.getElementById('library-view'),
             practice: document.getElementById('practice-view'),
             metronome: document.getElementById('metronome-view'),
-            settings: document.getElementById('settings-view')
+            settings: document.getElementById('settings-view'),
+            tuner: document.getElementById('tuner-view')
         };
 
         this.toastContainer = document.getElementById('toast-container');
+
+        // Initialize Precision Tuner
+        const tunerContainer = document.getElementById('tuner-container');
+        if (tunerContainer) {
+            this.tuner = new PrecisionTuner(tunerContainer);
+        }
 
         // Initialize renderers
         this.initRenderers();
