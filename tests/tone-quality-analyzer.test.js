@@ -121,7 +121,7 @@ describe('ToneQualityAnalyzer', () => {
         }
 
         const result = analyzer.detectHarshness(fft, frequencies, violinRange);
-        assert.strictEqual(result.level, 'good');
+        assert.strictEqual(result.level, 'excellent');
         assert.ok(result.score > 60);
     });
 
