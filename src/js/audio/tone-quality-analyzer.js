@@ -410,23 +410,21 @@ class ToneQualityAnalyzer {
         const totalEnergy = lowMidEnergy + highEnergy;
         const harshnessRatio = totalEnergy > 0 ? highEnergy / totalEnergy : 0;
 
-        // Determine harshness level and score using continuous function
+        // Determine harshness level and score using a single continuous function
         // Score decreases smoothly from 100 (good) to 0 (harsh) as harshness ratio increases
         // Using harshnessRatio / (harshnessThreshold * 2) as normalized measure (0 to ~1)
-        let level = 'good';
-        let score = 100;
-
+        // Formula: score = 100 * (1 - normalizedHarshness) is continuous everywhere
         const normalizedHarshness = harshnessRatio / (this.harshnessThreshold * 2);
+        let score = Math.max(0, 100 * (1 - normalizedHarshness));
 
-        if (normalizedHarshness >= 1) {
-            level = 'harsh';
-            score = Math.max(0, 100 * (1 - normalizedHarshness));
-        } else if (normalizedHarshness >= 0.5) {
-            level = 'acceptable';
-            score = Math.max(0, 100 * (1 - normalizedHarshness));
-        } else {
+        // Determine level label based on score ranges (still discontinuous labels, but continuous score)
+        let level;
+        if (score >= 80) {
             level = 'good';
-            score = 100 * (1 - normalizedHarshness * 0.2); // Max 20% penalty for good range
+        } else if (score >= 40) {
+            level = 'acceptable';
+        } else {
+            level = 'harsh';
         }
 
         return {
