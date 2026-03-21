@@ -608,7 +608,7 @@ class VibratoFilter {
 
         if (validFrequencies.length >= 3) {
             const stdDev = this.calculateStandardDeviation(validFrequencies);
-            const meanFreq = validFrequencies.reduce((a, b) => a + b, 0) / validFrequencies;
+            const meanFreq = validFrequencies.reduce((a, b) => a + b, 0) / validFrequencies.length;
 
             if (meanFreq > 0 && stdDev > 0) {
                 this.vibratoDepth = Math.round(1200 * Math.log2((meanFreq + stdDev) / meanFreq));

@@ -270,7 +270,8 @@ class PrecisionTuner {
             // Smooth the cents value for animation
             this.smoothedCents = this.smoothedCents * 0.7 + this.centsDeviation * 0.3;
 
-            this.updateDisplay(result, this.centsDeviation);
+            // Use smoothed cents for needle animation for smoother visual feedback
+            this.updateDisplay(result, this.smoothedCents);
         } else {
             this.showWaitingState();
         }
@@ -314,25 +315,16 @@ class PrecisionTuner {
             if (refNoteEl) refNoteEl.textContent = `${this.targetNote.name}${this.targetNote.octave}`;
         }
 
-        // Update needle position (only show if deviation > 10 cents)
-        const needleContainer = document.getElementById('needle-gauge-container');
-        const needle = document.getElementById('tuner-needle');
-
-        if (Math.abs(cents) > this.deviationThreshold) {
-            // Show needle gauge
-            if (needleContainer) needleContainer.classList.add('visible');
-            if (needle) {
-                // Clamp cents to -50 to +50 range for display
-                const clampedCents = Math.max(-50, Math.min(50, cents));
-                const rotation = clampedCents * 1.8; // 180 degrees = 100 cents
-                needle.style.transform = `rotate(${rotation}deg)`;
-            }
-        } else {
-            // Hide needle gauge when in tune (within threshold)
-            if (needleContainer) needleContainer.classList.remove('visible');
+        // Update needle rotation (visibility handled by updateFeedback)
+        const needle = this.container.querySelector('#tuner-needle');
+        if (needle) {
+            // Clamp cents to -50 to +50 range for display
+            const clampedCents = Math.max(-50, Math.min(50, cents));
+            const rotation = clampedCents * 1.8; // 180 degrees = 100 cents
+            needle.style.transform = `rotate(${rotation}deg)`;
         }
 
-        // Update feedback colors
+        // Update feedback colors (includes needle visibility logic)
         this.updateFeedback(cents);
     }
 
