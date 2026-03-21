@@ -61,6 +61,8 @@ class ConcertmasterApp {
         this.isTeacherMode = false;
         this.teacherService = null;
         this.studioDashboard = null;
+        this.heatMapHistoryService = null;
+        this.heatMapHistoryUI = null;
     }
 
     async init() {
@@ -117,7 +119,8 @@ class ConcertmasterApp {
             metronome: document.getElementById('metronome-view'),
             settings: document.getElementById('settings-view'),
             tuner: document.getElementById('tuner-view'),
-            studio: document.getElementById('studio-dashboard-view')
+            studio: document.getElementById('studio-dashboard-view'),
+            'heat-map-history': document.getElementById('heat-map-history-view')
         };
 
         this.toastContainer = document.getElementById('toast-container');
@@ -862,20 +865,63 @@ class ConcertmasterApp {
             link.style.display = enabled ? '' : 'none';
         });
 
+        // Show/hide heatmap (Audits) nav link
+        const heatmapNavLinks = document.querySelectorAll('.heatmap-nav-link');
+        heatmapNavLinks.forEach(link => {
+            link.style.display = enabled ? '' : 'none';
+        });
+
         // Show/hide the studio dashboard view
         const studioView = document.getElementById('studio-dashboard-view');
         if (studioView) {
             studioView.style.display = enabled ? '' : 'none';
         }
 
+        // Show/hide heat map history view
+        const heatmapView = document.getElementById('heat-map-history-view');
+        if (heatmapView) {
+            heatmapView.style.display = enabled ? '' : 'none';
+        }
+
         if (enabled && !this.studioDashboard) {
             // Initialize teacher service and dashboard on first enable
             this.teacherService = new TeacherService();
+            await this.teacherService.init();
+
             this.studioDashboard = new StudioDashboard(this.teacherService);
             await this.studioDashboard.init();
+
+            // Initialize heat map history service and UI
+            this.heatMapHistoryService = new HeatMapHistoryService();
+            await this.heatMapHistoryService.init();
+
+            this.heatMapHistoryUI = new HeatMapHistoryUI(this.heatMapHistoryService, this.teacherService);
+            await this.heatMapHistoryUI.init();
+
+            // Wire up studio dashboard to open heat map view on student selection
+            this._wireUpHeatMapFromDashboard();
         } else if (enabled && this.studioDashboard) {
             await this.studioDashboard.refresh();
         }
+    }
+
+    /**
+     * Wire up studio dashboard to open heat map view when a student is selected
+     */
+    _wireUpHeatMapFromDashboard() {
+        if (!this.studioDashboard || !this.heatMapHistoryUI) return;
+
+        // Listen for student selection events from studio dashboard
+        const originalSelectStudent = this.studioDashboard.selectStudent.bind(this.studioDashboard);
+        this.studioDashboard.selectStudent = async (studentId) => {
+            await originalSelectStudent(studentId);
+
+            // Load heat map for selected student
+            await this.heatMapHistoryUI.loadStudentHeatMaps(studentId);
+
+            // Navigate to heat map history view
+            this.navigateTo('heat-map-history');
+        };
     }
 
     // ============================================
@@ -1361,6 +1407,9 @@ class ConcertmasterApp {
         // Calculate final scores
         const finalScore = this.accuracyScorer.calculateOverall(this.sessionData);
 
+        // Save to heat map if in teacher mode with selected student
+        this._saveToHeatMap();
+
         // Add session-ended state to sheet music container
         const sheetContainer = document.getElementById('sheet-music-container');
         if (sheetContainer) {
@@ -1384,6 +1433,70 @@ class ConcertmasterApp {
         this.showSessionSummary(finalScore);
 
         this.showToast('Practice session ended', 'success');
+    }
+
+    /**
+     * Save practice session to heat map (teacher mode)
+     */
+    async _saveToHeatMap() {
+        if (!this.isTeacherMode) return;
+        if (!this.heatMapHistoryService) return;
+        if (!this.studioDashboard?.selectedStudentId) return;
+        if (!this.sessionData || !this.sessionData.notes || this.sessionData.notes.length === 0) return;
+
+        // Convert session notes to deviation format for heat map
+        const deviations = this.sessionData.notes
+            .filter(n => n.measure && (n.accuracy < 100 || !n.matched))
+            .map(n => ({
+                measure: n.measure,
+                type: n.rhythmScore < 100 ? 'pitch' : 'pitch', // Simplified - could add rhythm detection
+                deviation_cents: 100 - n.accuracy,
+                timestamp: n.timestamp
+            }));
+
+        const sessionData = {
+            scoreId: this.sessionData.scoreId,
+            pieceName: this.currentScore?.title || '',
+            duration_ms: this.sessionData.startTime ? Date.now() - this.sessionData.startTime : 0,
+            total_deviations: deviations.length,
+            pitch_deviations: deviations.length,
+            rhythm_deviations: 0,
+            intonation_deviations: 0,
+            deviations: deviations,
+            average_pitch_deviation_cents: deviations.length > 0
+                ? deviations.reduce((sum, d) => sum + Math.abs(d.deviation_cents || 0), 0) / deviations.length
+                : 0,
+            average_rhythm_deviation_ms: 0,
+            problem_measures: this._extractProblemMeasures(deviations)
+        };
+
+        try {
+            await this.heatMapHistoryService.savePracticeSession(
+                this.studioDashboard.selectedStudentId,
+                sessionData
+            );
+            console.log('Practice session saved to heat map for student:', this.studioDashboard.selectedStudentId);
+        } catch (err) {
+            console.warn('Failed to save practice session to heat map:', err);
+        }
+    }
+
+    /**
+     * Extract problem measures from deviations
+     */
+    _extractProblemMeasures(deviations) {
+        const measureErrors = {};
+        deviations.forEach(d => {
+            if (!measureErrors[d.measure]) {
+                measureErrors[d.measure] = 0;
+            }
+            measureErrors[d.measure]++;
+        });
+
+        return Object.entries(measureErrors)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(([measure]) => parseInt(measure, 10));
     }
 
     processAudio(data) {
