@@ -55,10 +55,16 @@ app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // Serve static files (frontend) - root directory for PWA
-app.use(express.static(path.join(__dirname, '..')));
+app.use(express.static(path.join(__dirname, '..'), { index: 'index.html' }));
 // Serve index.html at root URL
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'index.html'));
+app.get('/', (req, res, next) => {
+  const indexPath = path.join(__dirname, '..', 'index.html');
+  res.sendFile(indexPath, (err) => {
+    if (err) {
+      console.error('Error serving index.html:', err);
+      res.status(500).json({ error: 'Failed to load frontend' });
+    }
+  });
 });
 
 // Health check routes
