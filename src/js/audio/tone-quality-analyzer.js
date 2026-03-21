@@ -22,7 +22,7 @@ class ToneQualityAnalyzer {
         this.instrument = 'violin';
 
         // Analysis parameters
-        this.confidenceThreshold = 0.1;
+        this.confidenceThreshold = 0.001;  // Low threshold for AnalyserNode path (max ~0.0316)
         this.harmonicOrder = 8;  // Analyze up to 8th harmonic
 
         // Tone quality thresholds

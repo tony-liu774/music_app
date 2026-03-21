@@ -84,7 +84,8 @@ class SessionLogger {
             measure: measure || 1,
             from_note: fromNote || '?',
             to_note: toNote || '?',
-            transition_quality: Math.round(transitionQuality || 100),
+            // Use nullish coalescing to allow 0 as valid score
+            transition_quality: Math.round(transitionQuality ?? 100),
             issue: issue || 'none',
             timestamp: Date.now() - (this.startTime || Date.now())
         };
