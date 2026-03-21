@@ -126,7 +126,7 @@ class OMRClient {
             return mergedScore;
 
         } catch (error) {
-            this.reportProgress(0, 'Error');
+            this.reportProgress(100, 'Error');
             throw new Error(`PDF processing failed: ${error.message}`);
         }
     }

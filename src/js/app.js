@@ -1984,9 +1984,8 @@ class ConcertmasterApp {
     }
 
     retryScan() {
-        // Clear file and show empty upload state (user must re-select)
-        this.scannerFile = null;
-        this.showScannerContent('upload');
+        // Clear file and reset DOM to match (user must re-select)
+        this.clearScannerFile();
     }
 
     scanAnother() {
@@ -1999,9 +1998,8 @@ class ConcertmasterApp {
         try {
             const imageData = await omrClient.scanFromCamera();
 
-            // Convert to a "file" for processing
-            const response = await fetch(imageData);
-            const blob = await response.blob();
+            // Convert to a "file" for processing using existing dataURLToBlob method
+            const blob = omrClient.dataURLToBlob(imageData);
             const file = new File([blob], 'camera-capture.jpg', { type: 'image/jpeg' });
 
             this.scannerFile = file;
