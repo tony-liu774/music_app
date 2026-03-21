@@ -155,7 +155,8 @@ class MusicXMLParser {
                     // Check for wedge (crescendo/decrescendo) context
                     for (const dyn of measure.dynamics) {
                         if (dyn.category === 'wedge' && dyn.beat !== undefined && currentBeat >= dyn.beat) {
-                            note.dynamicDirection = dyn.type;
+                            // wedge-stop ends the hairpin — clear direction rather than tagging notes with 'wedge-stop'
+                            note.dynamicDirection = dyn.type === 'wedge-stop' ? null : dyn.type;
                         }
                     }
 
@@ -224,29 +225,29 @@ class MusicXMLParser {
      */
     parseArticulations(notationsElement, note) {
         const articulationsEl = notationsElement.querySelector('articulations');
-        if (!articulationsEl) return;
+        if (articulationsEl) {
+            const articulationMap = {
+                'staccato': 'staccato',
+                'staccatissimo': 'staccato',
+                'accent': 'accent',
+                'strong-accent': 'marcato',
+                'tenuto': 'tenuto',
+                'detached-legato': 'legato',
+                'spiccato': 'staccato'
+            };
 
-        const articulationMap = {
-            'staccato': 'staccato',
-            'staccatissimo': 'staccato',
-            'accent': 'accent',
-            'strong-accent': 'marcato',
-            'tenuto': 'tenuto',
-            'detached-legato': 'legato',
-            'spiccato': 'staccato'
-        };
-
-        for (const [xmlTag, artType] of Object.entries(articulationMap)) {
-            if (articulationsEl.querySelector(xmlTag)) {
-                note.accents.push(artType);
-                // Set primary articulation to the first one found
-                if (!note.articulation) {
-                    note.articulation = artType;
+            for (const [xmlTag, artType] of Object.entries(articulationMap)) {
+                if (articulationsEl.querySelector(xmlTag)) {
+                    note.accents.push(artType);
+                    // Set primary articulation to the first one found
+                    if (!note.articulation) {
+                        note.articulation = artType;
+                    }
                 }
             }
         }
 
-        // Check for pizzicato in technical element
+        // Check for pizzicato in technical element (independent of articulations)
         const technical = notationsElement.querySelector('technical');
         if (technical && technical.querySelector('snap-pizzicato, pizzicato')) {
             note.articulation = 'pizzicato';
@@ -376,4 +377,9 @@ class MusicXMLParser {
 }
 
 // Export
-window.MusicXMLParser = MusicXMLParser;
+if (typeof window !== 'undefined') {
+    window.MusicXMLParser = MusicXMLParser;
+}
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { MusicXMLParser };
+}

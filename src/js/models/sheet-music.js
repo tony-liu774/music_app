@@ -226,9 +226,14 @@ class ScoreLibrary {
 }
 
 // Export for use in other modules
-window.Note = Note;
-window.Rest = Rest;
-window.Measure = Measure;
-window.Part = Part;
-window.Score = Score;
-window.ScoreLibrary = ScoreLibrary;
+if (typeof window !== 'undefined') {
+    window.Note = Note;
+    window.Rest = Rest;
+    window.Measure = Measure;
+    window.Part = Part;
+    window.Score = Score;
+    window.ScoreLibrary = ScoreLibrary;
+}
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { Note, Rest, Measure, Part, Score, ScoreLibrary };
+}

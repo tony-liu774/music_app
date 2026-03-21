@@ -1,318 +1,294 @@
 /**
  * Tests for MusicXML Parser - Dynamics & Articulation Parsing
- * Run with: node tests/musicxml-dynamics.test.js
+ * Uses production parseDirection / parseArticulations via CommonJS export
+ * Run with: node --test tests/musicxml-dynamics.test.js
  */
 
-// Minimal DOMParser polyfill for Node.js testing
+const { describe, it, beforeEach } = require('node:test');
+const assert = require('node:assert');
+
+// Import production model classes
+const { Note, Rest, Measure, Part, Score } = require('../src/js/models/sheet-music');
+
+// Import production parser
+const { MusicXMLParser } = require('../src/js/parsers/musicxml-parser');
+
+// jsdom for DOM element creation
 const { JSDOM } = (() => {
     try { return require('jsdom'); } catch (e) { return { JSDOM: null }; }
 })();
 
-// Stub Note class
-class Note {
-    constructor(pitch, duration, position = {}) {
-        this.pitch = pitch;
-        this.duration = duration;
-        this.position = position;
-        this.type = 'note';
-        this.tie = null;
-        this.dot = false;
-        this.accents = [];
-        this.dynamic = 'mf';
-        this.articulation = null;
-        this.dynamicDirection = null;
-    }
-    getMIDI() {
-        const steps = { 'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11 };
-        return 12 + (steps[this.pitch.step] || 0) + (this.pitch.alter || 0) + ((this.pitch.octave || 4) * 12);
-    }
-    getFrequency() { return 440 * Math.pow(2, (this.getMIDI() - 69) / 12); }
-    getName() {
-        const alter = this.pitch.alter || 0;
-        if (alter === 1) return this.pitch.step + '#';
-        if (alter === -1) return this.pitch.step + 'b';
-        return this.pitch.step;
-    }
-}
-
-class Rest {
-    constructor(duration, position = {}) { this.duration = duration; this.position = position; this.type = 'rest'; }
-}
-
-class Measure {
-    constructor(number = 1) {
-        this.number = number; this.notes = []; this.rests = [];
-        this.clef = null; this.key = { fifths: 0, mode: 'major' }; this.timeSignature = { beats: 4, beatType: 4 };
-        this.dynamics = []; this.articulations = [];
-    }
-    addElement(element) {
-        if (element instanceof Note) this.notes.push(element);
-        else if (element instanceof Rest) this.rests.push(element);
-    }
-}
-
-class Part { constructor(id, name = 'Part 1') { this.id = id; this.name = name; this.instrument = 'violin'; this.measures = []; } addMeasure(m) { this.measures.push(m); } }
-class Score { constructor(title = 'Untitled', composer = 'Unknown') { this.title = title; this.composer = composer; this.parts = []; this.divisions = 1; this.tempo = 120; } addPart(p) { this.parts.push(p); } }
-
-// Inline parseDirection from MusicXMLParser (mirror of production code)
-function parseDirection(dirElement, measureNumber, divisions = 1) {
-    const dirType = dirElement.querySelector('direction-type');
-    if (!dirType) return null;
-
-    const offsetEl = dirElement.querySelector('offset');
-    const beat = offsetEl ? parseInt(offsetEl.textContent) / divisions : 0;
-
-    const dynamicsEl = dirType.querySelector('dynamics');
-    if (dynamicsEl) {
-        const dynamicTypes = ['pp', 'p', 'mp', 'mf', 'f', 'ff', 'fp', 'sf', 'sfz'];
-        for (const type of dynamicTypes) {
-            if (dynamicsEl.querySelector(type)) {
-                return { category: 'dynamic', type, measure: measureNumber, beat };
-            }
-        }
-    }
-
-    const wedge = dirType.querySelector('wedge');
-    if (wedge) {
-        const wedgeType = wedge.getAttribute('type');
-        if (wedgeType === 'crescendo') {
-            return { category: 'wedge', type: 'crescendo', measure: measureNumber, beat };
-        } else if (wedgeType === 'diminuendo' || wedgeType === 'decrescendo') {
-            return { category: 'wedge', type: 'decrescendo', measure: measureNumber, beat };
-        } else if (wedgeType === 'stop') {
-            return { category: 'wedge', type: 'wedge-stop', measure: measureNumber, beat };
-        }
-    }
-
-    const words = dirType.querySelector('words');
-    if (words) {
-        const text = words.textContent.toLowerCase().trim();
-        if (text === 'pizz.' || text === 'pizz' || text === 'pizzicato') {
-            return { category: 'technique', type: 'pizzicato', measure: measureNumber, beat };
-        }
-        if (text.startsWith('cresc')) {
-            return { category: 'wedge', type: 'crescendo', measure: measureNumber, beat };
-        }
-        if (text.startsWith('dim') || text.startsWith('decresc')) {
-            return { category: 'wedge', type: 'decrescendo', measure: measureNumber, beat };
-        }
-    }
-
-    return null;
-}
-
-// Inline parseArticulations from MusicXMLParser (mirror of production code)
-function parseArticulations(notationsElement, note) {
-    const articulationsEl = notationsElement.querySelector('articulations');
-    if (!articulationsEl) return;
-
-    const articulationMap = {
-        'staccato': 'staccato',
-        'staccatissimo': 'staccato',
-        'accent': 'accent',
-        'strong-accent': 'marcato',
-        'tenuto': 'tenuto',
-        'detached-legato': 'legato',
-        'spiccato': 'staccato'
-    };
-
-    for (const [xmlTag, artType] of Object.entries(articulationMap)) {
-        if (articulationsEl.querySelector(xmlTag)) {
-            note.accents.push(artType);
-            if (!note.articulation) {
-                note.articulation = artType;
-            }
-        }
-    }
-
-    const technical = notationsElement.querySelector('technical');
-    if (technical && technical.querySelector('snap-pizzicato, pizzicato')) {
-        note.articulation = 'pizzicato';
-        note.accents.push('pizzicato');
-    }
-}
-
 // Helper: parse XML string to DOM element
 function xmlElement(xmlString) {
-    if (!JSDOM) throw new Error('jsdom not available');
+    if (!JSDOM) throw new Error('jsdom not available — install jsdom to run DOM tests');
     const dom = new JSDOM(xmlString, { contentType: 'text/xml' });
     return dom.window.document.documentElement;
 }
 
-// Test runner
-function runTests() {
-    console.log('Running MusicXML Dynamics & Articulation Parser Tests...\n');
-    let passed = 0, failed = 0, skipped = 0;
+describe('MusicXMLParser parseDirection', { skip: !JSDOM && 'jsdom not available' }, () => {
+    let parser;
 
-    function test(name, fn) {
-        try { fn(); console.log(`✓ ${name}`); passed++; }
-        catch (e) {
-            if (e.message === 'jsdom not available') { console.log(`- ${name} (skipped: no jsdom)`); skipped++; }
-            else { console.log(`✗ ${name}\n  Error: ${e.message}`); failed++; }
-        }
-    }
+    beforeEach(() => {
+        // Provide globals that MusicXMLParser constructor/methods expect
+        global.DOMParser = (new JSDOM('')).window.DOMParser;
+        global.Note = Note;
+        global.Rest = Rest;
+        global.Measure = Measure;
+        global.Part = Part;
+        global.Score = Score;
+        parser = new MusicXMLParser();
+    });
 
-    function assertEqual(actual, expected, msg) {
-        if (actual !== expected) throw new Error(`${msg}: expected ${expected}, got ${actual}`);
-    }
-
-    function assertTrue(value, msg) {
-        if (!value) throw new Error(msg || 'Expected true');
-    }
-
-    // === parseDirection tests (real DOM parsing) ===
-
-    test('parseDirection: should parse forte dynamic marking', () => {
+    it('should parse forte dynamic marking', () => {
         const el = xmlElement(`<direction><direction-type><dynamics><f/></dynamics></direction-type></direction>`);
-        const result = parseDirection(el, 1);
-        assertEqual(result.category, 'dynamic', 'Category is dynamic');
-        assertEqual(result.type, 'f', 'Dynamic type is forte');
-        assertEqual(result.measure, 1, 'Measure is 1');
-        assertEqual(result.beat, 0, 'Beat defaults to 0');
+        const result = parser.parseDirection(el, 1);
+        assert.strictEqual(result.category, 'dynamic');
+        assert.strictEqual(result.type, 'f');
+        assert.strictEqual(result.measure, 1);
+        assert.strictEqual(result.beat, 0);
     });
 
-    test('parseDirection: should parse piano dynamic marking', () => {
+    it('should parse piano dynamic marking', () => {
         const el = xmlElement(`<direction><direction-type><dynamics><p/></dynamics></direction-type></direction>`);
-        const result = parseDirection(el, 2);
-        assertEqual(result.type, 'p', 'Dynamic type is piano');
-        assertEqual(result.measure, 2, 'Measure is 2');
+        const result = parser.parseDirection(el, 2);
+        assert.strictEqual(result.type, 'p');
+        assert.strictEqual(result.measure, 2);
     });
 
-    test('parseDirection: should parse pp, mp, mf, ff dynamics', () => {
+    it('should parse pp, mp, mf, ff dynamics', () => {
         for (const dyn of ['pp', 'mp', 'mf', 'ff']) {
             const el = xmlElement(`<direction><direction-type><dynamics><${dyn}/></dynamics></direction-type></direction>`);
-            const result = parseDirection(el, 1);
-            assertEqual(result.type, dyn, `${dyn} parsed correctly`);
-            assertEqual(result.category, 'dynamic', `${dyn} is dynamic category`);
+            const result = parser.parseDirection(el, 1);
+            assert.strictEqual(result.type, dyn, `${dyn} parsed correctly`);
+            assert.strictEqual(result.category, 'dynamic');
         }
     });
 
-    test('parseDirection: should parse crescendo wedge', () => {
+    it('should parse fp, sf, sfz dynamics', () => {
+        for (const dyn of ['fp', 'sf', 'sfz']) {
+            const el = xmlElement(`<direction><direction-type><dynamics><${dyn}/></dynamics></direction-type></direction>`);
+            const result = parser.parseDirection(el, 1);
+            assert.strictEqual(result.type, dyn, `${dyn} parsed correctly`);
+            assert.strictEqual(result.category, 'dynamic');
+        }
+    });
+
+    it('should parse crescendo wedge', () => {
         const el = xmlElement(`<direction><direction-type><wedge type="crescendo"/></direction-type></direction>`);
-        const result = parseDirection(el, 3);
-        assertEqual(result.category, 'wedge', 'Category is wedge');
-        assertEqual(result.type, 'crescendo', 'Wedge type is crescendo');
+        const result = parser.parseDirection(el, 3);
+        assert.strictEqual(result.category, 'wedge');
+        assert.strictEqual(result.type, 'crescendo');
     });
 
-    test('parseDirection: should parse diminuendo wedge as decrescendo', () => {
+    it('should parse diminuendo wedge as decrescendo', () => {
         const el = xmlElement(`<direction><direction-type><wedge type="diminuendo"/></direction-type></direction>`);
-        const result = parseDirection(el, 4);
-        assertEqual(result.type, 'decrescendo', 'diminuendo maps to decrescendo');
+        const result = parser.parseDirection(el, 4);
+        assert.strictEqual(result.type, 'decrescendo');
     });
 
-    test('parseDirection: should parse wedge stop', () => {
+    it('should parse wedge stop', () => {
         const el = xmlElement(`<direction><direction-type><wedge type="stop"/></direction-type></direction>`);
-        const result = parseDirection(el, 5);
-        assertEqual(result.type, 'wedge-stop', 'Wedge stop');
+        const result = parser.parseDirection(el, 5);
+        assert.strictEqual(result.type, 'wedge-stop');
     });
 
-    test('parseDirection: should parse pizz. text direction as technique', () => {
+    it('should parse pizz. text direction as technique', () => {
         const el = xmlElement(`<direction><direction-type><words>pizz.</words></direction-type></direction>`);
-        const result = parseDirection(el, 1);
-        assertEqual(result.category, 'technique', 'Category is technique');
-        assertEqual(result.type, 'pizzicato', 'Type is pizzicato');
+        const result = parser.parseDirection(el, 1);
+        assert.strictEqual(result.category, 'technique');
+        assert.strictEqual(result.type, 'pizzicato');
     });
 
-    test('parseDirection: should parse cresc. text as wedge crescendo', () => {
+    it('should parse cresc. text as wedge crescendo', () => {
         const el = xmlElement(`<direction><direction-type><words>cresc.</words></direction-type></direction>`);
-        const result = parseDirection(el, 1);
-        assertEqual(result.category, 'wedge', 'Category is wedge');
-        assertEqual(result.type, 'crescendo', 'Type is crescendo');
+        const result = parser.parseDirection(el, 1);
+        assert.strictEqual(result.category, 'wedge');
+        assert.strictEqual(result.type, 'crescendo');
     });
 
-    test('parseDirection: should parse dim. text as wedge decrescendo', () => {
+    it('should parse dim. text as wedge decrescendo', () => {
         const el = xmlElement(`<direction><direction-type><words>dim.</words></direction-type></direction>`);
-        const result = parseDirection(el, 1);
-        assertEqual(result.type, 'decrescendo', 'Type is decrescendo');
+        const result = parser.parseDirection(el, 1);
+        assert.strictEqual(result.type, 'decrescendo');
     });
 
-    test('parseDirection: should return null for empty direction-type', () => {
+    it('should return null for empty direction-type', () => {
         const el = xmlElement(`<direction></direction>`);
-        const result = parseDirection(el, 1);
-        assertEqual(result, null, 'No direction-type = null');
+        const result = parser.parseDirection(el, 1);
+        assert.strictEqual(result, null);
     });
 
-    // === offset → beat conversion ===
-
-    test('parseDirection: should compute beat from offset with divisions=2', () => {
+    // offset → beat conversion
+    it('should compute beat from offset with divisions=2', () => {
         const el = xmlElement(`<direction><direction-type><dynamics><f/></dynamics></direction-type><offset>4</offset></direction>`);
-        const result = parseDirection(el, 1, 2);
-        assertEqual(result.beat, 2, 'Offset 4 / divisions 2 = beat 2');
+        const result = parser.parseDirection(el, 1, 2);
+        assert.strictEqual(result.beat, 2);
     });
 
-    test('parseDirection: should default beat to 0 when no offset', () => {
+    it('should default beat to 0 when no offset', () => {
         const el = xmlElement(`<direction><direction-type><dynamics><mf/></dynamics></direction-type></direction>`);
-        const result = parseDirection(el, 1, 4);
-        assertEqual(result.beat, 0, 'No offset = beat 0');
+        const result = parser.parseDirection(el, 1, 4);
+        assert.strictEqual(result.beat, 0);
     });
 
-    test('parseDirection: should compute fractional beat from offset', () => {
+    it('should compute fractional beat from offset', () => {
         const el = xmlElement(`<direction><direction-type><wedge type="crescendo"/></direction-type><offset>3</offset></direction>`);
-        const result = parseDirection(el, 1, 4);
-        assertEqual(result.beat, 0.75, 'Offset 3 / divisions 4 = beat 0.75');
+        const result = parser.parseDirection(el, 1, 4);
+        assert.strictEqual(result.beat, 0.75);
+    });
+});
+
+describe('MusicXMLParser parseArticulations', { skip: !JSDOM && 'jsdom not available' }, () => {
+    let parser;
+
+    beforeEach(() => {
+        global.DOMParser = (new JSDOM('')).window.DOMParser;
+        global.Note = Note;
+        global.Rest = Rest;
+        global.Measure = Measure;
+        global.Part = Part;
+        global.Score = Score;
+        parser = new MusicXMLParser();
     });
 
-    // === parseArticulations tests ===
-
-    test('parseArticulations: should parse staccato marking', () => {
+    it('should parse staccato marking', () => {
         const el = xmlElement(`<notations><articulations><staccato/></articulations></notations>`);
         const note = new Note({ step: 'C', octave: 4, alter: 0 }, 1);
-        parseArticulations(el, note);
-        assertEqual(note.articulation, 'staccato', 'Staccato parsed');
-        assertEqual(note.accents[0], 'staccato', 'Staccato in accents');
+        parser.parseArticulations(el, note);
+        assert.strictEqual(note.articulation, 'staccato');
+        assert.strictEqual(note.accents[0], 'staccato');
     });
 
-    test('parseArticulations: should parse strong-accent as marcato', () => {
+    it('should parse strong-accent as marcato', () => {
         const el = xmlElement(`<notations><articulations><strong-accent/></articulations></notations>`);
         const note = new Note({ step: 'A', octave: 4, alter: 0 }, 1);
-        parseArticulations(el, note);
-        assertEqual(note.articulation, 'marcato', 'strong-accent maps to marcato');
+        parser.parseArticulations(el, note);
+        assert.strictEqual(note.articulation, 'marcato');
     });
 
-    test('parseArticulations: should parse tenuto marking', () => {
+    it('should parse tenuto marking', () => {
         const el = xmlElement(`<notations><articulations><tenuto/></articulations></notations>`);
         const note = new Note({ step: 'E', octave: 4, alter: 0 }, 1);
-        parseArticulations(el, note);
-        assertEqual(note.articulation, 'tenuto', 'Tenuto parsed');
+        parser.parseArticulations(el, note);
+        assert.strictEqual(note.articulation, 'tenuto');
     });
 
-    test('parseArticulations: should handle multiple articulations', () => {
+    it('should handle multiple articulations', () => {
         const el = xmlElement(`<notations><articulations><staccato/><accent/></articulations></notations>`);
         const note = new Note({ step: 'G', octave: 4, alter: 0 }, 1);
-        parseArticulations(el, note);
-        assertEqual(note.accents.length, 2, 'Two accents');
-        assertEqual(note.articulation, 'staccato', 'First found is primary');
+        parser.parseArticulations(el, note);
+        assert.strictEqual(note.accents.length, 2);
+        assert.strictEqual(note.articulation, 'staccato');
     });
 
-    // === Note model tests ===
+    it('should parse snap-pizzicato from technical element', () => {
+        const el = xmlElement(`<notations><technical><snap-pizzicato/></technical></notations>`);
+        const note = new Note({ step: 'D', octave: 3, alter: 0 }, 1);
+        parser.parseArticulations(el, note);
+        assert.strictEqual(note.articulation, 'pizzicato');
+        assert.ok(note.accents.includes('pizzicato'));
+    });
+});
 
-    test('Note: should create with default dynamics and articulation', () => {
+describe('MusicXMLParser parseNoteDynamics', { skip: !JSDOM && 'jsdom not available' }, () => {
+    let parser;
+
+    beforeEach(() => {
+        global.DOMParser = (new JSDOM('')).window.DOMParser;
+        global.Note = Note;
+        global.Rest = Rest;
+        global.Measure = Measure;
+        global.Part = Part;
+        global.Score = Score;
+        parser = new MusicXMLParser();
+    });
+
+    it('should parse note-level dynamic from notations', () => {
+        const el = xmlElement(`<notations><dynamics><ff/></dynamics></notations>`);
+        const note = new Note({ step: 'C', octave: 5, alter: 0 }, 1);
+        parser.parseNoteDynamics(el, note);
+        assert.strictEqual(note.dynamic, 'ff');
+    });
+
+    it('should parse sfz at note level', () => {
+        const el = xmlElement(`<notations><dynamics><sfz/></dynamics></notations>`);
+        const note = new Note({ step: 'G', octave: 4, alter: 0 }, 1);
+        parser.parseNoteDynamics(el, note);
+        assert.strictEqual(note.dynamic, 'sfz');
+    });
+});
+
+describe('MusicXMLParser parseMeasure wedge-stop handling', { skip: !JSDOM && 'jsdom not available' }, () => {
+    let parser;
+
+    beforeEach(() => {
+        global.DOMParser = (new JSDOM('')).window.DOMParser;
+        global.Note = Note;
+        global.Rest = Rest;
+        global.Measure = Measure;
+        global.Part = Part;
+        global.Score = Score;
+        parser = new MusicXMLParser();
+        parser.divisions = 1;
+    });
+
+    it('should not set dynamicDirection to wedge-stop on notes after hairpin end', () => {
+        // Crescendo starts at beat 0, stop at beat 1 (via offset).
+        // All directions are pre-parsed before notes, so offset determines beat position.
+        const xml = `<measure number="1">
+            <attributes><divisions>1</divisions></attributes>
+            <direction><direction-type><wedge type="crescendo"/></direction-type></direction>
+            <direction><direction-type><wedge type="stop"/></direction-type><offset>1</offset></direction>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration><type>quarter</type></note>
+            <note><pitch><step>D</step><octave>4</octave></pitch><duration>1</duration><type>quarter</type></note>
+        </measure>`;
+        const el = xmlElement(xml);
+        const measure = parser.parseMeasure(el, 1);
+
+        // First note at beat 0: sees crescendo (beat 0) but not stop (beat 1)
+        assert.strictEqual(measure.notes[0].dynamicDirection, 'crescendo');
+        // Second note at beat 1: sees crescendo (beat 0) then stop (beat 1) → null
+        assert.strictEqual(measure.notes[1].dynamicDirection, null);
+    });
+
+    it('should apply crescendo direction to notes within hairpin range', () => {
+        const xml = `<measure number="2">
+            <attributes><divisions>1</divisions></attributes>
+            <direction><direction-type><wedge type="crescendo"/></direction-type></direction>
+            <note><pitch><step>E</step><octave>4</octave></pitch><duration>1</duration><type>quarter</type></note>
+            <note><pitch><step>F</step><octave>4</octave></pitch><duration>1</duration><type>quarter</type></note>
+        </measure>`;
+        const el = xmlElement(xml);
+        const measure = parser.parseMeasure(el, 2);
+
+        assert.strictEqual(measure.notes[0].dynamicDirection, 'crescendo');
+        assert.strictEqual(measure.notes[1].dynamicDirection, 'crescendo');
+    });
+});
+
+describe('Note model properties', () => {
+    it('should create with default dynamics and articulation', () => {
         const note = new Note({ step: 'C', octave: 4, alter: 0 }, 1, { measure: 1, beat: 0 });
-        assertEqual(note.dynamic, 'mf', 'Default dynamic is mf');
-        assertEqual(note.articulation, null, 'Default articulation is null');
-        assertEqual(note.dynamicDirection, null, 'Default dynamicDirection is null');
-        assertTrue(Array.isArray(note.accents), 'Accents is array');
-        assertEqual(note.accents.length, 0, 'Accents is empty');
+        assert.strictEqual(note.dynamic, 'mf');
+        assert.strictEqual(note.articulation, null);
+        assert.strictEqual(note.dynamicDirection, null);
+        assert.ok(Array.isArray(note.accents));
+        assert.strictEqual(note.accents.length, 0);
     });
 
-    test('Note: should support setting dynamic and direction', () => {
+    it('should support setting dynamic and direction', () => {
         const note = new Note({ step: 'A', octave: 4, alter: 0 }, 1);
         note.dynamic = 'ff';
         note.dynamicDirection = 'crescendo';
-        assertEqual(note.dynamic, 'ff', 'Dynamic set to ff');
-        assertEqual(note.dynamicDirection, 'crescendo', 'Direction set');
+        assert.strictEqual(note.dynamic, 'ff');
+        assert.strictEqual(note.dynamicDirection, 'crescendo');
     });
+});
 
-    // === Measure model tests ===
-
-    test('Measure: should create with dynamics and articulations arrays', () => {
+describe('Measure model properties', () => {
+    it('should create with dynamics and articulations arrays', () => {
         const measure = new Measure(1);
-        assertTrue(Array.isArray(measure.dynamics), 'Dynamics is array');
-        assertTrue(Array.isArray(measure.articulations), 'Articulations is array');
+        assert.ok(Array.isArray(measure.dynamics));
+        assert.ok(Array.isArray(measure.articulations));
     });
-
-    console.log(`\n${passed} passed, ${failed} failed${skipped ? `, ${skipped} skipped` : ''}`);
-    if (failed > 0) process.exit(1);
-}
-
-runTests();
+});
