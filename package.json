@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "test": "NODE_ENV=test node --test tests/session-logger.test.js tests/practice-loop.test.js tests/pitch-detector.test.js tests/llm-service.test.js tests/ai-summary-generator.test.js tests/omr-client.test.js tests/bluetooth-hid.test.js tests/teacher-service.test.js tests/studio-dashboard.test.js tests/teacher-routes.test.js tests/auth-service.test.js tests/auth-routes.test.js tests/cloud-sync-service.test.js tests/pdf-export-service.test.js tests/sync-routes.test.js tests/teacher-report.test.js && node tests/scale-engine.test.js && npx jest tests/tuner.test.js"
+    "test": "NODE_ENV=test node --test tests/session-logger.test.js tests/practice-loop.test.js tests/pitch-detector.test.js tests/llm-service.test.js tests/ai-summary-generator.test.js tests/omr-client.test.js tests/bluetooth-hid.test.js tests/teacher-service.test.js tests/studio-dashboard.test.js tests/teacher-routes.test.js tests/auth-service.test.js tests/auth-routes.test.js tests/cloud-sync-service.test.js tests/pdf-export-service.test.js tests/sync-routes.test.js tests/teacher-report.test.js tests/video-snippet-routes.test.js && node tests/scale-engine.test.js && npx jest tests/tuner.test.js"
   },
   "keywords": [
     "express",

@@ -13,6 +13,10 @@ const router = express.Router();
 const students = new Map();
 const practiceLogs = new Map();
 
+// Video snippets storage (in-memory for demo; would use cloud storage in production)
+const videoSnippets = new Map();
+const REACTION_AUTO_DELETE_DAYS = 7;
+
 let nextId = 1;
 function generateId() {
     return 'srv-' + (nextId++) + '-' + Date.now().toString(36);
@@ -260,6 +264,181 @@ router.get('/metrics', (req, res) => {
         studentsActiveThisWeek,
         needsAttention
     });
+});
+
+// ============================================
+// Video Snippet Routes (Office Hours Drop)
+// ============================================
+
+/**
+ * Generate a unique ID for video snippets
+ */
+function generateSnippetId() {
+    return 'vid-' + Date.now().toString(36) + '-' + Math.random().toString(36).substr(2, 9);
+}
+
+/**
+ * Get snippets for a student (inbox view)
+ * GET /api/teacher/snippets/:studentId
+ */
+router.get('/snippets/:studentId', (req, res) => {
+    const { studentId } = req.params;
+
+    if (!students.has(studentId)) {
+        return res.status(404).json({ error: 'Student not found' });
+    }
+
+    const snippets = Array.from(videoSnippets.values())
+        .filter(s => s.studentId === studentId)
+        .sort((a, b) => b.submittedAt - a.submittedAt);
+
+    res.json({ snippets, total: snippets.length });
+});
+
+/**
+ * Get all pending snippets (teacher inbox)
+ * GET /api/teacher/snippets
+ */
+router.get('/snippets', (req, res) => {
+    const allSnippets = Array.from(videoSnippets.values())
+        .sort((a, b) => b.submittedAt - a.submittedAt);
+
+    // Group by student for teacher view
+    const snippetsByStudent = {};
+    for (const snippet of allSnippets) {
+        if (!snippetsByStudent[snippet.studentId]) {
+            snippetsByStudent[snippet.studentId] = {
+                studentId: snippet.studentId,
+                studentName: snippet.studentName || 'Unknown',
+                snippets: []
+            };
+        }
+        snippetsByStudent[snippet.studentId].snippets.push(snippet);
+    }
+
+    res.json({
+        snippets: allSnippets,
+        byStudent: Object.values(snippetsByStudent),
+        total: allSnippets.length
+    });
+});
+
+/**
+ * Submit a new video snippet (from student)
+ * POST /api/teacher/snippets
+ */
+router.post('/snippets', (req, res) => {
+    const { studentId, studentName, videoData, thumbnail, duration, title, notes } = req.body;
+
+    // Validate required fields
+    if (!studentId) {
+        return res.status(400).json({ error: 'Student ID is required' });
+    }
+
+    if (!videoData) {
+        return res.status(400).json({ error: 'Video data is required' });
+    }
+
+    // Validate video duration (max 15 seconds for office hours drop)
+    const validatedDuration = typeof duration === 'number' && duration > 0 ? Math.min(duration, 15) : 15;
+
+    const snippet = {
+        id: generateSnippetId(),
+        studentId: sanitizeString(studentId, 100),
+        studentName: sanitizeString(studentName || 'Anonymous', 200),
+        videoData: videoData, // Base64 encoded video
+        thumbnail: thumbnail || null,
+        duration: validatedDuration,
+        title: sanitizeString(title || 'Untitled Recording', 200),
+        notes: sanitizeString(notes || '', 1000),
+        submittedAt: Date.now(),
+        status: 'pending', // pending, reviewed, replied
+        teacherReply: null,
+        replyType: null, // text, voice
+        replyAt: null,
+        expiresAt: Date.now() + (REACTION_AUTO_DELETE_DAYS * 24 * 60 * 60 * 1000)
+    };
+
+    videoSnippets.set(snippet.id, snippet);
+    res.status(201).json(snippet);
+});
+
+/**
+ * Add teacher reply to a snippet
+ * POST /api/teacher/snippets/:id/reply
+ */
+router.post('/snippets/:id/reply', (req, res) => {
+    const { id } = req.params;
+    const { replyText, replyVoiceData, replyType } = req.body;
+
+    const snippet = videoSnippets.get(id);
+    if (!snippet) {
+        return res.status(404).json({ error: 'Snippet not found' });
+    }
+
+    // Validate reply type
+    const validReplyType = ['text', 'voice'].includes(replyType) ? replyType : 'text';
+
+    if (validReplyType === 'text') {
+        snippet.teacherReply = sanitizeString(replyText || '', 2000);
+    } else if (validReplyType === 'voice') {
+        snippet.teacherReply = replyVoiceData; // Base64 audio data
+    }
+
+    snippet.replyType = validReplyType;
+    snippet.replyAt = Date.now();
+    snippet.status = 'replied';
+
+    videoSnippets.set(id, snippet);
+    res.json(snippet);
+});
+
+/**
+ * Delete a snippet
+ * DELETE /api/teacher/snippets/:id
+ */
+router.delete('/snippets/:id', (req, res) => {
+    const { id } = req.params;
+
+    if (!videoSnippets.has(id)) {
+        return res.status(404).json({ error: 'Snippet not found' });
+    }
+
+    videoSnippets.delete(id);
+    res.status(204).end();
+});
+
+/**
+ * Clean up expired snippets (auto-delete after 7 days)
+ * POST /api/teacher/snippets/cleanup
+ */
+router.post('/snippets/cleanup', (req, res) => {
+    const now = Date.now();
+    let deletedCount = 0;
+
+    for (const [id, snippet] of videoSnippets.entries()) {
+        if (snippet.expiresAt && snippet.expiresAt < now) {
+            videoSnippets.delete(id);
+            deletedCount++;
+        }
+    }
+
+    res.json({ deletedCount, remaining: videoSnippets.size });
+});
+
+/**
+ * Get a single snippet by ID
+ * GET /api/teacher/snippets/:id
+ */
+router.get('/snippet/:id', (req, res) => {
+    const { id } = req.params;
+
+    const snippet = videoSnippets.get(id);
+    if (!snippet) {
+        return res.status(404).json({ error: 'Snippet not found' });
+    }
+
+    res.json(snippet);
 });
 
 module.exports = router;

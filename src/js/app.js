@@ -82,6 +82,9 @@ class ConcertmasterApp {
             // Initialize teacher mode if enabled
             this.initTeacherMode();
 
+            // Initialize video snippet feature
+            this.initVideoSnippets();
+
             console.log('Concertmaster initialized successfully');
         } catch (error) {
             console.error('Initialization error:', error);
@@ -469,6 +472,210 @@ class ConcertmasterApp {
             await this.studioDashboard.init();
         } else if (enabled && this.studioDashboard) {
             await this.studioDashboard.refresh();
+        }
+    }
+
+    // ============================================
+    // Video Snippet / Office Hours Drop
+    // ============================================
+
+    initVideoSnippets() {
+        // Video snippet button in practice view
+        const videoSnippetBtn = document.getElementById('video-snippet-btn');
+        const videoSnippetModal = document.getElementById('video-snippet-modal');
+        const videoSnippetClose = document.getElementById('video-snippet-close');
+        const cancelVideoBtn = document.getElementById('cancel-video-btn');
+        const submitVideoBtn = document.getElementById('submit-video-btn');
+        const startRecordBtn = document.getElementById('start-record-btn');
+        const videoPreview = document.getElementById('video-preview');
+        const videoOverlay = document.getElementById('video-overlay');
+        const recordingIndicator = document.getElementById('recording-indicator');
+        const recordingTime = document.getElementById('recording-time');
+        const videoForm = document.getElementById('video-form');
+        const snippetTitle = document.getElementById('snippet-title');
+        const snippetNotes = document.getElementById('snippet-notes');
+
+        // Teacher inbox elements
+        const teacherInboxModal = document.getElementById('teacher-inbox-modal');
+        const inboxClose = document.getElementById('inbox-close');
+        const inboxTabs = document.querySelectorAll('.inbox-tab');
+
+        // Video reply elements
+        const videoReplyModal = document.getElementById('video-reply-modal');
+        const replyClose = document.getElementById('reply-close');
+        const cancelReplyBtn = document.getElementById('cancel-reply-btn');
+        const sendReplyBtn = document.getElementById('send-reply-btn');
+        const replyTypeBtns = document.querySelectorAll('.reply-type-btn');
+        const replyText = document.getElementById('reply-text');
+        const voiceReplyRecorder = document.getElementById('voice-reply-recorder');
+        const voiceRecordBtn = document.getElementById('voice-record-btn');
+
+        let currentRecording = null;
+        let isRecording = false;
+
+        // Open video snippet modal
+        if (videoSnippetBtn && videoSnippetModal) {
+            videoSnippetBtn.addEventListener('click', async () => {
+                this.openModal(videoSnippetModal);
+                await this.startVideoPreview(videoPreview, videoOverlay, startRecordBtn);
+            });
+        }
+
+        // Close video snippet modal
+        const closeVideoModal = () => {
+            this.closeModal(videoSnippetModal);
+            this.stopVideoPreview();
+            resetVideoRecorder();
+        };
+
+        if (videoSnippetClose) videoSnippetClose.addEventListener('click', closeVideoModal);
+        if (cancelVideoBtn) cancelVideoBtn.addEventListener('click', closeVideoModal);
+
+        // Start recording
+        if (startRecordBtn) {
+            startRecordBtn.addEventListener('click', async () => {
+                if (!window.videoSnippetService) {
+                    this.showToast('Video service not available', 'error');
+                    return;
+                }
+
+                try {
+                    await window.videoSnippetService.requestPermissions();
+                    window.videoSnippetService.startRecording(videoPreview);
+                    isRecording = true;
+
+                    videoOverlay.style.display = 'none';
+                    recordingIndicator.style.display = 'flex';
+
+                    // Update time display
+                    window.videoSnippetService.onTimeUpdate = (elapsed, max) => {
+                        recordingTime.textContent = `0:${elapsed.toString().padStart(2, '0')} / 0:${max.toString().padStart(2, '0')}`;
+                    };
+
+                    // Handle recording complete
+                    window.videoSnippetService.onRecordingComplete = (recording) => {
+                        currentRecording = recording;
+                        videoForm.style.display = 'block';
+                        submitVideoBtn.style.display = 'inline-block';
+                    };
+                } catch (error) {
+                    this.showToast('Failed to start recording: ' + error.message, 'error');
+                }
+            });
+        }
+
+        // Submit video
+        if (submitVideoBtn) {
+            submitVideoBtn.addEventListener('click', async () => {
+                if (!currentRecording) return;
+
+                try {
+                    const studentId = localStorage.getItem('user_id') || 'student-1';
+                    const studentName = localStorage.getItem('user_name') || 'Student';
+
+                    await window.videoSnippetService.submitSnippet({
+                        studentId,
+                        studentName,
+                        videoData: currentRecording.videoData,
+                        thumbnail: currentRecording.thumbnail,
+                        duration: currentRecording.duration,
+                        title: snippetTitle.value,
+                        notes: snippetNotes.value
+                    });
+
+                    this.showToast('Video sent to teacher!', 'success');
+                    closeVideoModal();
+                } catch (error) {
+                    this.showToast('Failed to send video: ' + error.message, 'error');
+                }
+            });
+        }
+
+        // Reset video recorder
+        const resetVideoRecorder = () => {
+            currentRecording = null;
+            isRecording = false;
+            videoOverlay.style.display = 'flex';
+            recordingIndicator.style.display = 'none';
+            videoForm.style.display = 'none';
+            submitVideoBtn.style.display = 'none';
+            snippetTitle.value = '';
+            snippetNotes.value = '';
+            recordingTime.textContent = '0:00 / 0:15';
+        };
+
+        // Teacher inbox tab switching
+        inboxTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                inboxTabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+
+                const tabName = tab.dataset.tab;
+                document.getElementById('inbox-received').style.display = tabName === 'received' ? 'block' : 'none';
+                document.getElementById('inbox-sent').style.display = tabName === 'sent' ? 'block' : 'none';
+            });
+        });
+
+        // Close inbox modal
+        if (inboxClose) {
+            inboxClose.addEventListener('click', () => this.closeModal(teacherInboxModal));
+        }
+
+        // Close reply modal
+        if (replyClose) {
+            replyClose.addEventListener('click', () => this.closeModal(videoReplyModal));
+        }
+        if (cancelReplyBtn) {
+            cancelReplyBtn.addEventListener('click', () => this.closeModal(videoReplyModal));
+        }
+
+        // Reply type switching
+        replyTypeBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                replyTypeBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                const type = btn.dataset.type;
+                if (type === 'text') {
+                    replyText.style.display = 'block';
+                    voiceReplyRecorder.style.display = 'none';
+                } else {
+                    replyText.style.display = 'none';
+                    voiceReplyRecorder.style.display = 'flex';
+                }
+            });
+        });
+
+        // Send reply
+        if (sendReplyBtn) {
+            sendReplyBtn.addEventListener('click', async () => {
+                // TODO: Implement reply submission
+                this.showToast('Reply feature coming soon!', 'info');
+            });
+        }
+    }
+
+    async startVideoPreview(videoElement, overlay, startBtn) {
+        if (!window.videoSnippetService) return;
+
+        try {
+            await window.videoSnippetService.requestPermissions();
+            const stream = window.videoSnippetService.getStream();
+            if (videoElement && stream) {
+                videoElement.srcObject = stream;
+                videoElement.play();
+            }
+            if (overlay && startBtn) {
+                overlay.style.display = 'flex';
+            }
+        } catch (error) {
+            this.showToast('Camera access denied', 'error');
+        }
+    }
+
+    stopVideoPreview() {
+        if (window.videoSnippetService) {
+            window.videoSnippetService.stopPreview();
         }
     }
 
