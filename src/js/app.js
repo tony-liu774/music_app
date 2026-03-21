@@ -243,7 +243,6 @@ class ConcertmasterApp {
         // Filter chips - Instrument
         document.getElementById('instrument-chips')?.addEventListener('click', (e) => {
             if (e.target.classList.contains('chip')) {
-                // Update active state
                 document.querySelectorAll('#instrument-chips .chip').forEach(c => c.classList.remove('active'));
                 e.target.classList.add('active');
                 this.applyFilters();
@@ -253,7 +252,6 @@ class ConcertmasterApp {
         // Filter chips - Difficulty
         document.getElementById('difficulty-chips')?.addEventListener('click', (e) => {
             if (e.target.classList.contains('chip')) {
-                // Update active state
                 document.querySelectorAll('#difficulty-chips .chip').forEach(c => c.classList.remove('active'));
                 e.target.classList.add('active');
                 this.applyFilters();
@@ -274,8 +272,6 @@ class ConcertmasterApp {
      */
     async globalSearch(query) {
         const searchLocalOnly = document.getElementById('search-local-only')?.checked ?? true;
-
-        // First filter local scores
         const localResults = this.filterLibrary(query);
 
         if (searchLocalOnly) {
@@ -283,11 +279,9 @@ class ConcertmasterApp {
             return;
         }
 
-        // If not local only, also search IMSLP
         if (query && query.trim().length > 0) {
             try {
                 const imslpResults = await this.searchIMSLP(query);
-                // Combine results (local first, then IMSLP)
                 const allResults = [...localResults, ...imslpResults.map(item => ({
                     ...item,
                     isIMSLP: true
@@ -295,7 +289,6 @@ class ConcertmasterApp {
                 this.renderLibrary(allResults);
             } catch (error) {
                 console.error('IMSLP search error:', error);
-                // Show local results if IMSLP fails
                 this.renderLibrary(localResults);
             }
         } else {
@@ -334,7 +327,6 @@ class ConcertmasterApp {
         const query = document.getElementById('library-search-input').value;
         let results = this.scoreLibrary.scores;
 
-        // Apply text search
         if (query) {
             results = this.scoreLibrary.search(query);
         }
@@ -353,9 +345,7 @@ class ConcertmasterApp {
         const difficultyFilter = activeDifficulty?.dataset.value || 'all';
         if (difficultyFilter !== 'all') {
             const diffLevel = parseInt(difficultyFilter);
-            results = results.filter(score =>
-                score.difficulty === diffLevel
-            );
+            results = results.filter(score => score.difficulty === diffLevel);
         }
 
         // Apply composer filter
@@ -379,15 +369,196 @@ class ConcertmasterApp {
         const select = document.getElementById('composer-filter');
         if (!select) return;
 
-        // Keep the first "All Composers" option
         select.innerHTML = '<option value="all">All Composers</option>';
-
         composers.forEach(composer => {
             const option = document.createElement('option');
             option.value = composer;
             option.textContent = composer;
             select.appendChild(option);
         });
+    }
+
+    filterLibrary(query) {
+        return this.scoreLibrary.search(query);
+    }
+
+    /**
+     * Generate difficulty stars HTML
+     */
+    generateDifficultyStars(difficulty = 3) {
+        const stars = [];
+        for (let i = 1; i <= 5; i++) {
+            stars.push(`<span class="${i <= difficulty ? 'star-filled' : 'star-empty'}">★</span>`);
+        }
+        return stars.join('');
+    }
+
+    /**
+     * Format last practiced date
+     */
+    formatLastPracticed(dateString) {
+        if (!dateString) return 'Never practiced';
+        const date = new Date(dateString);
+        const now = new Date();
+        const diff = now - date;
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+        if (days === 0) return 'Today';
+        if (days === 1) return 'Yesterday';
+        if (days < 7) return `${days} days ago`;
+        if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+        return date.toLocaleDateString();
+    }
+
+    /**
+     * Render library - accepts optional scores array
+     */
+    renderLibrary(scores = null) {
+        const grid = document.getElementById('library-grid');
+        if (!grid) return;
+
+        const displayScores = scores !== null ? scores : this.scoreLibrary.scores;
+
+        if (displayScores.length === 0) {
+            grid.innerHTML = `
+                <div class="empty-state">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M9 18V5l12-2v13"/>
+                        <circle cx="6" cy="18" r="3"/>
+                        <circle cx="18" cy="16" r="3"/>
+                    </svg>
+                    <h3>No scores found</h3>
+                    <p>${scores !== null ? 'Try adjusting your filters' : 'Import sheet music to get started with practice'}</p>
+                </div>
+            `;
+            return;
+        }
+
+        grid.innerHTML = displayScores.map((score, index) => `
+            <div class="library-card ${score.isIMSLP ? 'imslp-card' : ''}" data-id="${score.id}" data-index="${index}" tabindex="0" role="option">
+                <div class="library-card-thumbnail">
+                    ${score.thumbnail ? `<img data-src="${score.thumbnail}" alt="" class="lazy-thumbnail" loading="lazy">` : `
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                    `}
+                    ${score.isIMSLP ? '<span class="imslp-badge">IMSLP</span>' : ''}
+                </div>
+                <h3 class="library-card-title">${score.title}</h3>
+                <p class="library-card-composer">${score.composer}</p>
+                <div class="library-card-meta">
+                    <span class="instrument-badge">${score.instrument || 'Violin'}</span>
+                    <span class="difficulty-stars">${this.generateDifficultyStars(score.difficulty)}</span>
+                    <button class="share-btn" data-id="${score.id}" title="Share score" aria-label="Share ${score.title}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="18" cy="5" r="3"/>
+                            <circle cx="6" cy="12" r="3"/>
+                            <circle cx="18" cy="19" r="3"/>
+                            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="library-card-stats">
+                    <span class="practice-count">${score.practiceCount || 0} practices</span>
+                    <span class="last-practiced">${this.formatLastPracticed(score.lastPracticed)}</span>
+                </div>
+            </div>
+        `).join('');
+
+        this.setupLazyLoading();
+
+        grid.querySelectorAll('.library-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                if (e.target.closest('.share-btn')) return;
+                const id = card.dataset.id;
+                const isIMSLP = card.classList.contains('imslp-card');
+                if (isIMSLP) {
+                    this.handleIMSLPCardClick(card, id);
+                } else {
+                    this.selectScore(id);
+                }
+            });
+        });
+
+        grid.querySelectorAll('.share-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const id = btn.dataset.id;
+                this.shareScore(id);
+            });
+        });
+    }
+
+    /**
+     * Handle IMSLP card click
+     */
+    async handleIMSLPCardClick(cardElement, imslpId) {
+        const confirmed = confirm('Add this IMSLP score to your local library?');
+        if (confirmed) {
+            alert('IMSLP download functionality - Score added to library!');
+        }
+    }
+
+    /**
+     * Share a score from the library
+     */
+    async shareScore(id) {
+        const score = this.scoreLibrary.scores.find(s => s.id === id);
+        if (!score) {
+            alert('Score not found');
+            return;
+        }
+
+        const shareData = {
+            title: score.title,
+            composer: score.composer,
+            instrument: score.instrument,
+            difficulty: score.difficulty
+        };
+
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: `${shareData.title} by ${shareData.composer}`,
+                    text: `Check out this sheet music: ${shareData.title}`,
+                    url: window.location.href
+                });
+                return;
+            } catch (err) {
+                console.log('Share cancelled:', err);
+            }
+        }
+
+        const shareText = `${shareData.title} by ${shareData.composer} (${shareData.instrument}, ${shareData.difficulty} stars)`;
+        try {
+            await navigator.clipboard.writeText(shareText);
+            alert('Score info copied to clipboard!');
+        } catch (err) {
+            prompt('Copy this to share:', shareText);
+        }
+    }
+
+    setupLazyLoading() {
+        if ('IntersectionObserver' in window) {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const img = entry.target.querySelector('.lazy-thumbnail');
+                        if (img && img.dataset.src) {
+                            img.src = img.dataset.src;
+                            img.classList.add('loaded');
+                            observer.unobserve(entry.target);
+                        }
+                    }
+                });
+            }, { rootMargin: '50px' });
+
+            document.querySelectorAll('.library-card').forEach(card => {
+                observer.observe(card);
+            });
+        }
     }
 
     setupPracticeControls() {
@@ -760,9 +931,58 @@ class ConcertmasterApp {
         this.renderLibrary();
     }
 
-    /**
-     * Setup lazy loading for thumbnails
-     */
+    renderLibrary() {
+        const grid = document.getElementById('library-grid');
+        if (!grid) return;
+
+        const scores = this.scoreLibrary.scores;
+
+        if (scores.length === 0) {
+            grid.innerHTML = `
+                <div class="empty-state">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M9 18V5l12-2v13"/>
+                        <circle cx="6" cy="18" r="3"/>
+                        <circle cx="18" cy="16" r="3"/>
+                    </svg>
+                    <h3>No scores yet</h3>
+                    <p>Import sheet music to get started with practice</p>
+                </div>
+            `;
+            return;
+        }
+
+        grid.innerHTML = scores.map((score, index) => `
+            <div class="library-card" data-id="${score.id}" data-index="${index}" tabindex="0" role="option">
+                <div class="library-card-thumbnail">
+                    ${score.thumbnail ? `<img data-src="${score.thumbnail}" alt="" class="lazy-thumbnail" loading="lazy">` : `
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                    `}
+                </div>
+                <h3 class="library-card-title">${score.title}</h3>
+                <p class="library-card-composer">${score.composer}</p>
+                <div class="library-card-meta">
+                    <span class="instrument-badge">${score.instrument || 'Violin'}</span>
+                    <span>${this.formatDate(score.addedAt)}</span>
+                </div>
+            </div>
+        `).join('');
+
+        // Setup lazy loading with IntersectionObserver
+        this.setupLazyLoading();
+
+        // Add click handlers
+        grid.querySelectorAll('.library-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const id = card.dataset.id;
+                this.selectScore(id);
+            });
+        });
+    }
+
     setupLazyLoading() {
         // Use IntersectionObserver for lazy loading thumbnails
         if ('IntersectionObserver' in window) {
@@ -792,188 +1012,32 @@ class ConcertmasterApp {
     }
 
     filterLibrary(query) {
-        // Return filtered results without rendering
-        return this.scoreLibrary.search(query);
-    }
-
-    /**
-     * Generate difficulty stars HTML
-     */
-    generateDifficultyStars(difficulty = 3) {
-        const stars = [];
-        for (let i = 1; i <= 5; i++) {
-            stars.push(`<span class="${i <= difficulty ? 'star-filled' : 'star-empty'}">★</span>`);
-        }
-        return stars.join('');
-    }
-
-    /**
-     * Format last practiced date
-     */
-    formatLastPracticed(dateString) {
-        if (!dateString) return 'Never practiced';
-        const date = new Date(dateString);
-        const now = new Date();
-        const diff = now - date;
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-
-        if (days === 0) return 'Today';
-        if (days === 1) return 'Yesterday';
-        if (days < 7) return `${days} days ago`;
-        if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
-        return date.toLocaleDateString();
-    }
-
-    renderLibraryFiltered(scores) {
-        // Re-render with filtered results (same as renderLibrary)
-        this.renderLibrary(scores);
-    }
-
-    /**
-     * Render library - accepts optional scores array
-     */
-    renderLibrary(scores = null) {
+        const results = this.scoreLibrary.search(query);
         const grid = document.getElementById('library-grid');
-        if (!grid) return;
 
-        // Use provided scores or fall back to all scores
-        const displayScores = scores !== null ? scores : this.scoreLibrary.scores;
-
-        if (displayScores.length === 0) {
+        if (results.length === 0) {
             grid.innerHTML = `
                 <div class="empty-state">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M9 18V5l12-2v13"/>
-                        <circle cx="6" cy="18" r="3"/>
-                        <circle cx="18" cy="16" r="3"/>
-                    </svg>
-                    <h3>No scores found</h3>
-                    <p>${scores !== null ? 'Try adjusting your filters' : 'Import sheet music to get started with practice'}</p>
+                    <p>No scores match your search</p>
                 </div>
             `;
             return;
         }
 
-        grid.innerHTML = displayScores.map((score, index) => `
-            <div class="library-card ${score.isIMSLP ? 'imslp-card' : ''}" data-id="${score.id}" data-index="${index}" tabindex="0" role="option">
+        // Re-render with filtered results
+        this.renderLibraryFiltered(results);
+    }
+
+    renderLibraryFiltered(scores) {
+        const grid = document.getElementById('library-grid');
+
+        grid.innerHTML = scores.map(score => `
+            <div class="library-card" data-id="${score.id}">
                 <div class="library-card-thumbnail">
-                    ${score.thumbnail ? `<img data-src="${score.thumbnail}" alt="" class="lazy-thumbnail" loading="lazy">` : `
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                         <polyline points="14 2 14 8 20 8"/>
                     </svg>
-                    `}
-                    ${score.isIMSLP ? '<span class="imslp-badge">IMSLP</span>' : ''}
-                </div>
-                <h3 class="library-card-title">${score.title}</h3>
-                <p class="library-card-composer">${score.composer}</p>
-                <div class="library-card-meta">
-                    <span class="instrument-badge">${score.instrument || 'Violin'}</span>
-                    <span class="difficulty-stars">${this.generateDifficultyStars(score.difficulty)}</span>
-                    <button class="share-btn" data-id="${score.id}" title="Share score" aria-label="Share ${score.title}">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="18" cy="5" r="3"/>
-                            <circle cx="6" cy="12" r="3"/>
-                            <circle cx="18" cy="19" r="3"/>
-                            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-                            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-                        </svg>
-                    </button>
-                </div>
-                <div class="library-card-stats">
-                    <span class="practice-count">${score.practiceCount || 0} practices</span>
-                    <span class="last-practiced">${this.formatLastPracticed(score.lastPracticed)}</span>
-                </div>
-            </div>
-        `).join('');
-
-        // Setup lazy loading with IntersectionObserver
-        this.setupLazyLoading();
-
-        // Add click handlers
-        grid.querySelectorAll('.library-card').forEach(card => {
-            card.addEventListener('click', (e) => {
-                // Don't trigger card click if share button was clicked
-                if (e.target.closest('.share-btn')) return;
-
-                const id = card.dataset.id;
-                const isIMSLP = card.classList.contains('imslp-card');
-                if (isIMSLP) {
-                    this.handleIMSLPCardClick(card, id);
-                } else {
-                    this.selectScore(id);
-                }
-            });
-        });
-
-        // Add share button handlers
-        grid.querySelectorAll('.share-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const id = btn.dataset.id;
-                this.shareScore(id);
-            });
-        });
-    }
-
-    /**
-     * Share a score from the library
-     */
-    async shareScore(id) {
-        const score = this.scoreLibrary.scores.find(s => s.id === id);
-        if (!score) {
-            alert('Score not found');
-            return;
-        }
-
-        // Create shareable data
-        const shareData = {
-            title: score.title,
-            composer: score.composer,
-            instrument: score.instrument,
-            difficulty: score.difficulty,
-            tags: score.tags || []
-        };
-
-        // Try using Web Share API if available
-        if (navigator.share) {
-            try {
-                await navigator.share({
-                    title: `${shareData.title} by ${shareData.composer}`,
-                    text: `Check out this sheet music: ${shareData.title}`,
-                    url: window.location.href
-                });
-                return;
-            } catch (err) {
-                // User cancelled or error
-                console.log('Share cancelled:', err);
-            }
-        }
-
-        // Fallback: Copy to clipboard
-        const shareText = `${shareData.title} by ${shareData.composer} (${shareData.instrument}, ${shareData.difficulty} stars)`;
-        try {
-            await navigator.clipboard.writeText(shareText);
-            alert('Score info copied to clipboard!');
-        } catch (err) {
-            // Fallback for older browsers
-            prompt('Copy this to share:', shareText);
-        }
-    }
-
-    /**
-     * Handle IMSLP card click - offer to download/add to library
-     */
-    async handleIMSLPCardClick(cardElement, imslpId) {
-        // Find the IMSLP result data
-        const imslpInput = document.getElementById('imslp-search-input');
-        // For now, prompt user to add to library
-        const confirmed = confirm('Add this IMSLP score to your local library?');
-        if (confirmed) {
-            // Would download from IMSLP and add to library
-            alert('IMSLP download functionality - Score added to library!');
-        }
-    }
                 </div>
                 <h3 class="library-card-title">${score.title}</h3>
                 <p class="library-card-composer">${score.composer}</p>
