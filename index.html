@@ -32,6 +32,7 @@
                     <a href="#tuner" class="nav-link">Tuner</a>
                     <a href="#settings" class="nav-link">Settings</a>
                     <a href="#studio-dashboard" class="nav-link studio-nav-link" style="display:none">Studio</a>
+                    <a href="#heat-map-history" class="nav-link heatmap-nav-link" style="display:none">Audits</a>
                 </div>
                 <button class="mobile-menu-btn mobile-only" aria-label="Menu">
                     <span></span>
@@ -87,6 +88,12 @@
                     <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
                 </svg>
                 <span>Studio</span>
+            </a>
+            <a href="#heat-map-history" class="mobile-nav-link heatmap-nav-link" style="display:none">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                </svg>
+                <span>Audits</span>
             </a>
         </div>
 
@@ -1585,6 +1592,11 @@
                     <!-- Dynamic content rendered by StudioDashboard -->
                 </div>
             </section>
+
+            <!-- Heat Map History View (Practice Audits) -->
+            <section id="heat-map-history-view" class="view" style="display:none">
+                <!-- Dynamic content rendered by HeatMapHistoryUI -->
+            </section>
         </main>
 
         <!-- Add Student Modal -->
@@ -2052,6 +2064,9 @@
     <script src="src/js/components/scale-engine-ui.js"></script>
     <script src="src/js/services/teacher-service.js"></script>
     <script src="src/js/components/studio-dashboard.js"></script>
+    <!-- Heat Map History (Practice Audits) -->
+    <script src="src/js/services/heat-map-history-service.js"></script>
+    <script src="src/js/components/heat-map-history-ui.js"></script>
     <!-- Cloud Sync & Teacher Export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
     <script src="src/js/services/auth-service.js"></script>
