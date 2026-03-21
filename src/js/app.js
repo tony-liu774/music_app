@@ -1445,28 +1445,57 @@ class ConcertmasterApp {
         if (!this.sessionData || !this.sessionData.notes || this.sessionData.notes.length === 0) return;
 
         // Convert session notes to deviation format for heat map
+        // Classify each error based on whether it's a pitch or rhythm issue
         const deviations = this.sessionData.notes
-            .filter(n => n.measure && (n.accuracy < 100 || !n.matched))
-            .map(n => ({
-                measure: n.measure,
-                type: n.rhythmScore < 100 ? 'pitch' : 'pitch', // Simplified - could add rhythm detection
-                deviation_cents: 100 - n.accuracy,
-                timestamp: n.timestamp
-            }));
+            .filter(n => n.measure)
+            .map(n => {
+                // Determine error type: pitch error (accuracy) vs rhythm error (timing)
+                // accuracy < 100 means pitch deviation, rhythmScore < 100 means timing issue
+                const isPitchError = n.accuracy !== undefined && n.accuracy < 100;
+                const isRhythmError = n.rhythmScore !== undefined && n.rhythmScore < 100;
+
+                // Prioritize pitch errors if both are present
+                let type = null;
+                if (isPitchError && isRhythmError) {
+                    // If both have issues, classify based on which is worse
+                    type = n.accuracy < n.rhythmScore ? 'pitch' : 'rhythm';
+                } else if (isPitchError) {
+                    type = 'pitch';
+                } else if (isRhythmError) {
+                    type = 'rhythm';
+                }
+
+                if (!type) return null;
+
+                return {
+                    measure: n.measure,
+                    type: type,
+                    deviation_cents: type === 'pitch' ? (100 - (n.accuracy || 0)) : 0,
+                    deviation_ms: type === 'rhythm' ? (100 - (n.rhythmScore || 0)) * 10 : 0,
+                    timestamp: n.timestamp
+                };
+            })
+            .filter(Boolean);
+
+        // Count deviations by type
+        const pitchDeviations = deviations.filter(d => d.type === 'pitch');
+        const rhythmDeviations = deviations.filter(d => d.type === 'rhythm');
 
         const sessionData = {
             scoreId: this.sessionData.scoreId,
             pieceName: this.currentScore?.title || '',
             duration_ms: this.sessionData.startTime ? Date.now() - this.sessionData.startTime : 0,
             total_deviations: deviations.length,
-            pitch_deviations: deviations.length,
-            rhythm_deviations: 0,
+            pitch_deviations: pitchDeviations.length,
+            rhythm_deviations: rhythmDeviations.length,
             intonation_deviations: 0,
             deviations: deviations,
-            average_pitch_deviation_cents: deviations.length > 0
-                ? deviations.reduce((sum, d) => sum + Math.abs(d.deviation_cents || 0), 0) / deviations.length
+            average_pitch_deviation_cents: pitchDeviations.length > 0
+                ? pitchDeviations.reduce((sum, d) => sum + Math.abs(d.deviation_cents || 0), 0) / pitchDeviations.length
                 : 0,
-            average_rhythm_deviation_ms: 0,
+            average_rhythm_deviation_ms: rhythmDeviations.length > 0
+                ? rhythmDeviations.reduce((sum, d) => sum + Math.abs(d.deviation_ms || 0), 0) / rhythmDeviations.length
+                : 0,
             problem_measures: this._extractProblemMeasures(deviations)
         };
 

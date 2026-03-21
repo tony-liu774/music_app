@@ -81,6 +81,17 @@ class HeatMapHistoryService {
     async savePracticeSession(studentId, sessionData) {
         if (!this.db) throw new Error('Database not initialized');
 
+        // Validate inputs
+        if (!studentId || typeof studentId !== 'string') {
+            throw new Error('Invalid studentId: must be a non-empty string');
+        }
+        if (studentId.length > 100) {
+            throw new Error('Invalid studentId: too long');
+        }
+        if (!sessionData || typeof sessionData !== 'object') {
+            throw new Error('Invalid sessionData: must be an object');
+        }
+
         const session = {
             id: typeof crypto !== 'undefined' && crypto.randomUUID
                 ? crypto.randomUUID()
@@ -142,17 +153,23 @@ class HeatMapHistoryService {
                 measures[measure].rhythmErrors++;
                 measures[measure].totalNotes++;
             } else if (dev.type === 'intonation') {
+                // Intonation errors track transition quality, not note accuracy
+                // They're tracked separately but don't affect note count
                 measures[measure].intonationErrors++;
             }
         }
 
         // Calculate accuracy score per measure
+        // Note: Intonation errors are tracked separately but not included in
+        // totalErrors for accuracy calculation since they represent note
+        // transitions, not individual note errors
         return Object.values(measures).map(m => ({
             measure: m.measure,
             pitchErrors: m.pitchErrors,
             rhythmErrors: m.rhythmErrors,
             intonationErrors: m.intonationErrors,
-            totalErrors: m.pitchErrors + m.rhythmErrors + m.intonationErrors,
+            // Total errors for accuracy = pitch + rhythm only (intonation is separate)
+            totalErrors: m.pitchErrors + m.rhythmErrors,
             totalNotes: m.totalNotes,
             // Accuracy: 100 - (errors / notes * 100), min 0
             accuracy: m.totalNotes > 0

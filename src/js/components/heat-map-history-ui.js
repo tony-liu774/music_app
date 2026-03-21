@@ -18,6 +18,18 @@ class HeatMapHistoryUI {
     }
 
     /**
+     * Escape HTML entities to prevent XSS attacks
+     * @param {string} str - String to escape
+     * @returns {string} Escaped string safe for HTML insertion
+     */
+    _escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        const div = document.createElement('div');
+        div.textContent = String(str);
+        return div.innerHTML;
+    }
+
+    /**
      * Initialize the component
      */
     async init() {
@@ -27,7 +39,11 @@ class HeatMapHistoryUI {
             this._createContainer();
         }
 
-        await this.heatMapService.init();
+        try {
+            await this.heatMapService.init();
+        } catch (err) {
+            console.error('Failed to initialize heat map service:', err);
+        }
 
         this.bindEvents();
         return this;
@@ -74,6 +90,12 @@ class HeatMapHistoryUI {
      * Load heat map data for a specific student
      */
     async loadStudentHeatMaps(studentId) {
+        // Validate studentId
+        if (!studentId || typeof studentId !== 'string' || studentId.length > 100) {
+            console.warn('Invalid studentId:', studentId);
+            return;
+        }
+
         this.currentStudentId = studentId;
         this.compareWeeks = [];
 
@@ -108,7 +130,7 @@ class HeatMapHistoryUI {
         const content = `
             <div class="section-header">
                 <h1>Practice Audits</h1>
-                <p class="subtitle">${student.name} - ${student.instrument}</p>
+                <p class="subtitle">${this._escapeHtml(student.name)} - ${this._escapeHtml(student.instrument)}</p>
             </div>
 
             ${this._renderControls(heatMaps)}
@@ -286,7 +308,7 @@ class HeatMapHistoryUI {
                     ${heatMap.piecesPracticed.length > 0 ? `
                         <div class="pieces-practiced">
                             <span class="pieces-label">Pieces Practiced:</span>
-                            ${heatMap.piecesPracticed.map(p => `<span class="piece-tag">${p}</span>`).join('')}
+                            ${heatMap.piecesPracticed.map(p => `<span class="piece-tag">${this._escapeHtml(p)}</span>`).join('')}
                         </div>
                     ` : ''}
                 </div>
@@ -431,7 +453,7 @@ class HeatMapHistoryUI {
                     ${weekSessions.map(s => `
                         <div class="session-item">
                             <span class="session-date">${new Date(s.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
-                            <span class="session-piece">${s.pieceName || s.scoreId}</span>
+                            <span class="session-piece">${this._escapeHtml(s.pieceName || s.scoreId)}</span>
                             <span class="session-duration">${this.heatMapService.formatPracticeTime(s.durationMs)}</span>
                             <span class="session-errors">${s.totalDeviations} errors</span>
                         </div>
