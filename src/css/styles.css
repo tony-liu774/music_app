@@ -1446,6 +1446,84 @@ a:hover {
     background: var(--success) !important;
 }
 
+/* Radar Chart */
+.radar-chart-section {
+    margin-bottom: var(--space-6);
+    text-align: center;
+}
+
+.radar-chart-section h3 {
+    margin-bottom: var(--space-4);
+}
+
+.radar-chart-container {
+    display: flex;
+    justify-content: center;
+    padding: var(--space-4);
+}
+
+.radar-chart {
+    width: 180px;
+    height: 180px;
+}
+
+.radar-circle {
+    fill: none;
+    stroke: var(--border);
+    stroke-width: 1;
+}
+
+.radar-axis {
+    stroke: var(--border);
+    stroke-width: 1;
+}
+
+.radar-polygon {
+    fill: rgba(201, 162, 39, 0.3);
+    stroke: var(--primary);
+    stroke-width: 2;
+}
+
+.radar-label {
+    font-size: 12px;
+    fill: var(--text-secondary);
+    font-weight: 600;
+}
+
+/* Recommendation Section */
+.recommendation-section {
+    text-align: left;
+    margin-bottom: var(--space-6);
+    padding: var(--space-4);
+    background: var(--bg-elevated);
+    border-radius: var(--radius-md);
+    border-left: 3px solid var(--primary);
+}
+
+.recommendation-section h3 {
+    margin-bottom: var(--space-2);
+    font-size: var(--text-base);
+}
+
+.recommendation-text {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+/* Three-axis color coding */
+.breakdown-value.good {
+    color: var(--success);
+}
+
+.breakdown-value.warning {
+    color: var(--warning);
+}
+
+.breakdown-value.poor {
+    color: var(--error);
+}
+
 .heatmap-container .measure-ok {
     background: var(--warning) !important;
 }
@@ -1466,4 +1544,5 @@ a:hover {
 
 .sheet-music-canvas .passed-note {
     opacity: 0.6;
+>>>>>>> origin/main
 }

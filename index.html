@@ -499,13 +499,27 @@
                             <span class="breakdown-value" id="pitch-accuracy">92%</span>
                         </div>
                         <div class="breakdown-item">
-                            <span class="breakdown-label">Timing Accuracy</span>
+                            <span class="breakdown-label">Rhythm Accuracy</span>
                             <span class="breakdown-value" id="timing-accuracy">78%</span>
+                        </div>
+                        <div class="breakdown-item">
+                            <span class="breakdown-label">Intonation</span>
+                            <span class="breakdown-value" id="intonation-accuracy">85%</span>
                         </div>
                         <div class="breakdown-item">
                             <span class="breakdown-label">Duration</span>
                             <span class="breakdown-value" id="session-duration">5:32</span>
                         </div>
+                    </div>
+                    <div class="radar-chart-section">
+                        <h3>Performance Profile</h3>
+                        <div class="radar-chart-container" id="radar-chart-container">
+                            <!-- Radar chart will be rendered here -->
+                        </div>
+                    </div>
+                    <div class="recommendation-section">
+                        <h3>Recommendation</h3>
+                        <p class="recommendation-text" id="axis-recommendation">Focus on pitch accuracy. Try using a tuner to calibrate your instrument.</p>
                     </div>
                     <div class="heatmap-section">
                         <h3>Practice Areas</h3>
@@ -533,6 +547,7 @@
     <script src="src/js/audio/instrument-detector.js"></script>
     <script src="src/js/audio/metronome.js"></script>
     <script src="src/js/analysis/performance-comparator.js"></script>
+    <script src="src/js/analysis/intonation-analyzer.js"></script>
     <script src="src/js/components/sheet-music-renderer.js"></script>
     <script src="src/js/components/heat-map-renderer.js"></script>
     <script src="src/js/components/follow-the-ball.js"></script>
