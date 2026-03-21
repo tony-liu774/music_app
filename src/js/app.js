@@ -29,6 +29,10 @@ class ConcertmasterApp {
         this.heatMapRenderer = null;
         this.followTheBall = null;
 
+        // Onboarding
+        this.onboardingService = null;
+        this.onboardingUI = null;
+
         // DOM Elements
         this.views = {};
         this.toastContainer = null;
@@ -67,6 +71,9 @@ class ConcertmasterApp {
 
             // Initialize accessibility features
             this.initAccessibility();
+
+            // Initialize onboarding
+            this.initOnboarding();
 
             // Initialize audio engine
             await this.initializeAudio();
@@ -123,6 +130,53 @@ class ConcertmasterApp {
         if (heatmapPreview) {
             this.heatMapRenderer = new HeatMapRenderer(heatmapPreview);
             this.heatMapRenderer.init();
+        }
+    }
+
+    /**
+     * Initialize onboarding flow
+     */
+    initOnboarding() {
+        // Create onboarding service
+        this.onboardingService = new OnboardingService();
+
+        // Load saved instrument if available
+        const savedInstrument = localStorage.getItem('selected_instrument');
+        if (savedInstrument && this.onboardingService.instrumentRanges[savedInstrument]) {
+            this.selectedInstrument = savedInstrument;
+        }
+
+        // Create onboarding UI
+        this.onboardingUI = new OnboardingUI(this.onboardingService);
+
+        // Set up completion callback to apply calibration
+        this.onboardingService.setOnComplete((data) => {
+            // Apply instrument calibration to audio engine
+            if (this.audioEngine && data.instrument) {
+                this.audioEngine.setInstrumentCalibration(data.instrument);
+                this.selectedInstrument = data.instrument;
+            }
+
+            // Request microphone access if not already granted
+            if (data.permissions?.microphone) {
+                this.requestMicrophoneAccess();
+            }
+        });
+
+        // Initialize UI
+        this.onboardingUI.init();
+    }
+
+    /**
+     * Request microphone access
+     */
+    async requestMicrophoneAccess() {
+        if (this.audioEngine) {
+            try {
+                await this.audioEngine.requestMicrophoneAccess();
+            } catch (error) {
+                console.warn('Microphone access not granted:', error);
+            }
         }
     }
 
