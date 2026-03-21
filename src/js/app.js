@@ -1984,8 +1984,9 @@ class ConcertmasterApp {
     }
 
     retryScan() {
-        // Clear file and reset DOM to match (user must re-select)
+        // Clear file and reset DOM, then show upload content
         this.clearScannerFile();
+        this.showScannerContent('upload');
     }
 
     scanAnother() {
