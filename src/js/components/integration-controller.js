@@ -10,6 +10,7 @@ class IntegrationController {
         this.followTheBall = null;
         this.rhythmAnalyzer = null;
         this.intonationAnalyzer = null;
+        this.bluetoothHIDListener = null;
 
         // Integration state
         this.lastZoomLevel = 100;
@@ -22,6 +23,7 @@ class IntegrationController {
         this.setupCursorRhythmIntegration();
         this.setupSessionPersistence();
         this.setupPerformanceOptimizations();
+        this.setupBluetoothPedalIntegration();
     }
 
     /**
@@ -70,6 +72,13 @@ class IntegrationController {
     }
 
     /**
+     * Connect Bluetooth HID Listener for pedal integration
+     */
+    setBluetoothHIDListener(listener) {
+        this.bluetoothHIDListener = listener;
+    }
+
+    /**
      * Setup integration between zoom and cursor movement
      * Library zoom works during cursor movement
      */
@@ -92,15 +101,9 @@ class IntegrationController {
         // At higher zoom levels, slow down cursor movement slightly
         // to give player more time to see notes
         const zoomFactor = zoomLevel / 100;
-        const adjustedSpeed = this.followTheBall.speed / Math.sqrt(zoomFactor);
 
         // Temporarily adjust speed (without saving)
         this.cursorSpeedMultiplier = zoomFactor;
-
-        // Apply zoom-aware animation speed
-        if (this.followTheBall.animationFrame) {
-            // Speed will be applied on next animation frame
-        }
     }
 
     /**
@@ -238,11 +241,46 @@ class IntegrationController {
 
         // Add metadata
         session.completedAt = new Date().toISOString();
-        session.duration = session.completedAt - session.startTime;
+        session.duration = Date.now() - session.startTime;
         session.zoomLevel = this.lastZoomLevel;
         session.cursorSpeed = this.followTheBall?.speed || 1;
 
         return session;
+    }
+
+    /**
+     * Setup Bluetooth pedal integration with cursor and loop
+     */
+    setupBluetoothPedalIntegration() {
+        if (!this.bluetoothHIDListener) return;
+
+        // Shared handler for all navigation actions (next/prev measure/page)
+        const handleNavigation = (measure) => {
+            if (this.followTheBall) {
+                const progress = this.bluetoothHIDListener.getMeasureProgress();
+                this.followTheBall.setTargetPosition(progress);
+            }
+            if (this.app && this.app.sheetMusicRenderer) {
+                this.app.sheetMusicRenderer.setCursorPosition(measure);
+            }
+        };
+
+        // Connect pedal navigation to Follow-the-Ball cursor and sheet music renderer
+        this.bluetoothHIDListener.onNextMeasure = handleNavigation;
+        this.bluetoothHIDListener.onPrevMeasure = handleNavigation;
+        this.bluetoothHIDListener.onNextPage = handleNavigation;
+        this.bluetoothHIDListener.onPrevPage = handleNavigation;
+
+        // Connect pedal to Smart Loop toggle
+        this.bluetoothHIDListener.onToggleLoop = () => {
+            if (this.app && this.app.practiceLoopController) {
+                if (this.app.practiceLoopController.isActive) {
+                    this.app.practiceLoopController.stop();
+                } else {
+                    this.app.practiceLoopController.start();
+                }
+            }
+        };
     }
 
     /**
@@ -282,4 +320,10 @@ class IntegrationController {
     }
 }
 
-window.IntegrationController = IntegrationController;
+if (typeof window !== 'undefined') {
+    window.IntegrationController = IntegrationController;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = IntegrationController;
+}
