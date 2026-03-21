@@ -166,11 +166,18 @@
                                 <polygon points="5 3 19 12 5 21 5 3"/>
                             </svg>
                         </button>
+                        <button class="btn btn-icon video-snippet-btn" id="video-snippet-btn" title="Record for Teacher">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M23 7l-7 5 7 5V7z"/>
+                                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                            </svg>
+                        </button>
                     </div>
                 </div>
 
                 <!-- Scale Engine Warm-Up Generator -->
                 <div id="scale-engine-container"></div>
+>>>>>>> origin/main
 
                 <!-- Annotation Toolbar -->
                 <div id="annotation-toolbar-wrapper">
@@ -902,6 +909,153 @@
                 </div>
             </div>
         </div>
+
+        <!-- Video Snippet Recording Modal (Office Hours Drop) -->
+        <div class="modal" id="video-snippet-modal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-large">
+                <button class="modal-close" aria-label="Close" id="video-snippet-close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+                <div class="video-recorder">
+                    <h2>Office Hours Drop</h2>
+                    <p class="video-recorder-subtitle">Record a 15-second video for your teacher</p>
+
+                    <div class="video-preview-container">
+                        <video id="video-preview" playsinline muted></video>
+                        <div class="video-overlay" id="video-overlay">
+                            <button class="record-button" id="start-record-btn">
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <circle cx="12" cy="12" r="8"/>
+                                </svg>
+                                <span>Start Recording</span>
+                            </button>
+                        </div>
+                        <div class="recording-indicator" id="recording-indicator" style="display: none;">
+                            <span class="recording-dot"></span>
+                            <span class="recording-time" id="recording-time">0:00 / 0:15</span>
+                        </div>
+                    </div>
+
+                    <div class="video-form" id="video-form" style="display: none;">
+                        <div class="video-trim-controls">
+                            <label>Trim Video (optional)</label>
+                            <div class="trim-slider-container">
+                                <div class="trim-slider" id="trim-slider">
+                                    <div class="trim-range" id="trim-range"></div>
+                                    <div class="trim-handle trim-handle-start" id="trim-handle-start"></div>
+                                    <div class="trim-handle trim-handle-end" id="trim-handle-end"></div>
+                                </div>
+                                <div class="trim-times">
+                                    <span id="trim-start-time">0:00</span>
+                                    <span id="trim-end-time">0:15</span>
+                                </div>
+                            </div>
+                            <p class="trim-hint">Drag handles to trim your recording</p>
+                        </div>
+                        <div class="form-group">
+                            <label for="snippet-title">Title (optional)</label>
+                            <input type="text" id="snippet-title" placeholder="e.g., Scales practice - C major">
+                        </div>
+                        <div class="form-group">
+                            <label for="snippet-notes">Notes for teacher (optional)</label>
+                            <textarea id="snippet-notes" placeholder="What would you like feedback on?"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="video-actions">
+                        <button class="btn btn-secondary" id="cancel-video-btn">Cancel</button>
+                        <button class="btn btn-primary" id="submit-video-btn" style="display: none;">Send to Teacher</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Teacher Inbox Modal -->
+        <div class="modal" id="teacher-inbox-modal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-large modal-dark">
+                <button class="modal-close" aria-label="Close" id="inbox-close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+                <div class="teacher-inbox">
+                    <h2>Teacher Inbox</h2>
+                    <div class="inbox-tabs">
+                        <button class="inbox-tab active" data-tab="received">Received</button>
+                        <button class="inbox-tab" data-tab="sent">Sent</button>
+                    </div>
+
+                    <div class="inbox-content" id="inbox-received">
+                        <div class="inbox-empty" id="inbox-empty-received">
+                            <p>No video snippets received yet</p>
+                        </div>
+                        <div class="inbox-list" id="received-snippets-list"></div>
+                    </div>
+
+                    <div class="inbox-content" id="inbox-sent" style="display: none;">
+                        <div class="inbox-empty" id="inbox-empty-sent">
+                            <p>No video snippets sent yet</p>
+                        </div>
+                        <div class="inbox-list" id="sent-snippets-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Video Reply Modal -->
+        <div class="modal" id="video-reply-modal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content">
+                <button class="modal-close" aria-label="Close" id="reply-close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+                <div class="video-reply-form">
+                    <h3>Reply to Recording</h3>
+                    <div class="reply-video-container">
+                        <video id="reply-video-player" controls></video>
+                    </div>
+                    <div class="reply-form">
+                        <div class="reply-type-selector">
+                            <button class="reply-type-btn active" data-type="text">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                </svg>
+                                Text
+                            </button>
+                            <button class="reply-type-btn" data-type="voice">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                                </svg>
+                                Voice
+                            </button>
+                        </div>
+                        <textarea id="reply-text" placeholder="Write your feedback..."></textarea>
+                        <div class="voice-recorder" id="voice-reply-recorder" style="display: none;">
+                            <button class="voice-record-btn" id="voice-record-btn">
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <circle cx="12" cy="12" r="8"/>
+                                </svg>
+                            </button>
+                            <span class="voice-status" id="voice-status">Click to record</span>
+                        </div>
+                    </div>
+                    <div class="reply-actions">
+                        <button class="btn btn-secondary" id="cancel-reply-btn">Cancel</button>
+                        <button class="btn btn-primary" id="send-reply-btn">Send Reply</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Toast Notifications -->
@@ -945,6 +1099,9 @@
     <script src="src/js/audio/scale-engine.js"></script>
     <script src="src/js/components/scale-engine-ui.js"></script>
     <script src="src/js/services/teacher-service.js"></script>
+    <script src="src/js/services/video-snippet-service.js"></script>
+    <script src="src/js/services/video-storage-service.js"></script>
+    <script src="src/js/services/push-notification-service.js"></script>
     <script src="src/js/components/studio-dashboard.js"></script>
     <script src="src/js/services/annotation-service.js"></script>
     <script src="src/js/components/annotation-canvas.js"></script>

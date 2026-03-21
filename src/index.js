@@ -11,6 +11,8 @@ const omrRoutes = require('./routes/omr');
 const teacherRoutes = require('./routes/teacher');
 const authRoutes = require('./routes/auth');
 const syncRoutes = require('./routes/sync');
+const notificationRoutes = require('./routes/notifications');
+const scheduler = require('./services/scheduler');
 
 const app = express();
 
@@ -74,6 +76,9 @@ app.use('/api/auth', authRoutes);
 // Cloud sync routes
 app.use('/api/sync', syncRoutes);
 
+// Push notifications routes
+app.use('/api/notifications', notificationRoutes);
+
 // API routes (placeholder for future routes)
 app.use('/api', (req, res) => {
   res.status(200).json({
@@ -117,6 +122,9 @@ app.use((err, req, res, _next) => {
 
 // Start server only when run directly (not when imported by tests)
 if (require.main === module) {
+  // Start the scheduler for background jobs
+  scheduler.start();
+
   const server = app.listen(config.port, () => {
     console.log(`Server running in ${config.nodeEnv} mode on port ${config.port}`);
     console.log(`Health check: http://localhost:${config.port}/health`);
