@@ -658,10 +658,10 @@ function runTests() {
     test('setConfig clamps tempo to valid range', () => {
         const engine = new ScaleEngine();
         engine.setConfig({ tempo: 5 });
-        assertEqual(engine.getConfig().tempo, 20, 'Tempo clamped to minimum 20');
+        assertEqual(engine.getConfig().tempo, 40, 'Tempo clamped to minimum 40');
 
         engine.setConfig({ tempo: 500 });
-        assertEqual(engine.getConfig().tempo, 300, 'Tempo clamped to maximum 300');
+        assertEqual(engine.getConfig().tempo, 200, 'Tempo clamped to maximum 200');
     });
 
     test('setConfig clamps octaves to valid range', () => {
@@ -671,6 +671,14 @@ function runTests() {
 
         engine.setConfig({ octaves: 5 });
         assertEqual(engine.getConfig().octaves, 3, 'Octaves clamped to maximum 3');
+    });
+
+    test('setConfig does not mutate caller config object', () => {
+        const engine = new ScaleEngine();
+        const input = { tempo: 500 };
+        engine.setConfig(input);
+        assertEqual(input.tempo, 500, 'Caller object not mutated');
+        assertEqual(engine.getConfig().tempo, 200, 'Engine config is clamped');
     });
 
     // ============================================
@@ -698,6 +706,18 @@ function runTests() {
         assertTrue(result.notes.length > 0, 'Octaves at 1 octave should produce notes');
     });
 
+    test('Etude patterns emit notes in complete pairs (no orphan notes)', () => {
+        const engine = new ScaleEngine();
+        engine.setConfig({
+            key: 'C', exerciseType: 'etude', etudePattern: 'thirds',
+            scaleType: 'major', octaves: 1, instrument: 'cello'
+        });
+        const result = engine.generate();
+        // All even-length patterns should emit an even number of notes (complete pairs)
+        assertEqual(result.notes.length % 2, 0,
+            `Thirds notes (${result.notes.length}) should be even (complete pairs)`);
+    });
+
     // ============================================
     // Shifts & Double Stops Tests (P2 feature)
     // ============================================
@@ -711,8 +731,10 @@ function runTests() {
         });
         const result = engine.generate();
         assertTrue(result.notes.length > 0, 'Shifts pattern generates notes');
-        // Shifts generate 4-note fragments; should be multiple of 4
-        assertEqual(result.notes.length % 4, 0, 'Shift notes come in groups of 4');
+        // Shifts generate fragments sized by pattern.intervals.length (8)
+        const shiftFragmentSize = ETUDE_PATTERNS.shifts.intervals.length;
+        assertEqual(result.notes.length % shiftFragmentSize, 0,
+            `Shift notes come in groups of ${shiftFragmentSize}`);
     });
 
     test('Double stops etude pattern generates notes', () => {

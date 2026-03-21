@@ -39,13 +39,14 @@ class ScaleEngine {
         if (newConfig.key && this.scaleData.KEY_SIGNATURES[newConfig.key] === undefined) {
             throw new Error(`Unknown key: ${newConfig.key}`);
         }
-        if (newConfig.tempo !== undefined) {
-            newConfig.tempo = Math.max(20, Math.min(300, newConfig.tempo));
+        const validated = { ...newConfig };
+        if (validated.tempo !== undefined) {
+            validated.tempo = Math.max(40, Math.min(200, validated.tempo));
         }
-        if (newConfig.octaves !== undefined) {
-            newConfig.octaves = Math.max(1, Math.min(3, newConfig.octaves));
+        if (validated.octaves !== undefined) {
+            validated.octaves = Math.max(1, Math.min(3, validated.octaves));
         }
-        Object.assign(this.config, newConfig);
+        Object.assign(this.config, validated);
         if (this.onConfigChange) {
             this.onConfigChange(this.config);
         }
@@ -178,32 +179,39 @@ class ScaleEngine {
 
         // Shifts pattern: play scale from each position (simulating position shifts)
         if (pattern.shift) {
-            return this.generateShiftPattern(fullScale, key);
+            return this.generateShiftPattern(fullScale, key, pattern);
         }
 
         // Double stops: play pairs of notes (thirds) simultaneously
         if (pattern.doubleStop) {
-            return this.generateDoubleStopPattern(fullScale, key);
+            return this.generateDoubleStopPattern(fullScale, key, pattern);
         }
 
-        // Apply the pattern indices to the scale
+        // Apply the pattern indices to the scale in complete pairs (no orphan notes)
         const notes = [];
         const patternIndices = pattern.intervals;
         const maxIndex = fullScale.length - 1;
 
-        // Find the maximum pattern offset that still has the first note within range
         for (let offset = 0; offset <= maxIndex; offset++) {
-            let addedAny = false;
-            for (const idx of patternIndices) {
-                const scaleIndex = offset + idx;
-                if (scaleIndex <= maxIndex) {
-                    const midi = fullScale[scaleIndex];
-                    const pitch = this.scaleData.midiToPitchInKey(midi, key);
-                    notes.push({ ...pitch, duration: this.config.noteDuration });
-                    addedAny = true;
+            // Process pattern in pairs to avoid orphan notes at boundaries
+            for (let p = 0; p + 1 < patternIndices.length; p += 2) {
+                const idx1 = offset + patternIndices[p];
+                const idx2 = offset + patternIndices[p + 1];
+                if (idx1 <= maxIndex && idx2 <= maxIndex) {
+                    const pitch1 = this.scaleData.midiToPitchInKey(fullScale[idx1], key);
+                    const pitch2 = this.scaleData.midiToPitchInKey(fullScale[idx2], key);
+                    notes.push({ ...pitch1, duration: this.config.noteDuration });
+                    notes.push({ ...pitch2, duration: this.config.noteDuration });
                 }
             }
-            if (!addedAny) break;
+            // Handle odd-length patterns (emit the last index only if in range)
+            if (patternIndices.length % 2 === 1) {
+                const lastIdx = offset + patternIndices[patternIndices.length - 1];
+                if (lastIdx <= maxIndex) {
+                    const pitch = this.scaleData.midiToPitchInKey(fullScale[lastIdx], key);
+                    notes.push({ ...pitch, duration: this.config.noteDuration });
+                }
+            }
         }
 
         return this.clampToInstrumentRange(notes);
@@ -237,9 +245,9 @@ class ScaleEngine {
      * Generate shift pattern - plays scale fragments starting from successive positions
      * Simulates left-hand position shifts on a string instrument
      */
-    generateShiftPattern(fullScale, key) {
+    generateShiftPattern(fullScale, key, pattern) {
         const notes = [];
-        const fragmentSize = 4; // 4-note groups per position
+        const fragmentSize = pattern.intervals.length;
         for (let pos = 0; pos + fragmentSize <= fullScale.length; pos++) {
             for (let i = 0; i < fragmentSize; i++) {
                 const midi = fullScale[pos + i];
@@ -251,12 +259,12 @@ class ScaleEngine {
     }
 
     /**
-     * Generate double stop pattern - pairs of notes a third apart
+     * Generate double stop pattern - pairs of notes at a given interval apart
      * Each pair is written as two sequential notes (bottom then top)
      */
-    generateDoubleStopPattern(fullScale, key) {
+    generateDoubleStopPattern(fullScale, key, pattern) {
         const notes = [];
-        const interval = 2; // thirds (2 scale degrees apart)
+        const interval = pattern.intervals[1]; // scale degree interval between notes
         for (let i = 0; i + interval < fullScale.length; i++) {
             const lowerMidi = fullScale[i];
             const upperMidi = fullScale[i + interval];

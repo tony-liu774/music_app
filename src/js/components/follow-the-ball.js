@@ -337,7 +337,6 @@ class FollowTheBall {
         this.targetPosition = 0;
         this.isPaused = false;
         this.updatePosition();
-        this.togglePause(); // Reset pause state
     }
 }
 
