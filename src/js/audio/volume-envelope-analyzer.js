@@ -117,9 +117,10 @@ class VolumeEnvelopeAnalyzer {
     /**
      * Analyze the attack characteristics of the current note onset
      * @param {Float32Array} audioBuffer - Time-domain audio data
+     * @param {number} [sampleRate=44100] - Audio sample rate in Hz
      * @returns {Object} Attack analysis { attackTime, peakAmplitude, decayRate }
      */
-    analyzeAttack(audioBuffer) {
+    analyzeAttack(audioBuffer, sampleRate = 44100) {
         if (!audioBuffer || audioBuffer.length === 0) {
             return { attackTime: 0, peakAmplitude: 0, decayRate: 0 };
         }
@@ -145,7 +146,6 @@ class VolumeEnvelopeAnalyzer {
             }
         }
 
-        const sampleRate = 44100;
         const attackTime = (peakIndex - attackStart) / sampleRate * 1000; // ms
 
         // Decay rate: how quickly amplitude drops after peak
@@ -181,9 +181,9 @@ class VolumeEnvelopeAnalyzer {
     }
 
     /**
-     * Convert dynamic marking to a numeric level (0-6)
+     * Convert dynamic marking to a numeric level (0-5)
      * @param {string} dynamic - Dynamic marking string
-     * @returns {number} Numeric level
+     * @returns {number} Numeric level (0=pp, 1=p, 2=mp, 3=mf, 4=f, 5=ff)
      */
     static dynamicToLevel(dynamic) {
         const levels = { 'pp': 0, 'p': 1, 'mp': 2, 'mf': 3, 'f': 4, 'ff': 5 };
@@ -191,7 +191,7 @@ class VolumeEnvelopeAnalyzer {
     }
 
     /**
-     * Convert numeric level (0-6) to dynamic marking
+     * Convert numeric level (0-5) to dynamic marking
      * @param {number} level - Numeric dynamic level
      * @returns {string} Dynamic marking
      */
@@ -206,11 +206,14 @@ class VolumeEnvelopeAnalyzer {
      * @returns {Object} Current volume envelope state
      */
     getState() {
+        const lastTimestamp = this.rmsHistory.length > 0
+            ? this.rmsHistory[this.rmsHistory.length - 1].timestamp
+            : 0;
         return {
             currentDynamic: this.currentDynamic,
             currentTrend: this.currentTrend,
             smoothedRMS: this.getSmoothedRMS(),
-            trendDuration: this.trendStartTime ? Date.now() - this.trendStartTime : 0,
+            trendDuration: this.trendStartTime ? lastTimestamp - this.trendStartTime : 0,
             dynamicLevel: VolumeEnvelopeAnalyzer.dynamicToLevel(this.currentDynamic),
             historyLength: this.rmsHistory.length
         };

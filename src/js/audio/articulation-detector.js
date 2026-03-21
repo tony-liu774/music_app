@@ -79,6 +79,7 @@ class ArticulationDetector {
             legato: 0,
             staccato: 0,
             accent: 0,
+            marcato: 0,
             tenuto: 0,
             pizzicato: 0
         };
@@ -128,6 +129,14 @@ class ArticulationDetector {
         }
         if (attackTime !== undefined && attackTime < this.config.accentAttackTime) {
             scores.accent += 25;
+        }
+
+        // --- Marcato detection (accent + staccato: loud and short) ---
+        if (this.avgPeakAmplitude > 0 && peakAmplitude > this.avgPeakAmplitude * this.config.accentPeakRatio && durationRatio < 0.6) {
+            scores.marcato += 60;
+        }
+        if (attackTime !== undefined && attackTime < this.config.accentAttackTime && durationRatio < 0.7) {
+            scores.marcato += 20;
         }
 
         // --- Tenuto detection ---
@@ -216,6 +225,10 @@ class ArticulationDetector {
             'tenuto-legato': 70,
             'staccato-accent': 50,
             'accent-staccato': 50,
+            'accent-marcato': 70,
+            'marcato-accent': 70,
+            'marcato-staccato': 50,
+            'staccato-marcato': 50,
             'legato-staccato': 20,
             'staccato-legato': 20,
             'pizzicato-staccato': 30,
@@ -247,7 +260,11 @@ class ArticulationDetector {
             'staccato-accent': 'Add more weight to the beginning of each note',
             'accent-staccato': 'Lighter, shorter strokes needed — less initial pressure',
             'tenuto-staccato': 'Shorten the notes — the score calls for separated strokes',
-            'staccato-tenuto': 'Hold each note to its full value'
+            'staccato-tenuto': 'Hold each note to its full value',
+            'accent-marcato': 'Shorten the note while keeping the strong attack',
+            'marcato-accent': 'Sustain the note a bit more — keep the weight but hold through',
+            'marcato-staccato': 'Lighten the initial attack — just separate the notes',
+            'staccato-marcato': 'Add more bow weight at the start of each short stroke'
         };
 
         return feedbackMap[`${detected}-${expected}`] || `Expected ${expected}, detected ${detected}`;
@@ -259,7 +276,7 @@ class ArticulationDetector {
      */
     getSummary() {
         const recent = this.noteEvents.slice(-20);
-        const counts = { legato: 0, staccato: 0, accent: 0, tenuto: 0, pizzicato: 0 };
+        const counts = { legato: 0, staccato: 0, accent: 0, marcato: 0, tenuto: 0, pizzicato: 0 };
 
         for (const event of recent) {
             if (event.articulation && counts[event.articulation.type] !== undefined) {

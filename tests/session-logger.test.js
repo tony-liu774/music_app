@@ -60,6 +60,35 @@ class SessionLogger {
         this.deviations.push(deviation);
     }
 
+    logDynamicsDeviation({ measure, beat, expectedDynamic, actualDynamic, deviation, expectedDirection, actualTrend }) {
+        const dev = {
+            type: 'dynamics',
+            measure: measure || 1,
+            beat: beat || 1,
+            expected_dynamic: expectedDynamic || 'mf',
+            actual_dynamic: actualDynamic || 'mf',
+            deviation: deviation || 0,
+            expected_direction: expectedDirection || null,
+            actual_trend: actualTrend || 'stable',
+            timestamp: Date.now() - (this.startTime || Date.now())
+        };
+        this.deviations.push(dev);
+    }
+
+    logArticulationDeviation({ measure, beat, expectedArticulation, detectedArticulation, score, feedback }) {
+        const dev = {
+            type: 'articulation',
+            measure: measure || 1,
+            beat: beat || 1,
+            expected_articulation: expectedArticulation || '?',
+            detected_articulation: detectedArticulation || '?',
+            score: Math.round(score || 0),
+            feedback: feedback || '',
+            timestamp: Date.now() - (this.startTime || Date.now())
+        };
+        this.deviations.push(dev);
+    }
+
     getSessionLog() {
         return {
             session_id: this.sessionId,
@@ -70,6 +99,8 @@ class SessionLogger {
             pitch_deviations: this.deviations.filter(d => d.type === 'pitch').length,
             rhythm_deviations: this.deviations.filter(d => d.type === 'rhythm').length,
             intonation_deviations: this.deviations.filter(d => d.type === 'intonation').length,
+            dynamics_deviations: this.deviations.filter(d => d.type === 'dynamics').length,
+            articulation_deviations: this.deviations.filter(d => d.type === 'articulation').length,
             deviations: this.deviations
         };
     }
@@ -78,6 +109,8 @@ class SessionLogger {
         const pitchDevs = this.deviations.filter(d => d.type === 'pitch');
         const rhythmDevs = this.deviations.filter(d => d.type === 'rhythm');
         const intDevs = this.deviations.filter(d => d.type === 'intonation');
+        const dynDevs = this.deviations.filter(d => d.type === 'dynamics');
+        const artDevs = this.deviations.filter(d => d.type === 'articulation');
 
         const avgPitchDev = pitchDevs.length > 0
             ? pitchDevs.reduce((sum, d) => sum + Math.abs(d.deviation_cents), 0) / pitchDevs.length
@@ -86,6 +119,14 @@ class SessionLogger {
         const avgRhythmDev = rhythmDevs.length > 0
             ? rhythmDevs.reduce((sum, d) => sum + Math.abs(d.deviation_ms), 0) / rhythmDevs.length
             : 0;
+
+        const avgDynDev = dynDevs.length > 0
+            ? dynDevs.reduce((sum, d) => sum + Math.abs(d.deviation), 0) / dynDevs.length
+            : 0;
+
+        const avgArtScore = artDevs.length > 0
+            ? artDevs.reduce((sum, d) => sum + (d.score || 0), 0) / artDevs.length
+            : 100;
 
         const measureErrors = {};
         this.deviations.forEach(d => {
@@ -105,8 +146,12 @@ class SessionLogger {
             pitch_deviation_count: pitchDevs.length,
             rhythm_deviation_count: rhythmDevs.length,
             intonation_deviation_count: intDevs.length,
+            dynamics_deviation_count: dynDevs.length,
+            articulation_deviation_count: artDevs.length,
             average_pitch_deviation_cents: Math.round(avgPitchDev),
             average_rhythm_deviation_ms: Math.round(avgRhythmDev),
+            average_dynamics_deviation: Math.round(avgDynDev * 10) / 10,
+            average_articulation_score: Math.round(avgArtScore),
             problem_measures: problemMeasures,
             worst_measure: problemMeasures.length > 0 ? problemMeasures[0].measure : null
         };
@@ -277,6 +322,114 @@ describe('SessionLogger', () => {
         assert.strictEqual(logger.deviations.length, 0);
         assert.strictEqual(logger.sessionId, null);
         assert.strictEqual(logger.startTime, null);
+    });
+
+    // --- Dynamics deviation tests ---
+
+    it('should log dynamics deviations correctly', () => {
+        logger.startSession('test-score');
+        logger.logDynamicsDeviation({
+            measure: 5,
+            beat: 1,
+            expectedDynamic: 'f',
+            actualDynamic: 'mp',
+            deviation: -2,
+            expectedDirection: 'crescendo',
+            actualTrend: 'stable'
+        });
+
+        assert.strictEqual(logger.deviations.length, 1);
+        assert.strictEqual(logger.deviations[0].type, 'dynamics');
+        assert.strictEqual(logger.deviations[0].measure, 5);
+        assert.strictEqual(logger.deviations[0].expected_dynamic, 'f');
+        assert.strictEqual(logger.deviations[0].actual_dynamic, 'mp');
+        assert.strictEqual(logger.deviations[0].deviation, -2);
+        assert.strictEqual(logger.deviations[0].expected_direction, 'crescendo');
+        assert.strictEqual(logger.deviations[0].actual_trend, 'stable');
+    });
+
+    it('should log dynamics deviations with defaults for missing fields', () => {
+        logger.startSession('test-score');
+        logger.logDynamicsDeviation({ measure: 1 });
+
+        assert.strictEqual(logger.deviations[0].expected_dynamic, 'mf');
+        assert.strictEqual(logger.deviations[0].actual_dynamic, 'mf');
+        assert.strictEqual(logger.deviations[0].deviation, 0);
+        assert.strictEqual(logger.deviations[0].expected_direction, null);
+        assert.strictEqual(logger.deviations[0].actual_trend, 'stable');
+    });
+
+    // --- Articulation deviation tests ---
+
+    it('should log articulation deviations correctly', () => {
+        logger.startSession('test-score');
+        logger.logArticulationDeviation({
+            measure: 3,
+            beat: 2,
+            expectedArticulation: 'staccato',
+            detectedArticulation: 'legato',
+            score: 20,
+            feedback: 'Shorten your bow strokes'
+        });
+
+        assert.strictEqual(logger.deviations.length, 1);
+        assert.strictEqual(logger.deviations[0].type, 'articulation');
+        assert.strictEqual(logger.deviations[0].measure, 3);
+        assert.strictEqual(logger.deviations[0].expected_articulation, 'staccato');
+        assert.strictEqual(logger.deviations[0].detected_articulation, 'legato');
+        assert.strictEqual(logger.deviations[0].score, 20);
+        assert.strictEqual(logger.deviations[0].feedback, 'Shorten your bow strokes');
+    });
+
+    it('should log articulation deviations with defaults for missing fields', () => {
+        logger.startSession('test-score');
+        logger.logArticulationDeviation({ measure: 1 });
+
+        assert.strictEqual(logger.deviations[0].expected_articulation, '?');
+        assert.strictEqual(logger.deviations[0].detected_articulation, '?');
+        assert.strictEqual(logger.deviations[0].score, 0);
+        assert.strictEqual(logger.deviations[0].feedback, '');
+    });
+
+    // --- Session log with dynamics/articulation ---
+
+    it('should include dynamics and articulation counts in session log', () => {
+        logger.startSession('test-score');
+        logger.logPitchDeviation({ measure: 1, deviationCents: -10 });
+        logger.logDynamicsDeviation({ measure: 2, expectedDynamic: 'f', actualDynamic: 'p', deviation: -3 });
+        logger.logArticulationDeviation({ measure: 3, expectedArticulation: 'staccato', detectedArticulation: 'legato', score: 20 });
+
+        const log = logger.getSessionLog();
+        assert.strictEqual(log.total_deviations, 3);
+        assert.strictEqual(log.pitch_deviations, 1);
+        assert.strictEqual(log.dynamics_deviations, 1);
+        assert.strictEqual(log.articulation_deviations, 1);
+    });
+
+    it('should include dynamics/articulation in summary stats', () => {
+        logger.startSession('test-score');
+        logger.logDynamicsDeviation({ measure: 1, deviation: 2 });
+        logger.logDynamicsDeviation({ measure: 2, deviation: -4 });
+        logger.logArticulationDeviation({ measure: 3, score: 60 });
+        logger.logArticulationDeviation({ measure: 4, score: 40 });
+
+        const stats = logger.getSummaryStats();
+        assert.strictEqual(stats.dynamics_deviation_count, 2);
+        assert.strictEqual(stats.articulation_deviation_count, 2);
+        assert.strictEqual(stats.average_dynamics_deviation, 3); // (2+4)/2
+        assert.strictEqual(stats.average_articulation_score, 50); // (60+40)/2
+    });
+
+    it('should count dynamics/articulation deviations in problem measures', () => {
+        logger.startSession('test-score');
+        logger.logDynamicsDeviation({ measure: 5, deviation: 2 });
+        logger.logDynamicsDeviation({ measure: 5, deviation: 3 });
+        logger.logArticulationDeviation({ measure: 5, score: 30 });
+        logger.logPitchDeviation({ measure: 7, deviationCents: -10 });
+
+        const stats = logger.getSummaryStats();
+        assert.strictEqual(stats.worst_measure, 5);
+        assert.strictEqual(stats.problem_measures[0].error_count, 3);
     });
 });
 

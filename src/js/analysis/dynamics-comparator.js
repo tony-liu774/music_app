@@ -20,9 +20,12 @@ class DynamicsComparator {
         // Current position in score
         this.currentMeasure = 1;
         this.currentBeat = 0;
-        this.expectedDynamic = 'mf';
-        this.expectedArticulation = null;
-        this.currentDynamicDirection = null; // 'crescendo' or 'decrescendo'
+
+        // Total frames processed (for unbiased session scoring)
+        this.totalDynamicsFrames = 0;
+        this.totalDynamicsScore = 0;
+        this.totalArticulationEvents = 0;
+        this.totalArticulationScore = 0;
     }
 
     /**
@@ -70,13 +73,17 @@ class DynamicsComparator {
                 }
             }
         }
+
+        // Sort by position for deterministic lookup
+        this.scoreDynamics.sort((a, b) => a.measure - b.measure || a.beat - b.beat);
+        this.scoreArticulations.sort((a, b) => a.measure - b.measure || a.beat - b.beat);
     }
 
     /**
-     * Get expected dynamic at a given position
+     * Get expected dynamic at a given position (pure query, no side effects)
      * @param {number} measure - Measure number
      * @param {number} beat - Beat position
-     * @returns {string} Expected dynamic marking
+     * @returns {Object} { dynamic: string, direction: string|null }
      */
     getExpectedDynamic(measure, beat) {
         let dynamic = 'mf'; // Default
@@ -96,9 +103,7 @@ class DynamicsComparator {
             }
         }
 
-        this.expectedDynamic = dynamic;
-        this.currentDynamicDirection = direction;
-        return dynamic;
+        return { dynamic, direction };
     }
 
     /**
@@ -110,11 +115,9 @@ class DynamicsComparator {
     getExpectedArticulation(measure, beat) {
         for (const art of this.scoreArticulations) {
             if (art.measure === measure && Math.abs(art.beat - beat) < 0.1) {
-                this.expectedArticulation = art.type;
                 return art.type;
             }
         }
-        this.expectedArticulation = null;
         return null;
     }
 
@@ -133,9 +136,9 @@ class DynamicsComparator {
         // Update volume envelope
         const envelope = this.volumeAnalyzer.addSample(rmsLevel, timestamp);
 
-        // Get expected dynamic at current position
-        const expected = this.getExpectedDynamic(measure, beat);
-        const expectedLevel = VolumeEnvelopeAnalyzer.dynamicToLevel(expected);
+        // Get expected dynamic at current position (pure query)
+        const { dynamic: expectedDynamic, direction } = this.getExpectedDynamic(measure, beat);
+        const expectedLevel = VolumeEnvelopeAnalyzer.dynamicToLevel(expectedDynamic);
         const actualLevel = envelope.dynamicLevel;
 
         // Compare dynamic levels
@@ -145,24 +148,29 @@ class DynamicsComparator {
         // Check crescendo/decrescendo compliance
         let directionScore = 100;
         let directionMatch = true;
-        if (this.currentDynamicDirection === 'crescendo' && envelope.currentTrend !== 'crescendo') {
+        if (direction === 'crescendo' && envelope.currentTrend !== 'crescendo') {
             directionScore = envelope.currentTrend === 'stable' ? 60 : 30;
             directionMatch = false;
-        } else if (this.currentDynamicDirection === 'decrescendo' && envelope.currentTrend !== 'decrescendo') {
+        } else if (direction === 'decrescendo' && envelope.currentTrend !== 'decrescendo') {
             directionScore = envelope.currentTrend === 'stable' ? 60 : 30;
             directionMatch = false;
         }
+
+        // Track running totals for unbiased session scoring
+        const combinedScore = Math.round((dynamicScore * 0.6 + directionScore * 0.4));
+        this.totalDynamicsFrames++;
+        this.totalDynamicsScore += combinedScore;
 
         // Log deviation if significant
         if (Math.abs(dynamicDeviation) >= 2 || !directionMatch) {
             this.logDynamicDeviation({
                 measure,
                 beat,
-                expectedDynamic: expected,
+                expectedDynamic,
                 actualDynamic: envelope.currentDynamic,
                 deviation: dynamicDeviation,
                 score: dynamicScore,
-                expectedDirection: this.currentDynamicDirection,
+                expectedDirection: direction,
                 actualTrend: envelope.currentTrend,
                 directionMatch,
                 timestamp
@@ -172,13 +180,13 @@ class DynamicsComparator {
         return {
             dynamicScore,
             directionScore,
-            expectedDynamic: expected,
+            expectedDynamic,
             actualDynamic: envelope.currentDynamic,
             dynamicDeviation,
             trend: envelope.currentTrend,
-            expectedDirection: this.currentDynamicDirection,
+            expectedDirection: direction,
             directionMatch,
-            combinedScore: Math.round((dynamicScore * 0.6 + directionScore * 0.4))
+            combinedScore
         };
     }
 
@@ -203,6 +211,10 @@ class DynamicsComparator {
         } else {
             comparison = { match: true, score: 80, feedback: '' };
         }
+
+        // Track running totals for unbiased session scoring
+        this.totalArticulationEvents++;
+        this.totalArticulationScore += comparison.score;
 
         // Log deviation if mismatch
         if (expected && !comparison.match) {
@@ -273,14 +285,12 @@ class DynamicsComparator {
      * @returns {Object} Dynamics and articulation scores
      */
     getSessionScores() {
-        const dynScores = this.dynamicsDeviations.map(d => d.score);
-        const artScores = this.articulationDeviations.map(d => d.score);
-
-        const avgDynamics = dynScores.length > 0
-            ? dynScores.reduce((a, b) => a + b, 0) / dynScores.length
+        // Use running totals for unbiased scoring (includes all frames, not just deviations)
+        const avgDynamics = this.totalDynamicsFrames > 0
+            ? this.totalDynamicsScore / this.totalDynamicsFrames
             : 75;
-        const avgArticulation = artScores.length > 0
-            ? artScores.reduce((a, b) => a + b, 0) / artScores.length
+        const avgArticulation = this.totalArticulationEvents > 0
+            ? this.totalArticulationScore / this.totalArticulationEvents
             : 75;
 
         return {
@@ -340,9 +350,10 @@ class DynamicsComparator {
         this.articulationDeviations = [];
         this.currentMeasure = 1;
         this.currentBeat = 0;
-        this.expectedDynamic = 'mf';
-        this.expectedArticulation = null;
-        this.currentDynamicDirection = null;
+        this.totalDynamicsFrames = 0;
+        this.totalDynamicsScore = 0;
+        this.totalArticulationEvents = 0;
+        this.totalArticulationScore = 0;
     }
 }
 

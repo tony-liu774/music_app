@@ -23,6 +23,7 @@ class ConcertmasterApp {
         this.sessionData = null;
         this.accuracyScorer = null;
         this.intonationAnalyzer = null;
+        this.dynamicsComparator = null;
 
         // UI Components
         this.sheetMusicRenderer = null;
@@ -109,6 +110,7 @@ class ConcertmasterApp {
         this.rhythmAnalyzer = new RhythmAnalyzer();
         this.accuracyScorer = new AccuracyScorer();
         this.intonationAnalyzer = new IntonationAnalyzer();
+        this.dynamicsComparator = new DynamicsComparator();
 
         // Get DOM elements
         this.views = {
@@ -1347,6 +1349,12 @@ class ConcertmasterApp {
         // Reset analyzers for new session
         this.rhythmAnalyzer.reset();
         this.intonationAnalyzer.reset();
+        this.dynamicsComparator.reset();
+
+        // Load score dynamics/articulation data for comparison
+        if (this.currentScore) {
+            this.dynamicsComparator.loadScore(this.currentScore);
+        }
 
         this.showToast('Practice started - play your instrument', 'success');
     }
@@ -1437,6 +1445,27 @@ class ConcertmasterApp {
                         const rhythmScore = this.rhythmAnalyzer.calculateOverallTiming();
                         this.intonationAnalyzer.recordRhythmScore(rhythmScore);
 
+                        // Dynamics & articulation analysis
+                        const beat = comparison.expectedNote?.position?.beat || 0;
+                        const dynResult = this.dynamicsComparator.processAudioFrame(
+                            data.level, measure, beat, noteTimestamp
+                        );
+                        this.intonationAnalyzer.recordDynamicsScore(dynResult.combinedScore);
+
+                        // Analyze attack envelope for articulation
+                        const attackInfo = this.dynamicsComparator.volumeAnalyzer.analyzeAttack(data.timeData);
+                        const expectedDuration = comparison.expectedNote ? comparison.expectedNote.duration * (60000 / (this.currentScore?.tempo || 120)) : 500;
+                        const artResult = this.dynamicsComparator.processNoteArticulation({
+                            timestamp: noteTimestamp,
+                            attackTime: attackInfo.attackTime,
+                            peakAmplitude: attackInfo.peakAmplitude,
+                            decayRate: attackInfo.decayRate,
+                            duration: expectedDuration * 0.9,
+                            expectedDuration: expectedDuration,
+                            measure: measure
+                        }, measure, beat);
+                        this.intonationAnalyzer.recordArticulationScore(artResult.score);
+
                         // Store in session data
                         if (this.sessionData) {
                             this.sessionData.pitchAccuracy.push(accuracy);
@@ -1447,7 +1476,9 @@ class ConcertmasterApp {
                                 measure: measure,
                                 accuracy: accuracy,
                                 rhythmScore: rhythmScore,
-                                matched: comparison.matched
+                                matched: comparison.matched,
+                                dynamicsScore: dynResult.combinedScore,
+                                articulationScore: artResult.score
                             });
                         }
 

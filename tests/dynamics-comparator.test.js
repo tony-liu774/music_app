@@ -57,8 +57,9 @@ class VolumeEnvelopeAnalyzer {
     static dynamicToLevel(d) { const l = { pp: 0, p: 1, mp: 2, mf: 3, f: 4, ff: 5 }; return l[d] !== undefined ? l[d] : 3; }
     static levelToDynamic(l) { return ['pp', 'p', 'mp', 'mf', 'f', 'ff'][Math.max(0, Math.min(5, Math.round(l)))]; }
     getState() {
+        const lastTimestamp = this.rmsHistory.length > 0 ? this.rmsHistory[this.rmsHistory.length - 1].timestamp : 0;
         return { currentDynamic: this.currentDynamic, currentTrend: this.currentTrend, smoothedRMS: this.getSmoothedRMS(),
-            trendDuration: this.trendStartTime ? Date.now() - this.trendStartTime : 0,
+            trendDuration: this.trendStartTime ? lastTimestamp - this.trendStartTime : 0,
             dynamicLevel: VolumeEnvelopeAnalyzer.dynamicToLevel(this.currentDynamic), historyLength: this.rmsHistory.length };
     }
     reset() { this.rmsHistory = []; this.currentDynamic = 'mf'; this.currentTrend = 'stable'; this.trendStartTime = null; this.trendStartLevel = null; }
@@ -79,7 +80,7 @@ class ArticulationDetector {
         return event.articulation;
     }
     classifyArticulation(noteEvent) {
-        const scores = { legato: 0, staccato: 0, accent: 0, tenuto: 0, pizzicato: 0 };
+        const scores = { legato: 0, staccato: 0, accent: 0, marcato: 0, tenuto: 0, pizzicato: 0 };
         const { attackTime, peakAmplitude, decayRate, duration, expectedDuration } = noteEvent;
         const durationRatio = (expectedDuration && expectedDuration > 0) ? duration / expectedDuration : 1;
         if (attackTime !== undefined && attackTime < this.config.pizzicatoAttackTime && decayRate > this.config.pizzicatoDecayRate) scores.pizzicato += 60;
@@ -93,6 +94,8 @@ class ArticulationDetector {
         else if (gap === null && durationRatio >= 0.8) scores.legato += 20;
         if (this.avgPeakAmplitude > 0 && peakAmplitude > this.avgPeakAmplitude * this.config.accentPeakRatio) scores.accent += 50;
         if (attackTime !== undefined && attackTime < this.config.accentAttackTime) scores.accent += 25;
+        if (this.avgPeakAmplitude > 0 && peakAmplitude > this.avgPeakAmplitude * this.config.accentPeakRatio && durationRatio < 0.6) scores.marcato += 60;
+        if (attackTime !== undefined && attackTime < this.config.accentAttackTime && durationRatio < 0.7) scores.marcato += 20;
         if (durationRatio >= 0.95 && durationRatio <= 1.1) scores.tenuto += 40;
         if (attackTime !== undefined && attackTime > 10 && attackTime < 30) scores.tenuto += 15;
         const entries = Object.entries(scores);
@@ -109,13 +112,13 @@ class ArticulationDetector {
     compareArticulation(detected, expected) {
         if (!detected || !expected) return { match: true, score: 75, feedback: '' };
         if (detected === expected) return { match: true, score: 100, feedback: '' };
-        const similarity = { 'legato-tenuto': 70, 'tenuto-legato': 70, 'staccato-accent': 50, 'accent-staccato': 50, 'legato-staccato': 20, 'staccato-legato': 20, 'pizzicato-staccato': 30, 'staccato-pizzicato': 30 };
+        const similarity = { 'legato-tenuto': 70, 'tenuto-legato': 70, 'staccato-accent': 50, 'accent-staccato': 50, 'accent-marcato': 70, 'marcato-accent': 70, 'marcato-staccato': 50, 'staccato-marcato': 50, 'legato-staccato': 20, 'staccato-legato': 20, 'pizzicato-staccato': 30, 'staccato-pizzicato': 30 };
         return { match: false, score: similarity[`${detected}-${expected}`] || 40, feedback: `Expected ${expected}, detected ${detected}` };
     }
     reset() { this.noteEvents = []; this.avgPeakAmplitude = 0; this.avgAttackTime = 0; this.noteCount = 0; }
 }
 
-// DynamicsComparator - the class under test
+// DynamicsComparator - the class under test (mirrors source)
 class DynamicsComparator {
     constructor() {
         this.volumeAnalyzer = new VolumeEnvelopeAnalyzer();
@@ -127,9 +130,10 @@ class DynamicsComparator {
         this.maxDeviations = 200;
         this.currentMeasure = 1;
         this.currentBeat = 0;
-        this.expectedDynamic = 'mf';
-        this.expectedArticulation = null;
-        this.currentDynamicDirection = null;
+        this.totalDynamicsFrames = 0;
+        this.totalDynamicsScore = 0;
+        this.totalArticulationEvents = 0;
+        this.totalArticulationScore = 0;
     }
 
     loadScore(score) {
@@ -153,6 +157,8 @@ class DynamicsComparator {
                 }
             }
         }
+        this.scoreDynamics.sort((a, b) => a.measure - b.measure || a.beat - b.beat);
+        this.scoreArticulations.sort((a, b) => a.measure - b.measure || a.beat - b.beat);
     }
 
     getExpectedDynamic(measure, beat) {
@@ -164,16 +170,13 @@ class DynamicsComparator {
                 else if (dyn.category === 'wedge') { direction = dyn.type === 'wedge-stop' ? null : dyn.type; }
             }
         }
-        this.expectedDynamic = dynamic;
-        this.currentDynamicDirection = direction;
-        return dynamic;
+        return { dynamic, direction };
     }
 
     getExpectedArticulation(measure, beat) {
         for (const art of this.scoreArticulations) {
-            if (art.measure === measure && Math.abs(art.beat - beat) < 0.1) { this.expectedArticulation = art.type; return art.type; }
+            if (art.measure === measure && Math.abs(art.beat - beat) < 0.1) return art.type;
         }
-        this.expectedArticulation = null;
         return null;
     }
 
@@ -181,21 +184,24 @@ class DynamicsComparator {
         this.currentMeasure = measure;
         this.currentBeat = beat;
         const envelope = this.volumeAnalyzer.addSample(rmsLevel, timestamp);
-        const expected = this.getExpectedDynamic(measure, beat);
-        const expectedLevel = VolumeEnvelopeAnalyzer.dynamicToLevel(expected);
+        const { dynamic: expectedDynamic, direction } = this.getExpectedDynamic(measure, beat);
+        const expectedLevel = VolumeEnvelopeAnalyzer.dynamicToLevel(expectedDynamic);
         const actualLevel = envelope.dynamicLevel;
         const dynamicDeviation = actualLevel - expectedLevel;
         const dynamicScore = this.calculateDynamicScore(expectedLevel, actualLevel);
         let directionScore = 100, directionMatch = true;
-        if (this.currentDynamicDirection === 'crescendo' && envelope.currentTrend !== 'crescendo') {
+        if (direction === 'crescendo' && envelope.currentTrend !== 'crescendo') {
             directionScore = envelope.currentTrend === 'stable' ? 60 : 30; directionMatch = false;
-        } else if (this.currentDynamicDirection === 'decrescendo' && envelope.currentTrend !== 'decrescendo') {
+        } else if (direction === 'decrescendo' && envelope.currentTrend !== 'decrescendo') {
             directionScore = envelope.currentTrend === 'stable' ? 60 : 30; directionMatch = false;
         }
+        const combinedScore = Math.round((dynamicScore * 0.6 + directionScore * 0.4));
+        this.totalDynamicsFrames++;
+        this.totalDynamicsScore += combinedScore;
         if (Math.abs(dynamicDeviation) >= 2 || !directionMatch) {
-            this.logDynamicDeviation({ measure, beat, expectedDynamic: expected, actualDynamic: envelope.currentDynamic, deviation: dynamicDeviation, score: dynamicScore, expectedDirection: this.currentDynamicDirection, actualTrend: envelope.currentTrend, directionMatch, timestamp });
+            this.logDynamicDeviation({ measure, beat, expectedDynamic, actualDynamic: envelope.currentDynamic, deviation: dynamicDeviation, score: dynamicScore, expectedDirection: direction, actualTrend: envelope.currentTrend, directionMatch, timestamp });
         }
-        return { dynamicScore, directionScore, expectedDynamic: expected, actualDynamic: envelope.currentDynamic, dynamicDeviation, trend: envelope.currentTrend, expectedDirection: this.currentDynamicDirection, directionMatch, combinedScore: Math.round((dynamicScore * 0.6 + directionScore * 0.4)) };
+        return { dynamicScore, directionScore, expectedDynamic, actualDynamic: envelope.currentDynamic, dynamicDeviation, trend: envelope.currentTrend, expectedDirection: direction, directionMatch, combinedScore };
     }
 
     processNoteArticulation(noteEvent, measure, beat) {
@@ -204,6 +210,8 @@ class DynamicsComparator {
         let comparison;
         if (expected) comparison = this.articulationDetector.compareArticulation(detected.type, expected);
         else comparison = { match: true, score: 80, feedback: '' };
+        this.totalArticulationEvents++;
+        this.totalArticulationScore += comparison.score;
         if (expected && !comparison.match) {
             this.logArticulationDeviation({ measure, beat, expectedArticulation: expected, detectedArticulation: detected.type, confidence: detected.confidence, score: comparison.score, feedback: comparison.feedback });
         }
@@ -228,10 +236,8 @@ class DynamicsComparator {
     }
 
     getSessionScores() {
-        const dynScores = this.dynamicsDeviations.map(d => d.score);
-        const artScores = this.articulationDeviations.map(d => d.score);
-        const avgD = dynScores.length > 0 ? dynScores.reduce((a, b) => a + b, 0) / dynScores.length : 75;
-        const avgA = artScores.length > 0 ? artScores.reduce((a, b) => a + b, 0) / artScores.length : 75;
+        const avgD = this.totalDynamicsFrames > 0 ? this.totalDynamicsScore / this.totalDynamicsFrames : 75;
+        const avgA = this.totalArticulationEvents > 0 ? this.totalArticulationScore / this.totalArticulationEvents : 75;
         return { dynamics: Math.round(avgD), articulation: Math.round(avgA), combined: Math.round(avgD * 0.5 + avgA * 0.5), dynamicsDeviationCount: this.dynamicsDeviations.length, articulationDeviationCount: this.articulationDeviations.length };
     }
 
@@ -256,9 +262,10 @@ class DynamicsComparator {
         this.articulationDeviations = [];
         this.currentMeasure = 1;
         this.currentBeat = 0;
-        this.expectedDynamic = 'mf';
-        this.expectedArticulation = null;
-        this.currentDynamicDirection = null;
+        this.totalDynamicsFrames = 0;
+        this.totalDynamicsScore = 0;
+        this.totalArticulationEvents = 0;
+        this.totalArticulationScore = 0;
     }
 }
 
@@ -319,16 +326,16 @@ function runTests() {
         assertEqual(comp.scoreArticulations[0].type, 'staccato', 'Articulation type should be staccato');
     });
 
-    // Test 3: Get expected dynamic
+    // Test 3: Get expected dynamic (returns object)
     test('should return expected dynamic at position', () => {
         const comp = new DynamicsComparator();
         comp.scoreDynamics = [
             { measure: 1, beat: 0, type: 'p', category: 'dynamic' },
             { measure: 3, beat: 0, type: 'f', category: 'dynamic' }
         ];
-        assertEqual(comp.getExpectedDynamic(1, 0), 'p', 'Measure 1 = p');
-        assertEqual(comp.getExpectedDynamic(2, 0), 'p', 'Measure 2 = p (carried over)');
-        assertEqual(comp.getExpectedDynamic(3, 0), 'f', 'Measure 3 = f');
+        assertEqual(comp.getExpectedDynamic(1, 0).dynamic, 'p', 'Measure 1 = p');
+        assertEqual(comp.getExpectedDynamic(2, 0).dynamic, 'p', 'Measure 2 = p (carried over)');
+        assertEqual(comp.getExpectedDynamic(3, 0).dynamic, 'f', 'Measure 3 = f');
     });
 
     // Test 4: Get expected dynamic with crescendo
@@ -338,8 +345,9 @@ function runTests() {
             { measure: 1, beat: 0, type: 'p', category: 'dynamic' },
             { measure: 2, beat: 0, type: 'crescendo', category: 'wedge' }
         ];
-        comp.getExpectedDynamic(2, 1);
-        assertEqual(comp.currentDynamicDirection, 'crescendo', 'Should detect crescendo direction');
+        const result = comp.getExpectedDynamic(2, 1);
+        assertEqual(result.direction, 'crescendo', 'Should detect crescendo direction');
+        assertEqual(result.dynamic, 'p', 'Dynamic should still be p');
     });
 
     // Test 5: Calculate dynamic score
@@ -377,7 +385,6 @@ function runTests() {
             timestamp: 1000, attackTime: 10, peakAmplitude: 0.3, decayRate: 0.02,
             duration: 100, expectedDuration: 500, measure: 1
         }, 1, 0);
-        // The detected should be staccato (short duration)
         assertEqual(result.expected, 'staccato', 'Expected staccato');
         assertEqual(result.detected, 'staccato', 'Detected staccato');
         assertEqual(result.match, true, 'Should match');
@@ -395,15 +402,15 @@ function runTests() {
         assertTrue(comp.articulationDeviations.length > 0, 'Should log articulation deviation');
     });
 
-    // Test 10: Get session scores
-    test('should calculate session scores', () => {
+    // Test 10: Get session scores (unbiased — uses running totals)
+    test('should calculate session scores from all processed frames', () => {
         const comp = new DynamicsComparator();
-        comp.dynamicsDeviations = [{ score: 80 }, { score: 60 }];
-        comp.articulationDeviations = [{ score: 90 }, { score: 70 }];
+        comp.scoreDynamics = [{ measure: 1, beat: 0, type: 'mf', category: 'dynamic' }];
+        // Process matching frames
+        comp.processAudioFrame(0.20, 1, 0, 1000);
+        comp.processAudioFrame(0.20, 1, 1, 1050);
         const scores = comp.getSessionScores();
-        assertEqual(scores.dynamics, 70, 'Avg dynamics score');
-        assertEqual(scores.articulation, 80, 'Avg articulation score');
-        assertEqual(scores.combined, 75, 'Combined score');
+        assertEqual(scores.dynamics, 100, 'Matching frames should average 100');
     });
 
     // Test 11: Get problem measures
@@ -436,11 +443,14 @@ function runTests() {
         const comp = new DynamicsComparator();
         comp.dynamicsDeviations.push({ measure: 1, score: 50 });
         comp.articulationDeviations.push({ measure: 1, score: 50 });
+        comp.totalDynamicsFrames = 10;
+        comp.totalDynamicsScore = 800;
         comp.reset();
         assertEqual(comp.dynamicsDeviations.length, 0, 'Dynamics deviations cleared');
         assertEqual(comp.articulationDeviations.length, 0, 'Articulation deviations cleared');
         assertEqual(comp.currentMeasure, 1, 'Measure reset');
-        assertEqual(comp.expectedDynamic, 'mf', 'Dynamic reset');
+        assertEqual(comp.totalDynamicsFrames, 0, 'Dynamics frames reset');
+        assertEqual(comp.totalArticulationEvents, 0, 'Articulation events reset');
     });
 
     // Test 14: Direction compliance scoring
@@ -454,14 +464,12 @@ function runTests() {
         for (let i = 0; i < 10; i++) {
             comp.processAudioFrame(0.06, 1, 0, 1000 + i * 50);
         }
-        // Should have logged deviations due to no crescendo
         assertTrue(comp.dynamicsDeviations.length > 0, 'Should log deviation for missing crescendo');
     });
 
     // Test 15: No expected articulation
     test('should give default score when no articulation expected', () => {
         const comp = new DynamicsComparator();
-        // No score articulations loaded
         const result = comp.processNoteArticulation({
             timestamp: 1000, attackTime: 10, peakAmplitude: 0.3, decayRate: 0.02,
             duration: 200, expectedDuration: 500, measure: 1
@@ -497,16 +505,60 @@ function runTests() {
             { measure: 1, beat: 0, type: 'crescendo', category: 'wedge' },
             { measure: 2, beat: 0, type: 'wedge-stop', category: 'wedge' }
         ];
-        comp.getExpectedDynamic(2, 1);
-        assertEqual(comp.currentDynamicDirection, null, 'Direction should be null after wedge-stop');
+        const result = comp.getExpectedDynamic(2, 1);
+        assertEqual(result.direction, null, 'Direction should be null after wedge-stop');
     });
 
-    // Test 18: Default session scores with no deviations
-    test('should return default 75 when no deviations recorded', () => {
+    // Test 18: Default session scores with no data
+    test('should return default 75 when no frames processed', () => {
         const comp = new DynamicsComparator();
         const scores = comp.getSessionScores();
         assertEqual(scores.dynamics, 75, 'Default dynamics = 75');
         assertEqual(scores.articulation, 75, 'Default articulation = 75');
+    });
+
+    // Test 19: getExpectedDynamic is pure (no side effects)
+    test('getExpectedDynamic should not mutate instance state', () => {
+        const comp = new DynamicsComparator();
+        comp.scoreDynamics = [
+            { measure: 1, beat: 0, type: 'f', category: 'dynamic' },
+            { measure: 2, beat: 0, type: 'crescendo', category: 'wedge' }
+        ];
+        const before = JSON.stringify({ m: comp.currentMeasure, b: comp.currentBeat });
+        comp.getExpectedDynamic(2, 1);
+        const after = JSON.stringify({ m: comp.currentMeasure, b: comp.currentBeat });
+        assertEqual(before, after, 'State should not change from getExpectedDynamic');
+    });
+
+    // Test 20: loadScore sorts by measure then beat
+    test('should sort scoreDynamics by (measure, beat) after loading', () => {
+        const comp = new DynamicsComparator();
+        const score = {
+            parts: [{
+                measures: [
+                    { number: 3, dynamics: [{ type: 'ff', beat: 0, category: 'dynamic' }], notes: [] },
+                    { number: 1, dynamics: [{ type: 'p', beat: 2, category: 'dynamic' }], notes: [] },
+                    { number: 1, dynamics: [{ type: 'pp', beat: 0, category: 'dynamic' }], notes: [] }
+                ]
+            }]
+        };
+        comp.loadScore(score);
+        assertEqual(comp.scoreDynamics[0].type, 'pp', 'First should be pp (m1 b0)');
+        assertEqual(comp.scoreDynamics[1].type, 'p', 'Second should be p (m1 b2)');
+        assertEqual(comp.scoreDynamics[2].type, 'ff', 'Third should be ff (m3 b0)');
+    });
+
+    // Test 21: Session scores track articulation from all events
+    test('should include matching articulation events in session scores', () => {
+        const comp = new DynamicsComparator();
+        // No expected articulation, so default score 80
+        comp.processNoteArticulation({
+            timestamp: 1000, attackTime: 10, peakAmplitude: 0.3, decayRate: 0.02,
+            duration: 200, expectedDuration: 500, measure: 1
+        }, 1, 0);
+        const scores = comp.getSessionScores();
+        assertEqual(scores.articulation, 80, 'Should reflect default 80 score');
+        assertEqual(comp.totalArticulationEvents, 1, 'Should have 1 event');
     });
 
     console.log(`\n${passed} passed, ${failed} failed`);

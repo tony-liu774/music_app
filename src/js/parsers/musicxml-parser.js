@@ -107,8 +107,9 @@ class MusicXMLParser {
             }
         }
 
-        // Parse direction elements (dynamics, wedges/hairpins)
+        // Parse direction elements (dynamics, wedges/hairpins, techniques)
         let currentDynamic = null;
+        let currentTechnique = null;
         const directions = measureElement.querySelectorAll('direction');
         directions.forEach(dirElement => {
             const parsed = this.parseDirection(dirElement, measureNumber);
@@ -118,6 +119,9 @@ class MusicXMLParser {
                     currentDynamic = parsed.type;
                 } else if (parsed.category === 'wedge') {
                     measure.dynamics.push(parsed);
+                } else if (parsed.category === 'technique') {
+                    measure.articulations.push(parsed);
+                    currentTechnique = parsed.type;
                 }
             }
         });
@@ -145,6 +149,11 @@ class MusicXMLParser {
                         if (dyn.category === 'wedge' && dyn.beat !== undefined && currentBeat >= dyn.beat) {
                             note.dynamicDirection = dyn.type;
                         }
+                    }
+
+                    // Apply current technique (e.g., pizzicato from text direction)
+                    if (currentTechnique && !note.articulation) {
+                        note.articulation = currentTechnique;
                     }
 
                     measure.notes.push(note);
@@ -314,7 +323,7 @@ class MusicXMLParser {
         if (words) {
             const text = words.textContent.toLowerCase().trim();
             if (text === 'pizz.' || text === 'pizz' || text === 'pizzicato') {
-                return { category: 'dynamic', type: 'pizzicato', measure: measureNumber, beat: 0 };
+                return { category: 'technique', type: 'pizzicato', measure: measureNumber, beat: 0 };
             }
             if (text.startsWith('cresc')) {
                 return { category: 'wedge', type: 'crescendo', measure: measureNumber, beat: 0 };

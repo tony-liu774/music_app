@@ -12,6 +12,7 @@ class IntonationAnalyzer {
         this.articulationScores = [];
         this.noteHistory = [];
         this.maxHistorySize = 10;
+        this.maxScoreHistory = 500;
     }
 
     /**
@@ -40,9 +41,11 @@ class IntonationAnalyzer {
             const prevNote = this.noteHistory[this.noteHistory.length - 2];
             const transitionScore = this.calculateTransitionScore(prevNote, noteInfo);
             this.transitionScores.push(transitionScore);
+            if (this.transitionScores.length > this.maxScoreHistory) this.transitionScores.shift();
         }
 
         this.pitchScores.push(pitchAccuracy);
+        if (this.pitchScores.length > this.maxScoreHistory) this.pitchScores.shift();
     }
 
     /**
@@ -93,6 +96,7 @@ class IntonationAnalyzer {
      */
     recordRhythmScore(score) {
         this.rhythmScores.push(score);
+        if (this.rhythmScores.length > this.maxScoreHistory) this.rhythmScores.shift();
     }
 
     /**
@@ -101,6 +105,7 @@ class IntonationAnalyzer {
      */
     recordDynamicsScore(score) {
         this.dynamicsScores.push(score);
+        if (this.dynamicsScores.length > this.maxScoreHistory) this.dynamicsScores.shift();
     }
 
     /**
@@ -109,6 +114,7 @@ class IntonationAnalyzer {
      */
     recordArticulationScore(score) {
         this.articulationScores.push(score);
+        if (this.articulationScores.length > this.maxScoreHistory) this.articulationScores.shift();
     }
 
     /**
