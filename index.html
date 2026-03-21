@@ -1668,6 +1668,161 @@
             </div>
         </div>
 
+        <!-- OMR Scanner Modal -->
+        <div class="modal" id="scanner-modal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-scanner">
+                <button class="modal-close" aria-label="Close" id="scanner-close-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+
+                <!-- Scanner Title -->
+                <div class="scanner-header">
+                    <h2>Scan Sheet Music</h2>
+                    <p class="scanner-subtitle">Upload a photo or PDF to convert to digital notation</p>
+                </div>
+
+                <!-- Scanner Tabs -->
+                <div class="scanner-tabs">
+                    <button class="scanner-tab active" data-tab="upload">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                        Upload
+                    </button>
+                    <button class="scanner-tab" data-tab="camera">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                            <circle cx="12" cy="13" r="4"/>
+                        </svg>
+                        Camera
+                    </button>
+                </div>
+
+                <!-- Upload Tab Content -->
+                <div class="scanner-tab-content active" id="scanner-upload-content">
+                    <div class="upload-zone" id="upload-zone">
+                        <div class="upload-zone-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                                <line x1="12" y1="18" x2="12" y2="12"/>
+                                <line x1="9" y1="15" x2="15" y2="15"/>
+                            </svg>
+                        </div>
+                        <p class="upload-zone-text">Drag & drop or click to upload</p>
+                        <p class="upload-zone-hint">Supports PDF, JPEG, PNG, WebP, TIFF</p>
+                        <input type="file" id="scanner-file-input" accept=".pdf,.jpg,.jpeg,.png,.webp,.tiff" hidden>
+                    </div>
+                    <div class="selected-file" id="selected-file" style="display: none;">
+                        <div class="file-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                            </svg>
+                        </div>
+                        <div class="file-info">
+                            <span class="file-name" id="selected-file-name"></span>
+                            <span class="file-size" id="selected-file-size"></span>
+                        </div>
+                        <button class="file-remove" id="remove-selected-file">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"/>
+                                <line x1="6" y1="6" x2="18" y2="18"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Camera Tab Content -->
+                <div class="scanner-tab-content" id="scanner-camera-content">
+                    <div class="camera-preview" id="camera-preview">
+                        <p class="camera-hint">Click "Open Camera" to start capturing</p>
+                    </div>
+                    <button class="btn btn-primary" id="open-camera-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                            <circle cx="12" cy="13" r="4"/>
+                        </svg>
+                        Open Camera
+                    </button>
+                </div>
+
+                <!-- Processing State -->
+                <div class="scanner-processing" id="scanner-processing" style="display: none;">
+                    <div class="processing-animation">
+                        <div class="processing-ring"></div>
+                        <div class="processing-ring processing-ring-delay"></div>
+                        <div class="processing-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 6v6l4 2"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <h3 class="processing-title">Processing</h3>
+                    <p class="processing-message" id="processing-message">Initializing...</p>
+                    <div class="processing-progress">
+                        <div class="processing-progress-bar" id="processing-progress-bar"></div>
+                    </div>
+                    <span class="processing-percent" id="processing-percent">0%</span>
+                </div>
+
+                <!-- Error State -->
+                <div class="scanner-error" id="scanner-error" style="display: none;">
+                    <div class="error-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="15" y1="9" x2="9" y2="15"/>
+                            <line x1="9" y1="9" x2="15" y2="15"/>
+                        </svg>
+                    </div>
+                    <h3>Processing Failed</h3>
+                    <p class="error-message" id="error-message">Unable to process the image. Please try again.</p>
+                    <button class="btn btn-secondary" id="retry-scan-btn">Try Again</button>
+                </div>
+
+                <!-- Success State -->
+                <div class="scanner-success" id="scanner-success" style="display: none;">
+                    <div class="success-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M9 12l2 2 4-4"/>
+                        </svg>
+                    </div>
+                    <h3>Scan Complete!</h3>
+                    <p>Your sheet music has been converted to digital notation.</p>
+                    <div class="scanned-preview" id="scanned-preview">
+                        <div class="preview-info">
+                            <span class="preview-title" id="scanned-title"></span>
+                            <span class="preview-meta" id="scanned-meta"></span>
+                        </div>
+                    </div>
+                    <div class="scanner-success-actions">
+                        <button class="btn btn-secondary" id="scan-another-btn">Scan Another</button>
+                        <button class="btn btn-primary" id="add-to-library-btn">Add to Library</button>
+                    </div>
+                </div>
+
+                <!-- Scanner Actions -->
+                <div class="scanner-actions" id="scanner-actions">
+                    <button class="btn btn-secondary" id="cancel-scanner-btn">Cancel</button>
+                    <button class="btn btn-primary" id="process-scan-btn" disabled>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M12 6v6l4 2"/>
+                        </svg>
+                        Process
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- IMSLP Search Modal -->
         <div class="modal" id="imslp-modal">
             <div class="modal-backdrop"></div>

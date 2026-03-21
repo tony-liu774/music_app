@@ -287,8 +287,11 @@ class ConcertmasterApp {
         });
 
         document.getElementById('scan-music-btn')?.addEventListener('click', () => {
-            this.showToast('Scan feature coming soon', 'info');
+            this.openScannerModal();
         });
+
+        // Scanner modal setup
+        this.setupScannerModal();
 
         document.getElementById('search-imslp-btn')?.addEventListener('click', () => {
             document.getElementById('imslp-modal')?.classList.add('active');
@@ -1700,6 +1703,369 @@ class ConcertmasterApp {
         setTimeout(() => {
             toast.remove();
         }, 3000);
+    }
+
+    // ============================================
+    // OMR Scanner Modal Methods
+    // ============================================
+
+    setupScannerModal() {
+        const scannerModal = document.getElementById('scanner-modal');
+        if (!scannerModal) return;
+
+        // Tab switching
+        document.querySelectorAll('.scanner-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.dataset.tab;
+                this.switchScannerTab(tabName);
+            });
+        });
+
+        // Upload zone click
+        const uploadZone = document.getElementById('upload-zone');
+        const fileInput = document.getElementById('scanner-file-input');
+
+        uploadZone?.addEventListener('click', () => {
+            fileInput?.click();
+        });
+
+        // Drag and drop
+        uploadZone?.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+
+        uploadZone?.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+
+        uploadZone?.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            const files = e.dataTransfer?.files;
+            if (files?.length) {
+                this.handleScannerFile(files[0]);
+            }
+        });
+
+        // File input change
+        fileInput?.addEventListener('change', (e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+                this.handleScannerFile(file);
+            }
+        });
+
+        // Remove selected file
+        document.getElementById('remove-selected-file')?.addEventListener('click', () => {
+            this.clearScannerFile();
+        });
+
+        // Cancel button
+        document.getElementById('cancel-scanner-btn')?.addEventListener('click', () => {
+            this.closeScannerModal();
+        });
+
+        // Close button
+        document.getElementById('scanner-close-btn')?.addEventListener('click', () => {
+            this.closeScannerModal();
+        });
+
+        // Process scan button
+        document.getElementById('process-scan-btn')?.addEventListener('click', () => {
+            this.processScan();
+        });
+
+        // Retry button
+        document.getElementById('retry-scan-btn')?.addEventListener('click', () => {
+            this.retryScan();
+        });
+
+        // Scan another button
+        document.getElementById('scan-another-btn')?.addEventListener('click', () => {
+            this.scanAnother();
+        });
+
+        // Add to library button
+        document.getElementById('add-to-library-btn')?.addEventListener('click', () => {
+            this.addScannedToLibrary();
+        });
+
+        // Open camera button
+        document.getElementById('open-camera-btn')?.addEventListener('click', () => {
+            this.openCamera();
+        });
+    }
+
+    openScannerModal() {
+        const modal = document.getElementById('scanner-modal');
+        if (modal) {
+            modal.classList.add('active');
+            this.resetScannerModal();
+        }
+    }
+
+    closeScannerModal() {
+        const modal = document.getElementById('scanner-modal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
+        this.resetScannerModal();
+    }
+
+    resetScannerModal() {
+        // Reset state
+        this.scannerFile = null;
+        this.scannedScore = null;
+
+        // Show upload content
+        this.showScannerContent('upload');
+
+        // Clear file selection
+        document.getElementById('upload-zone')?.style.removeProperty('display');
+        document.getElementById('selected-file')?.style.setProperty('display', 'none');
+        document.getElementById('scanner-file-input').value = '';
+
+        // Reset process button
+        const processBtn = document.getElementById('process-scan-btn');
+        if (processBtn) {
+            processBtn.disabled = true;
+        }
+
+        // Switch to upload tab
+        this.switchScannerTab('upload');
+    }
+
+    switchScannerTab(tabName) {
+        // Update tab buttons
+        document.querySelectorAll('.scanner-tab').forEach(tab => {
+            tab.classList.toggle('active', tab.dataset.tab === tabName);
+        });
+
+        // Update content
+        document.querySelectorAll('.scanner-tab-content').forEach(content => {
+            content.classList.remove('active');
+        });
+
+        const content = document.getElementById(`scanner-${tabName}-content`);
+        if (content) {
+            content.classList.add('active');
+        }
+    }
+
+    showScannerContent(type) {
+        // Hide all content sections
+        document.getElementById('scanner-upload-content')?.style.setProperty('display', 'none');
+        document.getElementById('scanner-camera-content')?.style.setProperty('display', 'none');
+        document.getElementById('scanner-processing')?.style.setProperty('display', 'none');
+        document.getElementById('scanner-error')?.style.setProperty('display', 'none');
+        document.getElementById('scanner-success')?.style.setProperty('display', 'none');
+
+        // Show requested content
+        if (type === 'upload' || type === 'camera') {
+            document.getElementById(`scanner-${type}-content`)?.style.removeProperty('display');
+            document.getElementById('scanner-actions')?.style.removeProperty('display');
+        } else if (type === 'processing') {
+            document.getElementById('scanner-processing')?.style.removeProperty('display');
+        } else if (type === 'error') {
+            document.getElementById('scanner-error')?.style.removeProperty('display');
+            document.getElementById('scanner-actions')?.style.removeProperty('display');
+        } else if (type === 'success') {
+            document.getElementById('scanner-success')?.style.removeProperty('display');
+        }
+    }
+
+    handleScannerFile(file) {
+        try {
+            // Validate file
+            const omrClient = new OMRClient();
+            omrClient.validateFile(file);
+
+            this.scannerFile = file;
+
+            // Show selected file
+            const uploadZone = document.getElementById('upload-zone');
+            const selectedFile = document.getElementById('selected-file');
+
+            if (uploadZone) uploadZone.style.display = 'none';
+            if (selectedFile) {
+                selectedFile.style.display = 'flex';
+                const fileName = document.getElementById('selected-file-name');
+                const fileSize = document.getElementById('selected-file-size');
+
+                if (fileName) fileName.textContent = file.name;
+                if (fileSize) fileSize.textContent = this.formatFileSize(file.size);
+            }
+
+            // Enable process button
+            const processBtn = document.getElementById('process-scan-btn');
+            if (processBtn) processBtn.disabled = false;
+
+        } catch (error) {
+            this.showToast(error.message, 'error');
+        }
+    }
+
+    clearScannerFile() {
+        this.scannerFile = null;
+
+        const uploadZone = document.getElementById('upload-zone');
+        const selectedFile = document.getElementById('selected-file');
+        const fileInput = document.getElementById('scanner-file-input');
+        const processBtn = document.getElementById('process-scan-btn');
+
+        if (uploadZone) uploadZone.style.display = '';
+        if (selectedFile) selectedFile.style.display = 'none';
+        if (fileInput) fileInput.value = '';
+        if (processBtn) processBtn.disabled = true;
+    }
+
+    async processScan() {
+        if (!this.scannerFile) {
+            this.showToast('Please select a file first', 'error');
+            return;
+        }
+
+        // Show processing state
+        this.showScannerContent('processing');
+
+        const omrClient = new OMRClient();
+
+        omrClient.onProgress(({ percent, message }) => {
+            this.updateProcessingProgress(percent, message);
+        });
+
+        try {
+            const score = await omrClient.processFile(this.scannerFile);
+            this.scannedScore = score;
+
+            // Show success state
+            this.showScannerSuccess(score);
+
+        } catch (error) {
+            // Show error state
+            this.showScannerError(error.message);
+        }
+    }
+
+    updateProcessingProgress(percent, message) {
+        const progressBar = document.getElementById('processing-progress-bar');
+        const percentText = document.getElementById('processing-percent');
+        const messageText = document.getElementById('processing-message');
+
+        if (progressBar) progressBar.style.width = `${percent}%`;
+        if (percentText) percentText.textContent = `${percent}%`;
+        if (messageText) messageText.textContent = message;
+    }
+
+    showScannerError(message) {
+        const errorEl = document.getElementById('error-message');
+        if (errorEl) errorEl.textContent = message;
+
+        this.showScannerContent('error');
+    }
+
+    showScannerSuccess(score) {
+        const titleEl = document.getElementById('scanned-title');
+        const metaEl = document.getElementById('scanned-meta');
+
+        if (titleEl) titleEl.textContent = score.title || 'Scanned Score';
+        if (metaEl) {
+            const measureCount = score.getTotalMeasures();
+            const noteCount = score.getAllNotes().length;
+            metaEl.textContent = `${measureCount} measures, ${noteCount} notes`;
+        }
+
+        this.showScannerContent('success');
+    }
+
+    retryScan() {
+        this.showScannerContent('upload');
+    }
+
+    scanAnother() {
+        this.resetScannerModal();
+    }
+
+    async openCamera() {
+        const omrClient = new OMRClient();
+
+        try {
+            const imageData = await omrClient.scanFromCamera();
+
+            // Convert to a "file" for processing
+            const response = await fetch(imageData);
+            const blob = await response.blob();
+            const file = new File([blob], 'camera-capture.jpg', { type: 'image/jpeg' });
+
+            this.scannerFile = file;
+
+            // Show selected file
+            const uploadZone = document.getElementById('upload-zone');
+            const selectedFile = document.getElementById('selected-file');
+
+            if (uploadZone) uploadZone.style.display = 'none';
+            if (selectedFile) {
+                selectedFile.style.display = 'flex';
+                const fileName = document.getElementById('selected-file-name');
+                const fileSize = document.getElementById('selected-file-size');
+
+                if (fileName) fileName.textContent = file.name;
+                if (fileSize) fileSize.textContent = this.formatFileSize(file.size);
+            }
+
+            // Enable process button
+            const processBtn = document.getElementById('process-scan-btn');
+            if (processBtn) processBtn.disabled = false;
+
+            // Switch back to upload tab
+            this.switchScannerTab('upload');
+
+        } catch (error) {
+            if (error.message !== 'Camera scan cancelled') {
+                this.showToast(error.message, 'error');
+            }
+        }
+    }
+
+    async addScannedToLibrary() {
+        if (!this.scannedScore) {
+            this.showToast('No scanned score to add', 'error');
+            return;
+        }
+
+        try {
+            // Get metadata from user
+            const title = this.scannedScore.title || 'Scanned Score';
+            const composer = this.scannedScore.composer || 'Unknown';
+
+            // Add to library
+            await this.scoreLibrary.addScore({
+                title: title,
+                composer: composer,
+                instrument: 'violin',
+                difficulty: 3,
+                data: this.scannedScore,
+                source: 'scanner'
+            });
+
+            // Refresh library display
+            await this.loadLibrary();
+
+            // Close modal
+            this.closeScannerModal();
+
+            this.showToast('Score added to library!', 'success');
+
+        } catch (error) {
+            this.showToast('Failed to add score: ' + error.message, 'error');
+        }
+    }
+
+    formatFileSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
     }
 }
 
