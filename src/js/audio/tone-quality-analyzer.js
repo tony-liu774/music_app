@@ -26,8 +26,10 @@ class ToneQualityAnalyzer {
         this.harmonicOrder = 8;  // Analyze up to 8th harmonic
 
         // Tone quality thresholds
+        // Note: After dB-to-linear conversion, max amplitude is ~0.0316 (-30dB)
+        // Thresholds are scaled accordingly
         this.harshnessThreshold = 0.35;  // High-frequency energy ratio for harshness
-        this.wolfToneThreshold = 0.15;   // Narrow bandwidth threshold for wolf tones
+        this.wolfToneThreshold = 0.005;  // Threshold for wolf tone detection (low due to dB conversion)
         this.purityThreshold = 60;       // Minimum purity score for good tone
 
         // Wolf tone detection - common wolf tone frequencies for each instrument

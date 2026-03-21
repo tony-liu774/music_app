@@ -157,9 +157,10 @@ class SessionLogger {
             type: 'tone_quality',
             measure: measure || 1,
             note: note || '?',
-            quality_score: Math.round(qualityScore || 50),
-            purity_score: Math.round(purityScore || 50),
-            harshness_score: Math.round(harshnessScore || 50),
+            // Use nullish coalescing to allow 0 as valid score
+            quality_score: Math.round(qualityScore ?? 50),
+            purity_score: Math.round(purityScore ?? 50),
+            harshness_score: Math.round(harshnessScore ?? 50),
             wolf_tone_detected: wolfToneDetected || false,
             wolf_tone_frequency: wolfToneFrequency || null,
             timestamp: Date.now() - (this.startTime || Date.now())

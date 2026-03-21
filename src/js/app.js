@@ -1049,15 +1049,14 @@ class ConcertmasterApp {
                 }
 
                 // Log to session logger for AI summary (throttled to once per second)
-                // Only log when there's a notable issue (low score) or significant change
+                // Only log when there's a notable issue (low score, wolf tone) AND rate-limited
                 if (this.aiSummaryGenerator && toneQualityResult) {
                     const now = Date.now();
                     const score = toneQualityResult.qualityScore ?? 50;
-                    const shouldLog = score < 60 || // Log when tone is poor
-                        toneQualityResult.wolfToneDetected || // Always log wolf tones
-                        (now - this.lastToneQualityLogTime > this.toneQualityLogInterval); // Or throttle
+                    const isNoteworthy = score < 60 || toneQualityResult.wolfToneDetected;
+                    const timeGateElapsed = now - this.lastToneQualityLogTime > this.toneQualityLogInterval;
 
-                    if (shouldLog) {
+                    if (isNoteworthy && timeGateElapsed) {
                         this.aiSummaryGenerator.logToneQualityDeviation({
                             measure: result.measure || 1,
                             note: result.name + result.octave,
