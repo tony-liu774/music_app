@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "test": "node --test tests/session-logger.test.js tests/practice-loop.test.js tests/pitch-detector.test.js tests/llm-service.test.js tests/ai-summary-generator.test.js tests/omr-client.test.js tests/bluetooth-hid.test.js tests/teacher-service.test.js tests/studio-dashboard.test.js tests/teacher-routes.test.js tests/library-service.test.js && node tests/scale-engine.test.js && node tests/volume-envelope-analyzer.test.js && node tests/articulation-detector.test.js && node tests/dynamics-comparator.test.js && node tests/musicxml-dynamics.test.js && node tests/intonation-analyzer.test.js && npx jest tests/tuner.test.js tests/onboarding.test.js"
+    "test": "NODE_ENV=test node --test tests/session-logger.test.js tests/practice-loop.test.js tests/pitch-detector.test.js tests/llm-service.test.js tests/ai-summary-generator.test.js tests/omr-client.test.js tests/bluetooth-hid.test.js tests/teacher-service.test.js tests/studio-dashboard.test.js tests/teacher-routes.test.js tests/library-service.test.js tests/auth-service.test.js tests/auth-routes.test.js tests/cloud-sync-service.test.js tests/pdf-export-service.test.js tests/sync-routes.test.js tests/teacher-report.test.js && node tests/scale-engine.test.js && node tests/volume-envelope-analyzer.test.js && node tests/articulation-detector.test.js && node tests/dynamics-comparator.test.js && node tests/musicxml-dynamics.test.js && node tests/intonation-analyzer.test.js && npx jest tests/tuner.test.js tests/onboarding.test.js"
   },
   "keywords": [
     "express",
@@ -16,14 +16,18 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "express-rate-limit": "^7.1.5",
     "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "jspdf": "^4.2.1",
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
-    "openai": "^4.28.0"
+    "openai": "^4.28.0",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "jest": "^30.3.0",
