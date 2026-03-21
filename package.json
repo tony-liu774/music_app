@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "test": "node --test tests/session-logger.test.js tests/practice-loop.test.js tests/pitch-detector.test.js tests/llm-service.test.js tests/ai-summary-generator.test.js tests/bluetooth-hid.test.js && node tests/scale-engine.test.js && npx jest tests/tuner.test.js"
+<<<<<<< HEAD
+    "test": "node --test tests/session-logger.test.js tests/practice-loop.test.js tests/pitch-detector.test.js tests/llm-service.test.js tests/ai-summary-generator.test.js tests/omr-client.test.js tests/bluetooth-hid.test.js && node tests/scale-engine.test.js && npx jest tests/tuner.test.js"
+>>>>>>> origin/main
   },
   "keywords": [
     "express",
