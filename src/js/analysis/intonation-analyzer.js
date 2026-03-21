@@ -8,8 +8,11 @@ class IntonationAnalyzer {
         this.pitchScores = [];
         this.rhythmScores = [];
         this.transitionScores = [];
+        this.dynamicsScores = [];
+        this.articulationScores = [];
         this.noteHistory = [];
         this.maxHistorySize = 10;
+        this.maxScoreHistory = 500;
     }
 
     /**
@@ -38,9 +41,11 @@ class IntonationAnalyzer {
             const prevNote = this.noteHistory[this.noteHistory.length - 2];
             const transitionScore = this.calculateTransitionScore(prevNote, noteInfo);
             this.transitionScores.push(transitionScore);
+            if (this.transitionScores.length > this.maxScoreHistory) this.transitionScores.shift();
         }
 
         this.pitchScores.push(pitchAccuracy);
+        if (this.pitchScores.length > this.maxScoreHistory) this.pitchScores.shift();
     }
 
     /**
@@ -91,25 +96,63 @@ class IntonationAnalyzer {
      */
     recordRhythmScore(score) {
         this.rhythmScores.push(score);
+        if (this.rhythmScores.length > this.maxScoreHistory) this.rhythmScores.shift();
     }
 
     /**
-     * Calculate the overall intonation score combining all three axes
+     * Record a dynamics accuracy score
+     * @param {number} score - Dynamics score 0-100
+     */
+    recordDynamicsScore(score) {
+        this.dynamicsScores.push(score);
+        if (this.dynamicsScores.length > this.maxScoreHistory) this.dynamicsScores.shift();
+    }
+
+    /**
+     * Record an articulation accuracy score
+     * @param {number} score - Articulation score 0-100
+     */
+    recordArticulationScore(score) {
+        this.articulationScores.push(score);
+        if (this.articulationScores.length > this.maxScoreHistory) this.articulationScores.shift();
+    }
+
+    /**
+     * Calculate the overall intonation score combining all axes
+     * When dynamics/articulation data is available, uses expanded weighting
      */
     calculateIntonationScore() {
         const pitchScore = this.getAveragePitchScore();
         const rhythmScore = this.getAverageRhythmScore();
         const transitionScore = this.getAverageTransitionScore();
+        const dynamicsScore = this.getAverageDynamicsScore();
+        const articulationScore = this.getAverageArticulationScore();
 
-        // Weighted average: pitch 40%, rhythm 40%, transitions 20%
-        const overall = (pitchScore * 0.4) + (rhythmScore * 0.4) + (transitionScore * 0.2);
+        const hasDynamicsData = this.dynamicsScores.length > 0 || this.articulationScores.length > 0;
 
-        return {
+        let overall;
+        if (hasDynamicsData) {
+            // Expanded weighting: pitch 30%, rhythm 30%, transitions 15%, dynamics 15%, articulation 10%
+            overall = (pitchScore * 0.30) + (rhythmScore * 0.30) + (transitionScore * 0.15) +
+                      (dynamicsScore * 0.15) + (articulationScore * 0.10);
+        } else {
+            // Original weighting: pitch 40%, rhythm 40%, transitions 20%
+            overall = (pitchScore * 0.4) + (rhythmScore * 0.4) + (transitionScore * 0.2);
+        }
+
+        const result = {
             overall: Math.round(overall),
             pitch: Math.round(pitchScore),
             rhythm: Math.round(rhythmScore),
             transition: Math.round(transitionScore)
         };
+
+        if (hasDynamicsData) {
+            result.dynamics = Math.round(dynamicsScore);
+            result.articulation = Math.round(articulationScore);
+        }
+
+        return result;
     }
 
     /**
@@ -137,6 +180,22 @@ class IntonationAnalyzer {
     }
 
     /**
+     * Get average dynamics score
+     */
+    getAverageDynamicsScore() {
+        if (this.dynamicsScores.length === 0) return 75;
+        return this.dynamicsScores.reduce((a, b) => a + b, 0) / this.dynamicsScores.length;
+    }
+
+    /**
+     * Get average articulation score
+     */
+    getAverageArticulationScore() {
+        if (this.articulationScores.length === 0) return 75;
+        return this.articulationScores.reduce((a, b) => a + b, 0) / this.articulationScores.length;
+    }
+
+    /**
      * Get the weakest axis for recommendations
      */
     getWeakestAxis() {
@@ -146,6 +205,14 @@ class IntonationAnalyzer {
             { name: 'rhythm', score: scores.rhythm },
             { name: 'intonation', score: scores.transition }
         ];
+
+        // Include dynamics/articulation if available
+        if (scores.dynamics !== undefined) {
+            axes.push({ name: 'dynamics', score: scores.dynamics });
+        }
+        if (scores.articulation !== undefined) {
+            axes.push({ name: 'articulation', score: scores.articulation });
+        }
 
         axes.sort((a, b) => a.score - b.score);
         return axes[0];
@@ -177,6 +244,8 @@ class IntonationAnalyzer {
         this.pitchScores = [];
         this.rhythmScores = [];
         this.transitionScores = [];
+        this.dynamicsScores = [];
+        this.articulationScores = [];
         this.noteHistory = [];
     }
 
@@ -198,4 +267,9 @@ class IntonationAnalyzer {
     }
 }
 
-window.IntonationAnalyzer = IntonationAnalyzer;
+if (typeof window !== 'undefined') {
+    window.IntonationAnalyzer = IntonationAnalyzer;
+}
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { IntonationAnalyzer };
+}

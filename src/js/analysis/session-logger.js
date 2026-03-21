@@ -92,6 +92,56 @@ class SessionLogger {
     }
 
     /**
+     * Log a dynamics deviation (volume level mismatch with score marking)
+     * @param {Object} params - Deviation parameters
+     * @param {number} params.measure - Measure number
+     * @param {number} params.beat - Beat number
+     * @param {string} params.expectedDynamic - Expected dynamic marking (pp, p, mp, mf, f, ff)
+     * @param {string} params.actualDynamic - Detected dynamic marking
+     * @param {number} params.deviation - Numeric level deviation
+     * @param {string} params.expectedDirection - Expected direction (crescendo/decrescendo/null)
+     * @param {string} params.actualTrend - Detected trend
+     */
+    logDynamicsDeviation({ measure, beat, expectedDynamic, actualDynamic, deviation, expectedDirection, actualTrend }) {
+        const dev = {
+            type: 'dynamics',
+            measure: measure || 1,
+            beat: beat || 1,
+            expected_dynamic: expectedDynamic || 'mf',
+            actual_dynamic: actualDynamic || 'mf',
+            deviation: deviation || 0,
+            expected_direction: expectedDirection || null,
+            actual_trend: actualTrend || 'stable',
+            timestamp: Date.now() - (this.startTime || Date.now())
+        };
+        this.deviations.push(dev);
+    }
+
+    /**
+     * Log an articulation deviation (bow stroke mismatch with score marking)
+     * @param {Object} params - Deviation parameters
+     * @param {number} params.measure - Measure number
+     * @param {number} params.beat - Beat number
+     * @param {string} params.expectedArticulation - Expected articulation from score
+     * @param {string} params.detectedArticulation - Detected articulation from audio
+     * @param {number} params.score - Accuracy score 0-100
+     * @param {string} params.feedback - Human-readable feedback
+     */
+    logArticulationDeviation({ measure, beat, expectedArticulation, detectedArticulation, score, feedback }) {
+        const dev = {
+            type: 'articulation',
+            measure: measure || 1,
+            beat: beat || 1,
+            expected_articulation: expectedArticulation || '?',
+            detected_articulation: detectedArticulation || '?',
+            score: Math.round(score || 0),
+            feedback: feedback || '',
+            timestamp: Date.now() - (this.startTime || Date.now())
+        };
+        this.deviations.push(dev);
+    }
+
+    /**
      * Get the complete session log in JSON format
      * @returns {Object} Complete session log
      */
@@ -105,6 +155,8 @@ class SessionLogger {
             pitch_deviations: this.deviations.filter(d => d.type === 'pitch').length,
             rhythm_deviations: this.deviations.filter(d => d.type === 'rhythm').length,
             intonation_deviations: this.deviations.filter(d => d.type === 'intonation').length,
+            dynamics_deviations: this.deviations.filter(d => d.type === 'dynamics').length,
+            articulation_deviations: this.deviations.filter(d => d.type === 'articulation').length,
             deviations: this.deviations
         };
     }
@@ -117,6 +169,8 @@ class SessionLogger {
         const pitchDevs = this.deviations.filter(d => d.type === 'pitch');
         const rhythmDevs = this.deviations.filter(d => d.type === 'rhythm');
         const intDevs = this.deviations.filter(d => d.type === 'intonation');
+        const dynDevs = this.deviations.filter(d => d.type === 'dynamics');
+        const artDevs = this.deviations.filter(d => d.type === 'articulation');
 
         const avgPitchDev = pitchDevs.length > 0
             ? pitchDevs.reduce((sum, d) => sum + Math.abs(d.deviation_cents), 0) / pitchDevs.length
@@ -125,6 +179,14 @@ class SessionLogger {
         const avgRhythmDev = rhythmDevs.length > 0
             ? rhythmDevs.reduce((sum, d) => sum + Math.abs(d.deviation_ms), 0) / rhythmDevs.length
             : 0;
+
+        const avgDynDev = dynDevs.length > 0
+            ? dynDevs.reduce((sum, d) => sum + Math.abs(d.deviation), 0) / dynDevs.length
+            : 0;
+
+        const avgArtScore = artDevs.length > 0
+            ? artDevs.reduce((sum, d) => sum + (d.score || 0), 0) / artDevs.length
+            : 100;
 
         // Find most problematic measures
         const measureErrors = {};
@@ -145,8 +207,12 @@ class SessionLogger {
             pitch_deviation_count: pitchDevs.length,
             rhythm_deviation_count: rhythmDevs.length,
             intonation_deviation_count: intDevs.length,
+            dynamics_deviation_count: dynDevs.length,
+            articulation_deviation_count: artDevs.length,
             average_pitch_deviation_cents: Math.round(avgPitchDev),
             average_rhythm_deviation_ms: Math.round(avgRhythmDev),
+            average_dynamics_deviation: Math.round(avgDynDev * 10) / 10,
+            average_articulation_score: Math.round(avgArtScore),
             problem_measures: problemMeasures,
             worst_measure: problemMeasures.length > 0 ? problemMeasures[0].measure : null
         };
@@ -176,4 +242,9 @@ class SessionLogger {
     }
 }
 
-window.SessionLogger = SessionLogger;
+if (typeof window !== 'undefined') {
+    window.SessionLogger = SessionLogger;
+}
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { SessionLogger };
+}
