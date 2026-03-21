@@ -29,6 +29,10 @@ class ConcertmasterApp {
         this.heatMapRenderer = null;
         this.followTheBall = null;
 
+        // Scale Engine (warm-up generator)
+        this.scaleEngine = null;
+        this.scaleEngineUI = null;
+
         // Onboarding
         this.onboardingService = null;
         this.onboardingUI = null;
@@ -110,6 +114,9 @@ class ConcertmasterApp {
 
         // Initialize renderers
         this.initRenderers();
+
+        // Initialize scale engine
+        this.initScaleEngine();
     }
 
     initRenderers() {
@@ -130,6 +137,25 @@ class ConcertmasterApp {
         if (heatmapPreview) {
             this.heatMapRenderer = new HeatMapRenderer(heatmapPreview);
             this.heatMapRenderer.init();
+        }
+    }
+
+    /**
+     * Initialize Scale Engine warm-up generator
+     */
+    initScaleEngine() {
+        this.scaleEngine = new ScaleEngine();
+
+        const scaleContainer = document.getElementById('scale-engine-container');
+        if (scaleContainer) {
+            this.scaleEngineUI = new ScaleEngineUI(scaleContainer);
+            this.scaleEngineUI.init(this.scaleEngine);
+            this.scaleEngineUI.connectModules({
+                metronome: this.metronome,
+                followTheBall: this.followTheBall,
+                intonationAnalyzer: this.intonationAnalyzer,
+                sheetMusicRenderer: this.sheetMusicRenderer
+            });
         }
     }
 
