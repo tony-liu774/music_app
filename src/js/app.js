@@ -66,12 +66,20 @@ class ConcertmasterApp {
         this.isTeacherMode = false;
         this.teacherService = null;
         this.studioDashboard = null;
+
+        // SSO / OAuth
+        this.authService = null;
+        this.oauthService = null;
+        this.ssoLoginUI = null;
     }
 
     async init() {
         console.log('Initializing Virtual Concertmaster...');
 
         try {
+            // Initialize SSO / OAuth
+            this.initSSO();
+
             // Initialize components
             this.initializeComponents();
 
@@ -394,6 +402,51 @@ class ConcertmasterApp {
                 await this.audioEngine.requestMicrophoneAccess();
             } catch (error) {
                 console.warn('Microphone access not granted:', error);
+            }
+        }
+    }
+
+    /**
+     * Initialize SSO / OAuth services and show login screen if needed.
+     */
+    initSSO() {
+        if (typeof AuthService === 'undefined' || typeof OAuthService === 'undefined') {
+            return;
+        }
+
+        this.authService = new AuthService();
+        this.oauthService = new OAuthService(this.authService);
+
+        // Configure with env-provided client IDs (set via global config)
+        const oauthConfig = window.OAUTH_CONFIG || {};
+        this.oauthService.configure({
+            googleClientId: oauthConfig.googleClientId || '',
+            appleClientId: oauthConfig.appleClientId || ''
+        });
+
+        // Listen for logout events to clear OAuth provider
+        this.authService.onAuthStateChange((event) => {
+            if (event === 'logout') {
+                this.oauthService.clearProvider();
+            }
+        });
+
+        // Show SSO login screen if user is not authenticated
+        if (typeof SSOLoginUI !== 'undefined') {
+            this.ssoLoginUI = new SSOLoginUI(this.oauthService, this.authService);
+            this.ssoLoginUI.init({
+                onSuccess: (user, provider) => {
+                    if (user) {
+                        this.showToast(`Signed in as ${user.displayName || user.email}`, 'success');
+                    }
+                },
+                onError: (error, provider) => {
+                    console.warn(`SSO error (${provider}):`, error.message);
+                }
+            });
+
+            if (!this.authService.isAuthenticated()) {
+                this.ssoLoginUI.show();
             }
         }
     }

@@ -10,6 +10,7 @@ const imslpRoutes = require('./routes/imslp');
 const omrRoutes = require('./routes/omr');
 const teacherRoutes = require('./routes/teacher');
 const authRoutes = require('./routes/auth');
+const oauthRoutes = require('./routes/oauth');
 const syncRoutes = require('./routes/sync');
 const notificationRoutes = require('./routes/notifications');
 const scheduler = require('./services/scheduler');
@@ -72,6 +73,9 @@ app.use('/api/teacher', teacherRoutes);
 
 // Authentication routes
 app.use('/api/auth', authRoutes);
+
+// OAuth SSO routes
+app.use('/api/auth/oauth', oauthRoutes);
 
 // Cloud sync routes
 app.use('/api/sync', syncRoutes);
