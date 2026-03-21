@@ -9,20 +9,10 @@ class AudioEngine {
         this.analyser = null;
         this.microphone = null;
         this.gainNode = null;
-        this.inputFilter = null;
         this.isInitialized = false;
         this.isListening = false;
         this.bufferSize = 2048;
         this.sampleRate = 44100;
-
-        // Current instrument calibration
-        this.currentInstrument = null;
-        this.instrumentRanges = {
-            violin: { minFreq: 196, maxFreq: 2637 },
-            viola: { minFreq: 130, maxFreq: 1760 },
-            cello: { minFreq: 65, maxFreq: 987 },
-            bass: { minFreq: 41, maxFreq: 523 }
-        };
 
         // Callbacks
         this.onAudioData = null;
@@ -234,83 +224,6 @@ class AudioEngine {
             sampleRate: this.sampleRate,
             contextState: this.audioContext?.state || 'closed'
         };
-    }
-
-    /**
-     * Set instrument calibration - applies bandpass filter for specific instrument
-     * @param {string} instrument - Instrument key (violin, viola, cello, bass)
-     */
-    setInstrumentCalibration(instrument) {
-        if (!this.instrumentRanges[instrument]) {
-            console.warn('Unknown instrument:', instrument);
-            return false;
-        }
-
-        this.currentInstrument = instrument;
-        const range = this.instrumentRanges[instrument];
-
-        // Apply bandpass filter for instrument frequency range
-        this.applyBandpassFilter(range.minFreq, range.maxFreq);
-
-        console.log(`Instrument calibration set: ${instrument} (${range.minFreq}-${range.maxFreq} Hz)`);
-        return true;
-    }
-
-    /**
-     * Apply bandpass filter to remove out-of-range frequencies
-     * Filters out sympathetic vibrations and noise outside instrument range
-     * @param {number} minFreq - Minimum frequency in Hz
-     * @param {number} maxFreq - Maximum frequency in Hz
-     */
-    applyBandpassFilter(minFreq, maxFreq) {
-        if (!this.audioContext) return;
-
-        // Disconnect existing filter if any
-        if (this.inputFilter) {
-            this.inputFilter.disconnect();
-        }
-
-        // Create bandpass filter
-        this.inputFilter = this.audioContext.createBiquadFilter();
-        this.inputFilter.type = 'bandpass';
-        this.inputFilter.frequency.value = (minFreq + maxFreq) / 2; // Center frequency
-        this.inputFilter.Q.value = 1.0; // Quality factor - wider passband for string instruments
-
-        // Reconnect audio chain with filter
-        if (this.microphone && this.gainNode) {
-            this.microphone.disconnect();
-            this.microphone.connect(this.inputFilter);
-            this.inputFilter.connect(this.gainNode);
-        }
-    }
-
-    /**
-     * Apply notch filter to remove sympathetic vibrations
-     * @param {number} freq - Frequency to notch out (Hz)
-     * @param {number} bandwidth - Bandwidth in Hz
-     */
-    applyNotchFilter(freq, bandwidth = 20) {
-        if (!this.audioContext) return;
-
-        const notchFilter = this.audioContext.createBiquadFilter();
-        notchFilter.type = 'notch';
-        notchFilter.frequency.value = freq;
-        notchFilter.Q.value = freq / bandwidth;
-
-        // Insert into audio chain
-        if (this.inputFilter) {
-            this.inputFilter.connect(notchFilter);
-            notchFilter.connect(this.gainNode);
-        }
-    }
-
-    /**
-     * Get current instrument range
-     * @returns {Object|null}
-     */
-    getCurrentInstrumentRange() {
-        if (!this.currentInstrument) return null;
-        return this.instrumentRanges[this.currentInstrument];
     }
 
     dispose() {
