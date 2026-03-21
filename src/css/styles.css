@@ -4784,3 +4784,412 @@ button.btn-icon.student-remove-btn:hover {
         display: none;
     }
 }
+
+/* ============================================
+   Studio License UI
+   ============================================ */
+
+#license-view {
+    display: none;
+}
+
+#license-view.active {
+    display: block;
+}
+
+.license-content {
+    padding: var(--space-6, 1.5rem);
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* Upgrade Prompt */
+.license-upgrade {
+    text-align: center;
+}
+
+.license-upgrade .license-header {
+    margin-bottom: var(--space-8, 2rem);
+}
+
+.license-upgrade .license-header h2 {
+    font-family: var(--font-display, 'Playfair Display', Georgia, serif);
+    font-size: 2rem;
+    color: var(--text-primary, #f5f5dc);
+    margin-bottom: var(--space-2, 0.5rem);
+}
+
+.license-upgrade .license-header p {
+    color: var(--text-muted, #6a6a7a);
+    font-size: 1.1rem;
+}
+
+/* Plan Cards */
+.license-upgrade .plans-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--space-6, 1.5rem);
+    margin-bottom: var(--space-8, 2rem);
+}
+
+.plan-card {
+    background: var(--bg-elevated, #1a1a28);
+    border: 1px solid var(--border-color, #2d2d3d);
+    border-radius: var(--radius-xl, 1rem);
+    padding: var(--space-6, 1.5rem);
+    position: relative;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.plan-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 32px rgba(201, 162, 39, 0.15);
+}
+
+.plan-card.studio {
+    border-color: var(--color-amber, #c9a227);
+}
+
+.plan-badge {
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, var(--color-amber, #c9a227), #e6b800);
+    color: #0a0a12;
+    padding: var(--space-1, 0.25rem) var(--space-3, 0.75rem);
+    border-radius: var(--radius-full, 9999px);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.plan-name {
+    font-family: var(--font-display, 'Playfair Display', Georgia, serif);
+    font-size: 1.5rem;
+    color: var(--text-primary, #f5f5dc);
+    margin-bottom: var(--space-4, 1rem);
+}
+
+.plan-price {
+    margin-bottom: var(--space-2, 0.5rem);
+}
+
+.price-amount {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--color-amber, #c9a227);
+}
+
+.price-interval {
+    color: var(--text-muted, #6a6a7a);
+    font-size: 1rem;
+}
+
+.plan-students {
+    color: var(--text-muted, #6a6a7a);
+    font-size: 0.9rem;
+    margin-bottom: var(--space-3, 0.75rem);
+}
+
+.plan-description {
+    color: var(--text-secondary, #a0a0b0);
+    margin-bottom: var(--space-4, 1rem);
+    font-size: 0.95rem;
+}
+
+.plan-features {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 var(--space-6, 1.5rem) 0;
+    text-align: left;
+}
+
+.plan-features li {
+    color: var(--text-secondary, #a0a0b0);
+    padding: var(--space-2, 0.5rem) 0;
+    font-size: 0.9rem;
+    border-bottom: 1px solid var(--border-color, #2d2d3d);
+}
+
+.plan-features li:last-child {
+    border-bottom: none;
+}
+
+.feature-check {
+    color: var(--color-emerald, #10b981);
+    margin-right: var(--space-2, 0.5rem);
+    font-weight: 600;
+}
+
+.plan-cta {
+    width: 100%;
+    padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+/* License Activation */
+.license-activation {
+    background: var(--bg-elevated, #1a1a28);
+    border: 1px solid var(--border-color, #2d2d3d);
+    border-radius: var(--radius-xl, 1rem);
+    padding: var(--space-6, 1.5rem);
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.license-activation h3 {
+    color: var(--text-primary, #f5f5dc);
+    font-size: 1.1rem;
+    margin-bottom: var(--space-4, 1rem);
+}
+
+.activation-form {
+    display: flex;
+    gap: var(--space-3, 0.75rem);
+}
+
+.license-key-input {
+    flex: 1;
+    background: var(--bg-primary, #0a0a12);
+    border: 1px solid var(--border-color, #2d2d3d);
+    border-radius: var(--radius-lg, 0.75rem);
+    padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
+    color: var(--text-primary, #f5f5dc);
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 0.9rem;
+    letter-spacing: 0.05em;
+}
+
+.license-key-input:focus {
+    outline: none;
+    border-color: var(--color-amber, #c9a227);
+    box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.2);
+}
+
+.activation-error {
+    color: var(--color-crimson, #dc2626);
+    font-size: 0.9rem;
+    margin-top: var(--space-2, 0.5rem);
+    text-align: left;
+}
+
+/* License Dashboard */
+.license-dashboard {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.license-status-card {
+    background: var(--bg-elevated, #1a1a28);
+    border: 1px solid var(--border-color, #2d2d3d);
+    border-radius: var(--radius-xl, 1rem);
+    padding: var(--space-6, 1.5rem);
+    margin-bottom: var(--space-6, 1.5rem);
+}
+
+.status-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-4, 1rem);
+}
+
+.status-badge {
+    display: inline-block;
+    padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
+    border-radius: var(--radius-full, 9999px);
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.status-badge.free {
+    background: var(--bg-primary, #0a0a12);
+    color: var(--text-muted, #6a6a7a);
+    border: 1px solid var(--border-color, #2d2d3d);
+}
+
+.status-badge.pro {
+    background: linear-gradient(135deg, #2d5a4a, #1a3d30);
+    color: var(--color-emerald, #10b981);
+    border: 1px solid var(--color-emerald, #10b981);
+}
+
+.status-badge.studio {
+    background: linear-gradient(135deg, var(--color-amber, #c9a227), #a68520);
+    color: #0a0a12;
+    border: 1px solid var(--color-amber, #c9a227);
+}
+
+.status-active {
+    color: var(--color-emerald, #10b981);
+    font-size: 0.9rem;
+}
+
+.license-details {
+    margin-bottom: var(--space-4, 1rem);
+}
+
+.license-type {
+    color: var(--text-secondary, #a0a0b0);
+    margin-bottom: var(--space-1, 0.25rem);
+}
+
+.license-expiry {
+    color: var(--text-muted, #6a6a7a);
+    font-size: 0.9rem;
+}
+
+/* Student Section */
+.student-section {
+    margin-top: var(--space-6, 1.5rem);
+    padding-top: var(--space-4, 1rem);
+    border-top: 1px solid var(--border-color, #2d2d3d);
+}
+
+.student-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-3, 0.75rem);
+}
+
+.student-header h4 {
+    color: var(--text-primary, #f5f5dc);
+    font-size: 1rem;
+}
+
+.student-count {
+    color: var(--color-amber, #c9a227);
+    font-weight: 600;
+}
+
+.student-progress {
+    margin-bottom: var(--space-3, 0.75rem);
+}
+
+.progress-bar {
+    height: 8px;
+    background: var(--bg-primary, #0a0a12);
+    border-radius: var(--radius-full, 9999px);
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--color-amber, #c9a227), var(--color-emerald, #10b981));
+    border-radius: var(--radius-full, 9999px);
+    transition: width 0.3s ease;
+}
+
+.student-actions {
+    display: flex;
+    gap: var(--space-2, 0.5rem);
+}
+
+.student-limit-warning {
+    color: var(--color-crimson, #dc2626);
+    font-size: 0.85rem;
+    margin-top: var(--space-2, 0.5rem);
+}
+
+/* Features Section */
+.features-section {
+    background: var(--bg-elevated, #1a1a28);
+    border: 1px solid var(--border-color, #2d2d3d);
+    border-radius: var(--radius-xl, 1rem);
+    padding: var(--space-6, 1.5rem);
+    margin-bottom: var(--space-6, 1.5rem);
+}
+
+.features-section h3 {
+    color: var(--text-primary, #f5f5dc);
+    font-size: 1.25rem;
+    margin-bottom: var(--space-4, 1rem);
+}
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: var(--space-3, 0.75rem);
+}
+
+.feature-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3, 0.75rem);
+    padding: var(--space-3, 0.75rem);
+    background: var(--bg-primary, #0a0a12);
+    border-radius: var(--radius-lg, 0.75rem);
+    border: 1px solid var(--border-color, #2d2d3d);
+}
+
+.feature-item.available {
+    border-color: var(--color-emerald, #10b981);
+}
+
+.feature-item.locked {
+    opacity: 0.6;
+}
+
+.feature-icon {
+    font-size: 1.25rem;
+}
+
+.feature-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.feature-name {
+    color: var(--text-primary, #f5f5dc);
+    font-size: 0.9rem;
+}
+
+.feature-tier {
+    color: var(--text-muted, #6a6a7a);
+    font-size: 0.75rem;
+    text-transform: capitalize;
+}
+
+/* License Actions */
+.license-actions {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-3, 0.75rem);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .license-content {
+        padding: var(--space-4, 1rem);
+    }
+
+    .activation-form {
+        flex-direction: column;
+    }
+
+    .license-activation .btn {
+        width: 100%;
+    }
+
+    .features-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .student-actions {
+        flex-direction: column;
+    }
+
+    .license-actions {
+        flex-direction: column;
+    }
+
+    .license-actions .btn {
+        width: 100%;
+    }
+}
