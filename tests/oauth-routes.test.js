@@ -585,6 +585,44 @@ describe('JWKS Signature Verification', () => {
         });
     });
 
+    describe('Signature verification always runs when client ID is set', () => {
+        it('should verify signature in any environment when GOOGLE_CLIENT_ID is set (no escape hatch)', async () => {
+            // Even with SKIP_OAUTH_SIG_VERIFY=true, signature verification should still run
+            // because the escape hatch has been removed
+            const origSkip = process.env.SKIP_OAUTH_SIG_VERIFY;
+            process.env.SKIP_OAUTH_SIG_VERIFY = 'true';
+            process.env.GOOGLE_CLIENT_ID = TEST_GOOGLE_CLIENT_ID;
+            _setGoogleJwksCache([rsaPublicJwk], Date.now() + 3600000);
+
+            // A fake-signature token should be REJECTED because sig verification runs
+            const fakeToken = createGoogleIdToken({ aud: TEST_GOOGLE_CLIENT_ID });
+            await assert.rejects(
+                () => verifyGoogleToken(fakeToken),
+                /Token signing key not found|Token signature verification failed/
+            );
+
+            // Clean up
+            if (origSkip === undefined) delete process.env.SKIP_OAUTH_SIG_VERIFY;
+            else process.env.SKIP_OAUTH_SIG_VERIFY = origSkip;
+        });
+
+        it('should verify signature in any environment when APPLE_CLIENT_ID is set (no escape hatch)', async () => {
+            const origSkip = process.env.SKIP_OAUTH_SIG_VERIFY;
+            process.env.SKIP_OAUTH_SIG_VERIFY = 'true';
+            process.env.APPLE_CLIENT_ID = TEST_APPLE_CLIENT_ID;
+            _setAppleJwksCache([rsaPublicJwk], Date.now() + 3600000);
+
+            const fakeToken = createAppleIdToken({ aud: TEST_APPLE_CLIENT_ID });
+            await assert.rejects(
+                () => verifyAppleToken(fakeToken),
+                /Token signing key not found|Token signature verification failed/
+            );
+
+            if (origSkip === undefined) delete process.env.SKIP_OAUTH_SIG_VERIFY;
+            else process.env.SKIP_OAUTH_SIG_VERIFY = origSkip;
+        });
+    });
+
     describe('JWKS cache', () => {
         it('should use cached JWKS when not expired', async () => {
             process.env.GOOGLE_CLIENT_ID = TEST_GOOGLE_CLIENT_ID;

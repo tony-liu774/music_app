@@ -340,4 +340,82 @@ describe('SSOLoginUI', () => {
         expect(errorEl.getAttribute('role')).toBe('alert');
         expect(errorEl.getAttribute('aria-live')).toBe('polite');
     });
+
+    test('Escape key dismisses the dialog (same as skip)', () => {
+        let successUser = 'not-called';
+        let successProvider = null;
+
+        ui = new SSOLoginUI(oauthService, authService);
+        ui.init({
+            onSuccess: (user, provider) => {
+                successUser = user;
+                successProvider = provider;
+            }
+        });
+        ui.show();
+
+        // Simulate pressing Escape
+        const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true });
+        document.dispatchEvent(event);
+
+        expect(successUser).toBe(null);
+        expect(successProvider).toBe('skip');
+        expect(document.getElementById('sso-login-screen').classList.contains('visible')).toBe(false);
+    });
+
+    test('Escape key does nothing when dialog is not visible', () => {
+        let successCalled = false;
+
+        ui = new SSOLoginUI(oauthService, authService);
+        ui.init({
+            onSuccess: () => { successCalled = true; }
+        });
+        // Do NOT call show() -- dialog is hidden
+
+        const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true });
+        document.dispatchEvent(event);
+
+        expect(successCalled).toBe(false);
+    });
+
+    test('show moves focus to the first button', () => {
+        ui = new SSOLoginUI(oauthService, authService);
+        ui.init();
+        ui.show();
+
+        const googleBtn = document.getElementById('sso-google-btn');
+        expect(document.activeElement).toBe(googleBtn);
+    });
+
+    test('focus trap wraps Tab from last to first focusable element', () => {
+        ui = new SSOLoginUI(oauthService, authService);
+        ui.init();
+        ui.show();
+
+        const skipBtn = document.getElementById('sso-skip-btn');
+        skipBtn.focus();
+
+        // Simulate Tab on the last button
+        const tabEvent = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+        skipBtn.dispatchEvent(tabEvent);
+
+        // The event should have been prevented (focus trap caught it)
+        expect(tabEvent.defaultPrevented).toBe(true);
+    });
+
+    test('focus trap wraps Shift+Tab from first to last focusable element', () => {
+        ui = new SSOLoginUI(oauthService, authService);
+        ui.init();
+        ui.show();
+
+        const googleBtn = document.getElementById('sso-google-btn');
+        googleBtn.focus();
+
+        // Simulate Shift+Tab on the first button
+        const shiftTabEvent = new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true });
+        googleBtn.dispatchEvent(shiftTabEvent);
+
+        // The event should have been prevented (focus trap caught it)
+        expect(shiftTabEvent.defaultPrevented).toBe(true);
+    });
 });

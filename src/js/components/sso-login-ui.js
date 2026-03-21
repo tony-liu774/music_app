@@ -40,12 +40,17 @@ class SSOLoginUI {
     }
 
     /**
-     * Show the SSO login screen.
+     * Show the SSO login screen and move focus into the dialog.
      */
     show() {
         if (this.container) {
             this.container.classList.add('visible');
             this.container.setAttribute('aria-hidden', 'false');
+            // Move focus to the first interactive element inside the dialog
+            const firstBtn = this.container.querySelector('.sso-btn');
+            if (firstBtn) {
+                firstBtn.focus();
+            }
         }
     }
 
@@ -123,7 +128,7 @@ class SSOLoginUI {
     }
 
     /**
-     * Bind click events to SSO buttons.
+     * Bind click events, keyboard handlers, and focus trap to SSO buttons.
      * @private
      */
     _bindEvents() {
@@ -144,6 +149,39 @@ class SSOLoginUI {
         if (skipBtn) {
             skipBtn.addEventListener('click', () => this._handleSkip(), opts);
         }
+
+        // Escape key dismisses the dialog (same as skip)
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.container && this.container.classList.contains('visible')) {
+                this._handleSkip();
+            }
+        }, opts);
+
+        // Focus trap: keep Tab/Shift+Tab within the dialog while it is visible
+        this.container.addEventListener('keydown', (e) => {
+            if (e.key !== 'Tab') return;
+            const focusable = this.container.querySelectorAll(
+                'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+            );
+            if (focusable.length === 0) return;
+
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+
+            if (e.shiftKey) {
+                // Shift+Tab: wrap from first to last
+                if (document.activeElement === first) {
+                    e.preventDefault();
+                    last.focus();
+                }
+            } else {
+                // Tab: wrap from last to first
+                if (document.activeElement === last) {
+                    e.preventDefault();
+                    first.focus();
+                }
+            }
+        }, opts);
     }
 
     /**

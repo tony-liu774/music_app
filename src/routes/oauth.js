@@ -10,9 +10,8 @@ const router = express.Router();
 // Re-use shared user store, token infrastructure, and rate limiter from auth.js
 const { users, generateTokens, authRateLimiter } = require('./auth');
 
-// SKIP_OAUTH_SIG_VERIFY: escape hatch for local development ONLY.
-// Hard-blocked in production — setting this in production has no effect.
-const SKIP_OAUTH_SIG_VERIFY = process.env.SKIP_OAUTH_SIG_VERIFY === 'true' && config.nodeEnv !== 'production';
+// No escape hatch for signature verification — when a client ID is configured,
+// cryptographic signature verification always runs regardless of environment.
 
 const SUPPORTED_PROVIDERS = ['google', 'apple'];
 const MAX_OAUTH_TOKEN_LENGTH = 4096;
@@ -20,6 +19,7 @@ const MAX_DISPLAY_NAME_LENGTH = 100;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_EMAIL_LENGTH = 254;
 const HTTPS_URL_REGEX = /^https:\/\//;
+const MAX_JWKS_RESPONSE_BYTES = 100 * 1024; // 100KB defense-in-depth limit for JWKS responses
 
 // Google JWKS cache
 let googleJwksCache = null;
@@ -48,8 +48,20 @@ function fetchGoogleJwks() {
 
     return new Promise((resolve, reject) => {
         https.get('https://www.googleapis.com/oauth2/v3/certs', (res) => {
+            if (res.statusCode !== 200) {
+                res.resume(); // drain response to free up memory
+                return reject(new Error(`Google JWKS fetch returned HTTP ${res.statusCode}`));
+            }
             let data = '';
-            res.on('data', chunk => { data += chunk; });
+            let bytesReceived = 0;
+            res.on('data', chunk => {
+                bytesReceived += chunk.length;
+                if (bytesReceived > MAX_JWKS_RESPONSE_BYTES) {
+                    res.destroy();
+                    return reject(new Error('Google JWKS response exceeded size limit'));
+                }
+                data += chunk;
+            });
             res.on('end', () => {
                 try {
                     const jwks = JSON.parse(data);
@@ -80,8 +92,20 @@ function fetchAppleJwks() {
 
     return new Promise((resolve, reject) => {
         https.get('https://appleid.apple.com/auth/keys', (res) => {
+            if (res.statusCode !== 200) {
+                res.resume();
+                return reject(new Error(`Apple JWKS fetch returned HTTP ${res.statusCode}`));
+            }
             let data = '';
-            res.on('data', chunk => { data += chunk; });
+            let bytesReceived = 0;
+            res.on('data', chunk => {
+                bytesReceived += chunk.length;
+                if (bytesReceived > MAX_JWKS_RESPONSE_BYTES) {
+                    res.destroy();
+                    return reject(new Error('Apple JWKS response exceeded size limit'));
+                }
+                data += chunk;
+            });
             res.on('end', () => {
                 try {
                     const jwks = JSON.parse(data);
@@ -168,9 +192,9 @@ function decodePayload(idToken) {
 
 /**
  * Verify a Google ID token: signature, issuer, audience, expiry, claims.
- * In production, verifies against Google's JWKS public keys.
- * In test/dev without GOOGLE_CLIENT_ID, falls back to claim-only validation
- * with a NODE_ENV guard that logs a warning.
+ * When GOOGLE_CLIENT_ID is configured, verifies the cryptographic signature
+ * against Google's JWKS public keys and validates the audience claim.
+ * Without a client ID, rejects tokens in all non-test environments.
  * @param {string} idToken - Google ID token
  * @returns {Promise<Object>} Verified user info
  */
@@ -194,21 +218,20 @@ async function verifyGoogleToken(idToken) {
         throw new OAuthVerificationError('Token expired or missing expiration');
     }
 
-    // Audience validation
+    // Audience validation — always required outside of test environment.
+    // When GOOGLE_CLIENT_ID is not configured, reject all tokens to prevent
+    // silent security degradation from misconfigured deployments.
     const googleClientId = process.env.GOOGLE_CLIENT_ID || '';
-    if (googleClientId) {
-        if (payload.aud !== googleClientId) {
-            throw new OAuthVerificationError('Invalid token audience');
-        }
-    } else if (config.nodeEnv !== 'test') {
-        // Refuse to authenticate when client ID is not configured in non-test environments.
-        // Without a client ID, audience validation is meaningless.
+    if (!googleClientId && config.nodeEnv !== 'test') {
         throw new OAuthVerificationError('Google OAuth not configured (GOOGLE_CLIENT_ID missing)');
+    }
+    if (googleClientId && payload.aud !== googleClientId) {
+        throw new OAuthVerificationError('Invalid token audience');
     }
 
     // Cryptographic signature verification — always when client ID is set.
-    // Only skipped in test mode (no client ID) or with explicit SKIP_OAUTH_SIG_VERIFY in non-production.
-    if (googleClientId && !SKIP_OAUTH_SIG_VERIFY) {
+    // Only skipped in test mode (no client ID).
+    if (googleClientId) {
         const header = decodeJwtHeader(idToken);
         const jwks = await fetchGoogleJwks();
         const jwk = findJwkByKid(jwks, header.kid);
@@ -259,18 +282,17 @@ async function verifyAppleToken(idToken) {
         throw new OAuthVerificationError('Token expired or missing expiration');
     }
 
-    // Audience validation
+    // Audience validation — always required outside of test environment.
     const appleClientId = process.env.APPLE_CLIENT_ID || '';
-    if (appleClientId) {
-        if (payload.aud !== appleClientId) {
-            throw new OAuthVerificationError('Invalid token audience');
-        }
-    } else if (config.nodeEnv !== 'test') {
+    if (!appleClientId && config.nodeEnv !== 'test') {
         throw new OAuthVerificationError('Apple OAuth not configured (APPLE_CLIENT_ID missing)');
+    }
+    if (appleClientId && payload.aud !== appleClientId) {
+        throw new OAuthVerificationError('Invalid token audience');
     }
 
     // Cryptographic signature verification — always when client ID is set.
-    if (appleClientId && !SKIP_OAUTH_SIG_VERIFY) {
+    if (appleClientId) {
         const header = decodeJwtHeader(idToken);
         const jwks = await fetchAppleJwks();
         const jwk = findJwkByKid(jwks, header.kid);
