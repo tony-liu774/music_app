@@ -56,6 +56,11 @@ class ConcertmasterApp {
 
         // Screen reader live region
         this.liveRegion = null;
+
+        // Teacher mode
+        this.isTeacherMode = false;
+        this.teacherService = null;
+        this.studioDashboard = null;
     }
 
     async init() {
@@ -85,6 +90,9 @@ class ConcertmasterApp {
             // Load library
             await this.loadLibrary();
 
+            // Initialize teacher mode if enabled
+            this.initTeacherMode();
+
             console.log('Concertmaster initialized successfully');
         } catch (error) {
             console.error('Initialization error:', error);
@@ -108,7 +116,8 @@ class ConcertmasterApp {
             practice: document.getElementById('practice-view'),
             metronome: document.getElementById('metronome-view'),
             settings: document.getElementById('settings-view'),
-            tuner: document.getElementById('tuner-view')
+            tuner: document.getElementById('tuner-view'),
+            studio: document.getElementById('studio-dashboard-view')
         };
 
         this.toastContainer = document.getElementById('toast-container');
@@ -806,6 +815,24 @@ class ConcertmasterApp {
             this.pitchDetector.confidenceThreshold = value;
             if (sensitivityValue) sensitivityValue.textContent = value.toFixed(2);
         });
+
+        // Teacher mode toggle
+        const teacherToggle = document.getElementById('teacher-mode-toggle');
+        if (teacherToggle) {
+            // Restore saved state
+            const savedTeacherMode = localStorage.getItem('teacher_mode') === 'true';
+            if (savedTeacherMode) {
+                teacherToggle.classList.add('active');
+                teacherToggle.setAttribute('aria-checked', 'true');
+            }
+
+            teacherToggle.addEventListener('click', () => {
+                const isActive = teacherToggle.classList.toggle('active');
+                teacherToggle.setAttribute('aria-checked', isActive ? 'true' : 'false');
+                localStorage.setItem('teacher_mode', isActive ? 'true' : 'false');
+                this.toggleTeacherMode(isActive);
+            });
+        }
     }
 
     updateInstrumentSettings() {
@@ -813,6 +840,42 @@ class ConcertmasterApp {
         const range = this.pitchDetector.getInstrumentRange(this.selectedInstrument);
         this.pitchDetector.minFrequency = range.min;
         this.pitchDetector.maxFrequency = range.max;
+    }
+
+    // ============================================
+    // Teacher Mode / Studio Dashboard
+    // ============================================
+
+    initTeacherMode() {
+        const savedTeacherMode = localStorage.getItem('teacher_mode') === 'true';
+        if (savedTeacherMode) {
+            this.toggleTeacherMode(true);
+        }
+    }
+
+    async toggleTeacherMode(enabled) {
+        this.isTeacherMode = enabled;
+
+        // Show/hide studio nav link
+        const studioNavLinks = document.querySelectorAll('.studio-nav-link');
+        studioNavLinks.forEach(link => {
+            link.style.display = enabled ? '' : 'none';
+        });
+
+        // Show/hide the studio dashboard view
+        const studioView = document.getElementById('studio-dashboard-view');
+        if (studioView) {
+            studioView.style.display = enabled ? '' : 'none';
+        }
+
+        if (enabled && !this.studioDashboard) {
+            // Initialize teacher service and dashboard on first enable
+            this.teacherService = new TeacherService();
+            this.studioDashboard = new StudioDashboard(this.teacherService);
+            await this.studioDashboard.init();
+        } else if (enabled && this.studioDashboard) {
+            await this.studioDashboard.refresh();
+        }
     }
 
     // ============================================
