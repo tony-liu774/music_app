@@ -731,6 +731,7 @@ a:hover {
 
 .pitch-indicator,
 .timing-indicator,
+.tone-quality-indicator,
 .intonation-indicator {
     display: flex;
     align-items: center;
@@ -787,6 +788,65 @@ a:hover {
 .intonation-score {
     font-weight: 600;
     color: var(--success);
+}
+
+/* Tone Quality Indicator */
+.tone-quality-indicator {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.tone-quality-meter {
+    flex: 1;
+    height: 8px;
+    background: var(--bg-elevated);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+    position: relative;
+}
+
+.tone-quality-bar {
+    height: 100%;
+    width: 50%;
+    background: var(--success);
+    border-radius: var(--radius-full);
+    transition: width 150ms ease, background-color 150ms ease;
+    box-shadow: 0 0 8px var(--success);
+}
+
+.tone-quality-value {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    min-width: 45px;
+    text-align: right;
+    color: var(--success);
+}
+
+.tone-quality-status {
+    font-size: var(--text-xs);
+    min-width: 70px;
+    text-align: left;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Emerald glow for good tone */
+.tone-quality-good .tone-quality-bar {
+    box-shadow: 0 0 10px var(--success), 0 0 20px var(--success-glow);
+}
+
+/* Amber for acceptable tone */
+.tone-quality-acceptable .tone-quality-bar {
+    background: var(--warning);
+    box-shadow: 0 0 10px var(--warning);
+}
+
+/* Crimson for harsh tone */
+.tone-quality-harsh .tone-quality-bar,
+.tone-quality-very_harsh .tone-quality-bar {
+    background: var(--error);
+    box-shadow: 0 0 10px var(--error);
 }
 
 .score-display {

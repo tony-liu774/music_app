@@ -25,6 +25,8 @@ class ConcertmasterApp {
         this.intonationAnalyzer = null;
         this.dynamicsComparator = null;
         this.sessionLogger = null;
+        this.toneQualityAnalyzer = null;
+        this.aiSummaryGenerator = null;
 
         // UI Components
         this.sheetMusicRenderer = null;
@@ -47,6 +49,10 @@ class ConcertmasterApp {
 
         // Debounce timer for rhythm analysis
         this.rhythmAnalysisDebounce = null;
+
+        // Tone quality logging throttle
+        this.lastToneQualityLogTime = 0;
+        this.toneQualityLogInterval = 1000; // Log at most once per second
 
         // Screen reader live region
         this.liveRegion = null;
@@ -102,6 +108,8 @@ class ConcertmasterApp {
         this.intonationAnalyzer = new IntonationAnalyzer();
         this.dynamicsComparator = new DynamicsComparator();
         this.sessionLogger = new SessionLogger();
+        this.toneQualityAnalyzer = new ToneQualityAnalyzer();
+        this.aiSummaryGenerator = new AISummaryGenerator();
 
         // Get DOM elements
         this.views = {
@@ -438,6 +446,11 @@ class ConcertmasterApp {
         const range = this.pitchDetector.getInstrumentRange(this.selectedInstrument);
         this.pitchDetector.minFrequency = range.min;
         this.pitchDetector.maxFrequency = range.max;
+
+        // Also update tone quality analyzer instrument
+        if (this.toneQualityAnalyzer) {
+            this.toneQualityAnalyzer.configure({ instrument: this.selectedInstrument });
+        }
     }
 
     // ============================================
@@ -925,7 +938,8 @@ class ConcertmasterApp {
             startTime: Date.now(),
             notes: [],
             pitchAccuracy: [],
-            timingAccuracy: []
+            timingAccuracy: [],
+            toneQuality: []
         };
 
         // Update UI
@@ -953,6 +967,18 @@ class ConcertmasterApp {
         this.audioEngine.startCapture((data) => {
             this.processAudio(data);
         }, 50);
+
+        // Reset analyzers for new session
+        this.rhythmAnalyzer.reset();
+        this.intonationAnalyzer.reset();
+        if (this.toneQualityAnalyzer) {
+            this.toneQualityAnalyzer.reset();
+        }
+
+        // Start AI summary generator session
+        if (this.aiSummaryGenerator && this.currentScore) {
+            this.aiSummaryGenerator.startSession(this.currentScore.id);
+        }
 
         this.showToast('Practice started - play your instrument', 'success');
     }
@@ -1007,6 +1033,47 @@ class ConcertmasterApp {
         const result = this.pitchDetector.process(data.timeData);
 
         if (result) {
+            // Analyze tone quality (independent of pitch matching)
+            let toneQualityResult = null;
+            if (this.toneQualityAnalyzer) {
+                // Pass frequency data from AudioEngine if available
+                toneQualityResult = this.toneQualityAnalyzer.analyze(
+                    data.timeData,
+                    result.frequency,
+                    data.frequencyData
+                );
+
+                // Store in session data
+                if (this.sessionData && toneQualityResult) {
+                    this.sessionData.toneQuality.push(toneQualityResult.qualityScore);
+                }
+
+                // Log to session logger for AI summary (throttled to once per second)
+                // Only log when there's a notable issue (low score, wolf tone) AND rate-limited
+                if (this.aiSummaryGenerator && toneQualityResult) {
+                    const now = Date.now();
+                    const score = toneQualityResult.qualityScore ?? 50;
+                    const isNoteworthy = score < 60 || toneQualityResult.wolfToneDetected;
+                    const timeGateElapsed = now - this.lastToneQualityLogTime > this.toneQualityLogInterval;
+
+                    if (isNoteworthy && timeGateElapsed) {
+                        this.aiSummaryGenerator.logToneQualityDeviation({
+                            measure: result.measure || 1,
+                            note: result.name + result.octave,
+                            qualityScore: score,
+                            purityScore: toneQualityResult.purityScore,
+                            harshnessScore: toneQualityResult.harshnessScore,
+                            wolfToneDetected: toneQualityResult.wolfToneDetected,
+                            wolfToneFrequency: toneQualityResult.wolfToneFrequency
+                        });
+                        this.lastToneQualityLogTime = now;
+                    }
+                }
+
+                // Update tone quality display
+                this.updateToneQualityDisplay(toneQualityResult);
+            }
+
             // Record note onset for rhythm analysis
             const noteTimestamp = Date.now();
             this.rhythmAnalyzer.recordNoteOnset(noteTimestamp);
@@ -1223,6 +1290,74 @@ class ConcertmasterApp {
     }
 
     /**
+     * Update the tone quality display in the feedback panel
+     */
+    updateToneQualityDisplay(toneQualityResult) {
+        if (!toneQualityResult) return;
+
+        const toneQualityMeter = document.getElementById('tone-quality-meter');
+        const toneQualityBar = document.getElementById('tone-quality-bar');
+        const toneQualityValue = document.getElementById('tone-quality-value');
+        const toneQualityStatus = document.getElementById('tone-quality-status');
+        const toneQualityIndicator = document.getElementById('tone-quality-indicator');
+
+        const score = toneQualityResult.qualityScore ?? 50;
+
+        // Update bar width
+        if (toneQualityBar) {
+            toneQualityBar.style.width = score + '%';
+        }
+
+        // Update value display
+        if (toneQualityValue) {
+            toneQualityValue.textContent = Math.round(score) + '%';
+        }
+
+        // Get status and color
+        const status = ToneQualityAnalyzer.getQualityStatus(score);
+        const color = ToneQualityAnalyzer.getQualityColor(score);
+
+        // Update value color
+        if (toneQualityValue) {
+            toneQualityValue.style.color = color;
+        }
+
+        // Update status text
+        if (toneQualityStatus) {
+            const statusLabels = {
+                'excellent': 'Excellent',
+                'good': 'Good',
+                'acceptable': 'Acceptable',
+                'harsh': 'Harsh',
+                'very_harsh': 'Very Harsh'
+            };
+            toneQualityStatus.textContent = statusLabels[status] || status;
+        }
+
+        // Update container class for styling
+        if (toneQualityIndicator) {
+            toneQualityIndicator.classList.remove('tone-quality-good', 'tone-quality-acceptable', 'tone-quality-harsh', 'tone-quality-very_harsh');
+
+            if (score >= 60) {
+                toneQualityIndicator.classList.add('tone-quality-good');
+            } else if (score >= 40) {
+                toneQualityIndicator.classList.add('tone-quality-acceptable');
+            } else {
+                toneQualityIndicator.classList.add('tone-quality-harsh');
+            }
+        }
+
+        // Show wolf tone warning if detected
+        if (toneQualityResult.wolfToneDetected && toneQualityStatus) {
+            toneQualityStatus.textContent = 'Wolf Tone!';
+            toneQualityStatus.style.color = '#dc2626';
+        } else if (toneQualityStatus) {
+            // Reset color when wolf tone is not detected
+            toneQualityStatus.style.color = '';
+        }
+    }
+
+    /**
      * Animate score value change with smooth transition
      */
     animateScoreChange(element, targetScore) {
@@ -1275,6 +1410,23 @@ class ConcertmasterApp {
         const intonationAccuracyEl = document.getElementById('intonation-accuracy');
         if (intonationAccuracyEl) {
             intonationAccuracyEl.textContent = Math.round(intonationScores.transition) + '%';
+        }
+
+        // Add tone quality score if available
+        const toneQualityEl = document.getElementById('tone-quality-score');
+        if (toneQualityEl && this.sessionData?.toneQuality?.length > 0) {
+            const avgToneQuality = this.sessionData.toneQuality.reduce((a, b) => a + b, 0) / this.sessionData.toneQuality.length;
+            toneQualityEl.textContent = Math.round(avgToneQuality) + '%';
+            // Color based on score
+            if (avgToneQuality >= 60) {
+                toneQualityEl.style.color = '#10b981'; // emerald
+            } else if (avgToneQuality >= 40) {
+                toneQualityEl.style.color = '#f59e0b'; // amber
+            } else {
+                toneQualityEl.style.color = '#dc2626'; // crimson
+            }
+        } else if (toneQualityEl) {
+            toneQualityEl.textContent = '--%';
         }
 
         const duration = this.sessionData?.startTime ? Date.now() - this.sessionData.startTime : 0;

@@ -62,6 +62,15 @@ class AISummaryGenerator {
     }
 
     /**
+     * Log a tone quality deviation from performance
+     * @param {Object} params - Deviation parameters
+     */
+    logToneQualityDeviation(params) {
+        this.sessionLogger.logToneQualityDeviation(params);
+    }
+    }
+
+    /**
      * Generate the complete post-session summary
      * @returns {Promise<Object>} Complete summary with AI insights
      */
