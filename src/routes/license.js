@@ -638,6 +638,10 @@ router.post('/accept-invitation', authMiddleware, async (req, res) => {
         // Try to find student by email if provided, otherwise create new record
         let studentRecord = license.students.find(s => s.email === userEmail);
         if (studentRecord) {
+            // Check if this email slot is already claimed by another user
+            if (studentRecord.userId && studentRecord.userId !== userId) {
+                return res.status(409).json({ error: 'This invitation has already been claimed by another user' });
+            }
             // Update existing student record with userId
             // Don't increment studentCount - already counted when key was generated
             studentRecord.userId = userId;

@@ -110,6 +110,9 @@ class ConcertmasterApp {
             // Initialize teacher mode if enabled
             this.initTeacherMode();
 
+            // Initialize license service (always needed for feature gating)
+            await this.initLicense();
+
             // Initialize video snippet feature
             this.initVideoSnippets();
 
@@ -1093,9 +1096,6 @@ class ConcertmasterApp {
         } else if (enabled && this.studioDashboard) {
             await this.studioDashboard.refresh();
         }
-
-        // Initialize license service and UI
-        await this.initLicense();
     }
 
     // ============================================
