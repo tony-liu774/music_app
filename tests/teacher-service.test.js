@@ -281,7 +281,7 @@ describe('TeacherService - Dashboard Metrics', () => {
         assert.strictEqual(metrics.totalStudents, 0);
         assert.strictEqual(metrics.totalWeeklyPracticeMs, 0);
         assert.strictEqual(metrics.averageIntonation, null);
-        assert.strictEqual(metrics.studentsWithSessions, 0);
+        assert.strictEqual(metrics.studentsActiveThisWeek, 0);
         assert.deepStrictEqual(metrics.topPracticers, []);
         assert.deepStrictEqual(metrics.needsAttention, []);
     });
@@ -310,14 +310,17 @@ describe('TeacherService - Dashboard Metrics', () => {
         assert.strictEqual(metrics.averageIntonation, 85);
     });
 
-    test('should count students with sessions', () => {
+    test('should count students active this week', () => {
+        const now = Date.now();
+        const twoWeeksAgo = now - 14 * 24 * 60 * 60 * 1000;
         const students = [
-            { weeklyPracticeTimeMs: 0, averageIntonationScore: null, lastSessionAt: Date.now() },
+            { weeklyPracticeTimeMs: 0, averageIntonationScore: null, lastSessionAt: now },
             { weeklyPracticeTimeMs: 0, averageIntonationScore: null, lastSessionAt: null },
-            { weeklyPracticeTimeMs: 0, averageIntonationScore: null, lastSessionAt: Date.now() }
+            { weeklyPracticeTimeMs: 0, averageIntonationScore: null, lastSessionAt: twoWeeksAgo }
         ];
         const metrics = service.getDashboardMetrics(students);
-        assert.strictEqual(metrics.studentsWithSessions, 2);
+        // Only the student with lastSessionAt=now should be active this week
+        assert.strictEqual(metrics.studentsActiveThisWeek, 1);
     });
 
     test('should identify top 3 practicers', () => {

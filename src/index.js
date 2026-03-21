@@ -76,6 +76,8 @@ app.use('/api', (req, res) => {
       healthDetailed: '/health/detailed',
       imslpSearch: '/api/imslp/search',
       imslpDownload: '/api/imslp/download/:id',
+      teacherStudents: '/api/teacher/students',
+      teacherMetrics: '/api/teacher/metrics',
     },
   });
 });

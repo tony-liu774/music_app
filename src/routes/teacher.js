@@ -1,14 +1,54 @@
+/**
+ * Teacher (Studio Dashboard) API routes
+ * REST API stub for teacher portal data. Currently uses in-memory storage;
+ * the primary data source is the client-side IndexedDB in teacher-service.js.
+ * These routes are provided for future backend migration.
+ */
+
 const express = require('express');
 
 const router = express.Router();
 
-// In-memory store for server-side teacher data (would be replaced by a database in production)
+// In-memory store (would be replaced by a database in production)
 const students = new Map();
 const practiceLogs = new Map();
 
 let nextId = 1;
 function generateId() {
     return 'srv-' + (nextId++) + '-' + Date.now().toString(36);
+}
+
+/**
+ * Get the start of the current week (Monday at midnight)
+ */
+function getWeekStart() {
+    const now = new Date();
+    const day = now.getDay();
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+    const weekStart = new Date(now.getFullYear(), now.getMonth(), diff);
+    weekStart.setHours(0, 0, 0, 0);
+    return weekStart.getTime();
+}
+
+/**
+ * Middleware: require X-Teacher-Mode header to access teacher routes
+ */
+function requireTeacherMode(req, res, next) {
+    if (req.headers['x-teacher-mode'] !== 'true') {
+        return res.status(403).json({ error: 'Teacher mode not enabled' });
+    }
+    next();
+}
+
+// Apply teacher mode check to all routes
+router.use(requireTeacherMode);
+
+/**
+ * Validate and sanitize string fields with length limits
+ */
+function sanitizeString(value, maxLength = 500) {
+    if (typeof value !== 'string') return '';
+    return value.trim().slice(0, maxLength);
 }
 
 // GET /api/teacher/students - List all students
@@ -20,7 +60,7 @@ router.get('/students', (req, res) => {
     let result = allStudents;
 
     if (search) {
-        const lower = search.toLowerCase();
+        const lower = sanitizeString(search, 100).toLowerCase();
         result = result.filter(s =>
             s.name.toLowerCase().includes(lower) ||
             s.instrument.toLowerCase().includes(lower) ||
@@ -61,21 +101,26 @@ router.get('/students', (req, res) => {
 router.post('/students', (req, res) => {
     const { name, instrument, assignedPiece, email } = req.body;
 
-    if (!name || typeof name !== 'string' || !name.trim()) {
+    const sanitizedName = sanitizeString(name, 200);
+    if (!sanitizedName) {
         return res.status(400).json({ error: 'Student name is required' });
     }
 
+    const allowedInstruments = ['violin', 'viola', 'cello', 'bass'];
+    const sanitizedInstrument = allowedInstruments.includes(instrument) ? instrument : 'violin';
+
     const student = {
         id: generateId(),
-        name: name.trim(),
-        instrument: instrument || 'violin',
-        assignedPiece: assignedPiece || '',
-        email: email || '',
+        name: sanitizedName,
+        instrument: sanitizedInstrument,
+        assignedPiece: sanitizeString(assignedPiece, 500),
+        email: sanitizeString(email, 320),
         addedAt: Date.now(),
         lastSessionAt: null,
         totalPracticeTimeMs: 0,
         averageIntonationScore: null,
-        weeklyPracticeTimeMs: 0
+        weeklyPracticeTimeMs: 0,
+        weekStartTimestamp: getWeekStart()
     };
 
     students.set(student.id, student);
@@ -101,7 +146,7 @@ router.put('/students/:id', (req, res) => {
     const allowedFields = ['name', 'instrument', 'assignedPiece', 'email', 'notes', 'level'];
     for (const field of allowedFields) {
         if (req.body[field] !== undefined) {
-            student[field] = req.body[field];
+            student[field] = sanitizeString(req.body[field], field === 'email' ? 320 : 500);
         }
     }
 
@@ -109,12 +154,14 @@ router.put('/students/:id', (req, res) => {
     res.json(student);
 });
 
-// DELETE /api/teacher/students/:id - Remove a student
+// DELETE /api/teacher/students/:id - Remove a student and their practice logs
 router.delete('/students/:id', (req, res) => {
     if (!students.has(req.params.id)) {
         return res.status(404).json({ error: 'Student not found' });
     }
     students.delete(req.params.id);
+    // Also delete orphaned practice logs
+    practiceLogs.delete(req.params.id);
     res.status(204).end();
 });
 
@@ -127,16 +174,21 @@ router.post('/students/:id/sessions', (req, res) => {
 
     const { durationMs, piece, intonationScore, pitchScore, rhythmScore, notes } = req.body;
 
+    // Validate numeric fields
+    const validatedDuration = typeof durationMs === 'number' && durationMs >= 0 ? durationMs : 0;
+    const validatedIntonation = typeof intonationScore === 'number' && intonationScore >= 0 && intonationScore <= 100
+        ? intonationScore : null;
+
     const log = {
         id: generateId(),
         studentId: req.params.id,
         date: Date.now(),
-        durationMs: durationMs || 0,
-        piece: piece || '',
-        intonationScore: intonationScore ?? null,
+        durationMs: validatedDuration,
+        piece: sanitizeString(piece, 500),
+        intonationScore: validatedIntonation,
         pitchScore: pitchScore ?? null,
         rhythmScore: rhythmScore ?? null,
-        notes: notes || ''
+        notes: sanitizeString(notes, 2000)
     };
 
     // Store log
@@ -147,15 +199,23 @@ router.post('/students/:id/sessions', (req, res) => {
 
     // Update student aggregates
     student.lastSessionAt = log.date;
-    student.totalPracticeTimeMs = (student.totalPracticeTimeMs || 0) + (log.durationMs || 0);
-    student.weeklyPracticeTimeMs = (student.weeklyPracticeTimeMs || 0) + (log.durationMs || 0);
+    student.totalPracticeTimeMs = (student.totalPracticeTimeMs || 0) + validatedDuration;
 
-    if (log.intonationScore !== null) {
+    // Weekly practice time with reset logic
+    const weekStart = getWeekStart();
+    if (student.weekStartTimestamp !== weekStart) {
+        student.weeklyPracticeTimeMs = validatedDuration;
+        student.weekStartTimestamp = weekStart;
+    } else {
+        student.weeklyPracticeTimeMs = (student.weeklyPracticeTimeMs || 0) + validatedDuration;
+    }
+
+    if (validatedIntonation !== null) {
         if (student.averageIntonationScore === null) {
-            student.averageIntonationScore = log.intonationScore;
+            student.averageIntonationScore = validatedIntonation;
         } else {
             student.averageIntonationScore = Math.round(
-                student.averageIntonationScore * 0.7 + log.intonationScore * 0.3
+                student.averageIntonationScore * 0.7 + validatedIntonation * 0.3
             );
         }
     }
@@ -185,7 +245,10 @@ router.get('/metrics', (req, res) => {
         ? Math.round(studentsWithScores.reduce((sum, s) => sum + s.averageIntonationScore, 0) / studentsWithScores.length)
         : null;
 
-    const studentsWithSessions = allStudents.filter(s => s.lastSessionAt !== null).length;
+    const weekStart = getWeekStart();
+    const studentsActiveThisWeek = allStudents.filter(s =>
+        s.lastSessionAt !== null && s.lastSessionAt >= weekStart
+    ).length;
 
     const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
     const needsAttention = allStudents.filter(s => !s.lastSessionAt || s.lastSessionAt < oneWeekAgo).length;
@@ -194,7 +257,7 @@ router.get('/metrics', (req, res) => {
         totalStudents,
         totalWeeklyPracticeMs,
         averageIntonation,
-        studentsWithSessions,
+        studentsActiveThisWeek,
         needsAttention
     });
 });

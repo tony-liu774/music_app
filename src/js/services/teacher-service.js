@@ -1,6 +1,8 @@
 /**
  * Teacher Service - Student roster and practice data management
- * Uses IndexedDB for persistent storage of student records and practice logs
+ * Uses IndexedDB for persistent storage of student records and practice logs.
+ * This is the primary data layer (client-side). The server routes in
+ * src/routes/teacher.js provide a REST API stub for future backend migration.
  */
 
 class TeacherService {
@@ -47,198 +49,159 @@ class TeacherService {
     }
 
     /**
+     * Helper: wrap an IndexedDB request in a promise
+     */
+    _promisifyRequest(request) {
+        return new Promise((resolve, reject) => {
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    /**
      * Add a new student to the roster
      */
     async addStudent(studentData) {
-        return new Promise((resolve, reject) => {
-            if (!this.db) {
-                reject(new Error('Database not initialized'));
-                return;
-            }
+        if (!this.db) throw new Error('Database not initialized');
 
-            const student = {
-                id: typeof crypto !== 'undefined' && crypto.randomUUID
-                    ? crypto.randomUUID()
-                    : 'student-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
-                name: studentData.name,
-                instrument: studentData.instrument || 'violin',
-                level: studentData.level || 'beginner',
-                assignedPiece: studentData.assignedPiece || '',
-                email: studentData.email || '',
-                notes: studentData.notes || '',
-                addedAt: Date.now(),
-                lastSessionAt: null,
-                totalPracticeTimeMs: 0,
-                averageIntonationScore: null,
-                weeklyPracticeTimeMs: 0,
-                weekStartTimestamp: this._getWeekStart()
-            };
+        const student = {
+            id: typeof crypto !== 'undefined' && crypto.randomUUID
+                ? crypto.randomUUID()
+                : 'student-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+            name: studentData.name,
+            instrument: studentData.instrument || 'violin',
+            level: studentData.level || 'beginner',
+            assignedPiece: studentData.assignedPiece || '',
+            email: studentData.email || '',
+            notes: studentData.notes || '',
+            addedAt: Date.now(),
+            lastSessionAt: null,
+            totalPracticeTimeMs: 0,
+            averageIntonationScore: null,
+            weeklyPracticeTimeMs: 0,
+            weekStartTimestamp: this._getWeekStart()
+        };
 
-            const transaction = this.db.transaction(['students'], 'readwrite');
-            const store = transaction.objectStore('students');
-            const request = store.add(student);
-
-            request.onsuccess = () => {
-                this._notifyUpdate();
-                resolve(student);
-            };
-            request.onerror = () => reject(request.error);
-        });
+        const transaction = this.db.transaction(['students'], 'readwrite');
+        const store = transaction.objectStore('students');
+        await this._promisifyRequest(store.add(student));
+        this._notifyUpdate();
+        return student;
     }
 
     /**
      * Get all students
      */
     async getAllStudents() {
-        return new Promise((resolve, reject) => {
-            if (!this.db) {
-                reject(new Error('Database not initialized'));
-                return;
-            }
+        if (!this.db) throw new Error('Database not initialized');
 
-            const transaction = this.db.transaction(['students'], 'readonly');
-            const store = transaction.objectStore('students');
-            const request = store.getAll();
-
-            request.onsuccess = () => resolve(request.result || []);
-            request.onerror = () => reject(request.error);
-        });
+        const transaction = this.db.transaction(['students'], 'readonly');
+        const store = transaction.objectStore('students');
+        const result = await this._promisifyRequest(store.getAll());
+        return result || [];
     }
 
     /**
      * Get a single student by ID
      */
     async getStudent(id) {
-        return new Promise((resolve, reject) => {
-            if (!this.db) {
-                reject(new Error('Database not initialized'));
-                return;
-            }
+        if (!this.db) throw new Error('Database not initialized');
 
-            const transaction = this.db.transaction(['students'], 'readonly');
-            const store = transaction.objectStore('students');
-            const request = store.get(id);
-
-            request.onsuccess = () => resolve(request.result || null);
-            request.onerror = () => reject(request.error);
-        });
+        const transaction = this.db.transaction(['students'], 'readonly');
+        const store = transaction.objectStore('students');
+        const result = await this._promisifyRequest(store.get(id));
+        return result || null;
     }
 
     /**
      * Update student data
      */
     async updateStudent(id, updates) {
-        return new Promise(async (resolve, reject) => {
-            if (!this.db) {
-                reject(new Error('Database not initialized'));
-                return;
-            }
+        if (!this.db) throw new Error('Database not initialized');
 
-            try {
-                const student = await this.getStudent(id);
-                if (!student) {
-                    reject(new Error('Student not found'));
-                    return;
-                }
+        const student = await this.getStudent(id);
+        if (!student) throw new Error('Student not found');
 
-                const updated = { ...student, ...updates, id: student.id };
+        const updated = { ...student, ...updates, id: student.id };
 
-                const transaction = this.db.transaction(['students'], 'readwrite');
-                const store = transaction.objectStore('students');
-                const request = store.put(updated);
-
-                request.onsuccess = () => {
-                    this._notifyUpdate();
-                    resolve(updated);
-                };
-                request.onerror = () => reject(request.error);
-            } catch (err) {
-                reject(err);
-            }
-        });
+        const transaction = this.db.transaction(['students'], 'readwrite');
+        const store = transaction.objectStore('students');
+        await this._promisifyRequest(store.put(updated));
+        this._notifyUpdate();
+        return updated;
     }
 
     /**
-     * Remove a student from the roster
+     * Remove a student and their practice logs from the roster
      */
     async removeStudent(id) {
-        return new Promise((resolve, reject) => {
-            if (!this.db) {
-                reject(new Error('Database not initialized'));
-                return;
+        if (!this.db) throw new Error('Database not initialized');
+
+        // Delete student record
+        const studentTx = this.db.transaction(['students'], 'readwrite');
+        const studentStore = studentTx.objectStore('students');
+        await this._promisifyRequest(studentStore.delete(id));
+
+        // Delete orphaned practice logs for this student
+        try {
+            const logsTx = this.db.transaction(['practiceLogs'], 'readwrite');
+            const logsStore = logsTx.objectStore('practiceLogs');
+            const index = logsStore.index('studentId');
+            const logs = await this._promisifyRequest(index.getAll(id));
+            if (logs && logs.length > 0) {
+                const deleteTx = this.db.transaction(['practiceLogs'], 'readwrite');
+                const deleteStore = deleteTx.objectStore('practiceLogs');
+                for (const log of logs) {
+                    deleteStore.delete(log.id);
+                }
             }
+        } catch (err) {
+            console.warn('Failed to clean up practice logs for student:', err);
+        }
 
-            const transaction = this.db.transaction(['students'], 'readwrite');
-            const store = transaction.objectStore('students');
-            const request = store.delete(id);
-
-            request.onsuccess = () => {
-                this._notifyUpdate();
-                resolve();
-            };
-            request.onerror = () => reject(request.error);
-        });
+        this._notifyUpdate();
     }
 
     /**
      * Log a practice session for a student
      */
     async logPracticeSession(studentId, sessionData) {
-        return new Promise(async (resolve, reject) => {
-            if (!this.db) {
-                reject(new Error('Database not initialized'));
-                return;
-            }
+        if (!this.db) throw new Error('Database not initialized');
 
-            const log = {
-                id: typeof crypto !== 'undefined' && crypto.randomUUID
-                    ? crypto.randomUUID()
-                    : 'log-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
-                studentId,
-                date: Date.now(),
-                durationMs: sessionData.durationMs || 0,
-                piece: sessionData.piece || '',
-                intonationScore: sessionData.intonationScore || null,
-                pitchScore: sessionData.pitchScore || null,
-                rhythmScore: sessionData.rhythmScore || null,
-                notes: sessionData.notes || ''
-            };
+        const log = {
+            id: typeof crypto !== 'undefined' && crypto.randomUUID
+                ? crypto.randomUUID()
+                : 'log-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+            studentId,
+            date: Date.now(),
+            durationMs: sessionData.durationMs ?? 0,
+            piece: sessionData.piece || '',
+            intonationScore: sessionData.intonationScore ?? null,
+            pitchScore: sessionData.pitchScore ?? null,
+            rhythmScore: sessionData.rhythmScore ?? null,
+            notes: sessionData.notes || ''
+        };
 
-            try {
-                const transaction = this.db.transaction(['practiceLogs'], 'readwrite');
-                const store = transaction.objectStore('practiceLogs');
-                const request = store.add(log);
+        const transaction = this.db.transaction(['practiceLogs'], 'readwrite');
+        const store = transaction.objectStore('practiceLogs');
+        await this._promisifyRequest(store.add(log));
 
-                request.onsuccess = async () => {
-                    // Update student aggregate data
-                    await this._updateStudentAggregates(studentId, log);
-                    resolve(log);
-                };
-                request.onerror = () => reject(request.error);
-            } catch (err) {
-                reject(err);
-            }
-        });
+        // Update student aggregate data
+        await this._updateStudentAggregates(studentId, log);
+        return log;
     }
 
     /**
      * Get practice logs for a student
      */
     async getStudentLogs(studentId) {
-        return new Promise((resolve, reject) => {
-            if (!this.db) {
-                reject(new Error('Database not initialized'));
-                return;
-            }
+        if (!this.db) throw new Error('Database not initialized');
 
-            const transaction = this.db.transaction(['practiceLogs'], 'readonly');
-            const store = transaction.objectStore('practiceLogs');
-            const index = store.index('studentId');
-            const request = index.getAll(studentId);
-
-            request.onsuccess = () => resolve(request.result || []);
-            request.onerror = () => reject(request.error);
-        });
+        const transaction = this.db.transaction(['practiceLogs'], 'readonly');
+        const store = transaction.objectStore('practiceLogs');
+        const index = store.index('studentId');
+        const result = await this._promisifyRequest(index.getAll(studentId));
+        return result || [];
     }
 
     /**
@@ -300,7 +263,7 @@ class TeacherService {
                 totalStudents: 0,
                 totalWeeklyPracticeMs: 0,
                 averageIntonation: null,
-                studentsWithSessions: 0,
+                studentsActiveThisWeek: 0,
                 topPracticers: [],
                 needsAttention: []
             };
@@ -313,7 +276,11 @@ class TeacherService {
             ? studentsWithScores.reduce((sum, s) => sum + s.averageIntonationScore, 0) / studentsWithScores.length
             : null;
 
-        const studentsWithSessions = students.filter(s => s.lastSessionAt !== null).length;
+        // Count students who have actually practiced this week
+        const weekStart = this._getWeekStart();
+        const studentsActiveThisWeek = students.filter(s =>
+            s.lastSessionAt !== null && s.lastSessionAt >= weekStart
+        ).length;
 
         // Top 3 practicers this week
         const topPracticers = [...students]
@@ -330,7 +297,7 @@ class TeacherService {
             totalStudents: students.length,
             totalWeeklyPracticeMs,
             averageIntonation,
-            studentsWithSessions,
+            studentsActiveThisWeek,
             topPracticers,
             needsAttention
         };
@@ -370,17 +337,17 @@ class TeacherService {
 
             const updates = {
                 lastSessionAt: log.date,
-                totalPracticeTimeMs: (student.totalPracticeTimeMs || 0) + (log.durationMs || 0)
+                totalPracticeTimeMs: (student.totalPracticeTimeMs || 0) + (log.durationMs ?? 0)
             };
 
             // Update weekly practice time
             const weekStart = this._getWeekStart();
             if (student.weekStartTimestamp !== weekStart) {
                 // New week, reset weekly counter
-                updates.weeklyPracticeTimeMs = log.durationMs || 0;
+                updates.weeklyPracticeTimeMs = log.durationMs ?? 0;
                 updates.weekStartTimestamp = weekStart;
             } else {
-                updates.weeklyPracticeTimeMs = (student.weeklyPracticeTimeMs || 0) + (log.durationMs || 0);
+                updates.weeklyPracticeTimeMs = (student.weeklyPracticeTimeMs || 0) + (log.durationMs ?? 0);
             }
 
             // Update rolling average intonation score

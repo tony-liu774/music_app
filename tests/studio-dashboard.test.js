@@ -242,16 +242,24 @@ describe('StudioDashboard - Instrument Icons', () => {
         dashboard = new StudioDashboard(service);
     });
 
-    test('should return icon for violin', () => {
-        assert.ok(dashboard._getInstrumentIcon('violin'));
+    test('should return distinct abbreviation for violin', () => {
+        assert.strictEqual(dashboard._getInstrumentIcon('violin'), 'Vn');
     });
 
-    test('should return icon for cello', () => {
-        assert.ok(dashboard._getInstrumentIcon('cello'));
+    test('should return distinct abbreviation for cello', () => {
+        assert.strictEqual(dashboard._getInstrumentIcon('cello'), 'Vc');
     });
 
-    test('should return default icon for unknown instrument', () => {
-        assert.ok(dashboard._getInstrumentIcon('banjo'));
+    test('should return distinct abbreviation for viola', () => {
+        assert.strictEqual(dashboard._getInstrumentIcon('viola'), 'Va');
+    });
+
+    test('should return distinct abbreviation for bass', () => {
+        assert.strictEqual(dashboard._getInstrumentIcon('bass'), 'Cb');
+    });
+
+    test('should return fallback for unknown instrument', () => {
+        assert.strictEqual(dashboard._getInstrumentIcon('banjo'), '?');
     });
 });
 
@@ -306,7 +314,7 @@ describe('StudioDashboard - Metrics Rendering', () => {
             totalStudents: 5,
             totalWeeklyPracticeMs: 180 * 60000,
             averageIntonation: 82,
-            studentsWithSessions: 3
+            studentsActiveThisWeek: 3
         };
 
         const html = dashboard._renderMetricsCards(metrics);
@@ -321,7 +329,7 @@ describe('StudioDashboard - Metrics Rendering', () => {
             totalStudents: 0,
             totalWeeklyPracticeMs: 0,
             averageIntonation: null,
-            studentsWithSessions: 0
+            studentsActiveThisWeek: 0
         };
 
         const html = dashboard._renderMetricsCards(metrics);

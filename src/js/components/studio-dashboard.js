@@ -13,6 +13,7 @@ class StudioDashboard {
         this.sortBy = 'name';
         this.sortAscending = true;
         this.selectedStudentId = null;
+        this._searchDebounceTimer = null;
     }
 
     /**
@@ -69,6 +70,48 @@ class StudioDashboard {
         `;
 
         this._bindDynamicEvents();
+
+        // Restore search input focus and cursor position after re-render
+        const searchInput = document.getElementById('student-search');
+        if (searchInput && this.searchQuery) {
+            searchInput.focus();
+            searchInput.setSelectionRange(this.searchQuery.length, this.searchQuery.length);
+        }
+    }
+
+    /**
+     * Re-render only the roster section (used by debounced search)
+     */
+    _renderRosterOnly() {
+        if (!this.container) return;
+        const rosterContainer = this.container.querySelector('.student-roster') ||
+                                this.container.querySelector('.studio-empty');
+        if (!rosterContainer) {
+            // Fall back to full render if roster container not found
+            this.render();
+            return;
+        }
+
+        // Replace roster section
+        const parent = rosterContainer.parentNode;
+        const temp = document.createElement('div');
+        temp.innerHTML = this._renderStudentRoster();
+        parent.replaceChild(temp.firstElementChild || temp, rosterContainer);
+
+        // Re-bind roster-specific events
+        this.container?.querySelectorAll('.student-log-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.selectedStudentId = btn.dataset.studentId;
+                this._openLogSessionModal(btn.dataset.studentId);
+            });
+        });
+        this.container?.querySelectorAll('.student-remove-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._handleRemoveStudent(btn.dataset.studentId);
+            });
+        });
     }
 
     /**
@@ -80,6 +123,7 @@ class StudioDashboard {
             : null;
         const intonationInfo = this.teacherService.getIntonationEmoji(avgIntonation);
         const totalPractice = this.teacherService.formatPracticeTime(metrics.totalWeeklyPracticeMs);
+        const activeCount = metrics.studentsActiveThisWeek;
 
         return `
             <div class="studio-metrics" role="region" aria-label="Studio overview metrics">
@@ -116,7 +160,7 @@ class StudioDashboard {
                             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
                         </svg>
                     </div>
-                    <div class="metric-value">${metrics.studentsWithSessions}/${metrics.totalStudents}</div>
+                    <div class="metric-value">${activeCount}/${metrics.totalStudents}</div>
                     <div class="metric-label">Active This Week</div>
                 </div>
             </div>
@@ -217,6 +261,7 @@ class StudioDashboard {
             ? this._formatRelativeTime(student.lastSessionAt)
             : 'Never';
         const instrumentIcon = this._getInstrumentIcon(student.instrument);
+        const escapedInstrument = this._escapeHtml(this._capitalize(student.instrument));
 
         return `
             <div class="roster-row" role="row" data-student-id="${student.id}" tabindex="0">
@@ -225,7 +270,7 @@ class StudioDashboard {
                     <span class="student-meta">Last: ${lastSession}</span>
                 </div>
                 <div class="roster-cell roster-instrument" role="cell">
-                    <span class="instrument-badge">${instrumentIcon} ${this._capitalize(student.instrument)}</span>
+                    <span class="instrument-badge">${instrumentIcon} ${escapedInstrument}</span>
                 </div>
                 <div class="roster-cell roster-piece" role="cell">
                     ${student.assignedPiece ? this._escapeHtml(student.assignedPiece) : '<em>None assigned</em>'}
@@ -302,13 +347,16 @@ class StudioDashboard {
      * Bind events for dynamically rendered content
      */
     _bindDynamicEvents() {
-        // Search
+        // Debounced search - only re-renders roster, not the whole page
         const searchInput = document.getElementById('student-search');
         if (searchInput) {
             searchInput.addEventListener('input', (e) => {
                 this.searchQuery = e.target.value;
-                this.applyFilters();
-                this.render();
+                if (this._searchDebounceTimer) clearTimeout(this._searchDebounceTimer);
+                this._searchDebounceTimer = setTimeout(() => {
+                    this.applyFilters();
+                    this._renderRosterOnly();
+                }, 200);
             });
         }
 
@@ -318,7 +366,7 @@ class StudioDashboard {
             sortSelect.addEventListener('change', (e) => {
                 this.sortBy = e.target.value;
                 this.applyFilters();
-                this.render();
+                this._renderRosterOnly();
             });
         }
 
@@ -327,8 +375,10 @@ class StudioDashboard {
         if (sortDirBtn) {
             sortDirBtn.addEventListener('click', () => {
                 this.sortAscending = !this.sortAscending;
+                sortDirBtn.textContent = this.sortAscending ? '↑' : '↓';
+                sortDirBtn.title = this.sortAscending ? 'Ascending' : 'Descending';
                 this.applyFilters();
-                this.render();
+                this._renderRosterOnly();
             });
         }
 
@@ -463,14 +513,16 @@ class StudioDashboard {
         if (modal) modal.classList.remove('active');
     }
 
+    /**
+     * Escape HTML using regex for consistent behavior across browser and Node.js
+     */
     _escapeHtml(str) {
         if (!str) return '';
-        const div = typeof document !== 'undefined' ? document.createElement('div') : null;
-        if (div) {
-            div.textContent = str;
-            return div.innerHTML;
-        }
-        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
     }
 
     _capitalize(str) {
@@ -494,12 +546,12 @@ class StudioDashboard {
 
     _getInstrumentIcon(instrument) {
         const icons = {
-            violin: '🎻',
-            viola: '🎻',
-            cello: '🎻',
-            bass: '🎻'
+            violin: 'Vn',
+            viola: 'Va',
+            cello: 'Vc',
+            bass: 'Cb'
         };
-        return icons[instrument] || '🎵';
+        return icons[instrument] || '?';
     }
 
     _getScoreClass(score) {

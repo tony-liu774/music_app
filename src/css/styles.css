@@ -3378,18 +3378,18 @@ h1, h2, h3, h4, h5, h6 {
     cursor: pointer;
 }
 
-.studio-sort-dir {
-    background: var(--bg-surface, #141420) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    color: var(--primary, #c9a227) !important;
+button.btn.btn-icon.studio-sort-dir {
+    background: var(--bg-surface, #141420);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--primary, #c9a227);
     font-size: 1.1rem;
     width: 36px;
     height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0 !important;
-    border-radius: var(--radius-sm, 4px) !important;
+    padding: 0;
+    border-radius: var(--radius-sm, 4px);
 }
 
 /* Student Roster */
@@ -3524,9 +3524,9 @@ h1, h2, h3, h4, h5, h6 {
     height: 18px;
 }
 
-.student-remove-btn:hover {
-    color: var(--error-light, #ab3952) !important;
-    background: rgba(139, 41, 66, 0.15) !important;
+button.btn-icon.student-remove-btn:hover {
+    color: var(--error-light, #ab3952);
+    background: rgba(139, 41, 66, 0.15);
 }
 
 /* Empty State */
