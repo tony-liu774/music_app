@@ -639,6 +639,7 @@ router.post('/accept-invitation', authMiddleware, async (req, res) => {
         let studentRecord = license.students.find(s => s.email === userEmail);
         if (studentRecord) {
             // Update existing student record with userId
+            // Don't increment studentCount - already counted when key was generated
             studentRecord.userId = userId;
             studentRecord.activatedAt = Date.now();
         } else {
@@ -651,21 +652,26 @@ router.post('/accept-invitation', authMiddleware, async (req, res) => {
                 activatedAt: Date.now()
             };
             license.students.push(studentRecord);
+            license.studentCount++; // Only increment for new records
         }
-
-        license.studentCount++;
 
         // Update the license in the Map
         licenses.set(licenseKey, license);
 
-        // Decrement maxUses if set
+        // Handle maxUses for multi-use invites
         if (invitation.maxUses !== undefined) {
             invitation.maxUses--;
-            invitations.set(invitationToken, invitation);
+            if (invitation.maxUses <= 0) {
+                // Delete the invitation when max uses is reached
+                invitations.delete(invitationToken);
+            } else {
+                // Keep the invitation for remaining uses
+                invitations.set(invitationToken, invitation);
+            }
+        } else {
+            // Delete the invitation after successful use (single-use)
+            invitations.delete(invitationToken);
         }
-
-        // Delete the invitation after successful use
-        invitations.delete(invitationToken);
 
         res.json({
             message: 'Invitation accepted',

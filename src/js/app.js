@@ -1147,7 +1147,9 @@ class ConcertmasterApp {
         featuresToGate.forEach(feature => {
             const hasFeature = this.licenseService.hasFeature(feature.id);
             document.querySelectorAll(feature.selector).forEach(el => {
-                if (el.style.display === 'none') return; // Don't override explicit hide
+                // Only apply gating if element wasn't explicitly hidden by other code
+                // Use data attribute to track explicit hides vs license-gated hides
+                if (el.dataset.explicitHide === 'true') return;
                 el.style.display = hasFeature ? '' : 'none';
             });
         });

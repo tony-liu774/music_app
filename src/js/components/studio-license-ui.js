@@ -213,6 +213,15 @@ class StudioLicenseUI {
      * Bind static event listeners
      */
     bindEvents() {
+        // Event binding moved to _bindDynamicEvents() which is called on every render
+        // This ensures handlers are bound to fresh DOM elements after re-renders
+    }
+
+    /**
+     * Bind events for dynamically rendered content
+     * Called on every render to ensure handlers are bound to fresh DOM elements
+     */
+    _bindDynamicEvents() {
         // License activation
         const activateBtn = document.getElementById('activate-license-btn');
         if (activateBtn) {
@@ -229,19 +238,6 @@ class StudioLicenseUI {
             });
         }
 
-        // Plan CTAs
-        document.querySelectorAll('.plan-cta').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const planId = e.target.dataset.plan;
-                this._handlePlanSelect(planId);
-            });
-        });
-    }
-
-    /**
-     * Bind events for dynamically rendered content
-     */
-    _bindDynamicEvents() {
         // Deactivate license
         const deactivateBtn = document.getElementById('deactivate-license-btn');
         if (deactivateBtn) {
@@ -266,7 +262,7 @@ class StudioLicenseUI {
             linkBtn.addEventListener('click', () => this._handleGenerateInviteLink());
         }
 
-        // Re-bind plan CTAs
+        // Plan CTAs
         document.querySelectorAll('.plan-cta').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const planId = e.target.dataset.plan;

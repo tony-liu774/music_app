@@ -535,6 +535,44 @@ class LicenseService {
 
         return response.json();
     }
+
+    /**
+     * Redeem a student unlock key received from a teacher
+     * @param {string} studentKey - Student unlock key from teacher
+     * @returns {Promise<Object>} Redemption result with tier info
+     */
+    async redeemStudentKey(studentKey) {
+        if (!studentKey || typeof studentKey !== 'string') {
+            throw new Error('Valid student key is required');
+        }
+
+        const response = await fetch(`${this.apiBaseUrl}/api/licenses/redeem-student-key`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('music_app_auth_token')}`
+            },
+            body: JSON.stringify({ studentKey: studentKey.trim() })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to redeem student key');
+        }
+
+        const result = await response.json();
+
+        // Update local license if redeemed successfully
+        if (result.tier) {
+            this._saveLicense({
+                tier: result.tier,
+                status: 'active',
+                source: 'student_invite'
+            });
+        }
+
+        return result;
+    }
 }
 
 // Export for browser and Node.js
