@@ -101,15 +101,9 @@ class IntegrationController {
         // At higher zoom levels, slow down cursor movement slightly
         // to give player more time to see notes
         const zoomFactor = zoomLevel / 100;
-        const adjustedSpeed = this.followTheBall.speed / Math.sqrt(zoomFactor);
 
         // Temporarily adjust speed (without saving)
         this.cursorSpeedMultiplier = zoomFactor;
-
-        // Apply zoom-aware animation speed
-        if (this.followTheBall.animationFrame) {
-            // Speed will be applied on next animation frame
-        }
     }
 
     /**
@@ -247,7 +241,7 @@ class IntegrationController {
 
         // Add metadata
         session.completedAt = new Date().toISOString();
-        session.duration = session.completedAt - session.startTime;
+        session.duration = Date.now() - session.startTime;
         session.zoomLevel = this.lastZoomLevel;
         session.cursorSpeed = this.followTheBall?.speed || 1;
 
