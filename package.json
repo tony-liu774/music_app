@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "test": "node --test tests/session-logger.test.js tests/practice-loop.test.js tests/pitch-detector.test.js tests/llm-service.test.js tests/ai-summary-generator.test.js"
+    "test": "node --test tests/session-logger.test.js tests/practice-loop.test.js tests/pitch-detector.test.js tests/llm-service.test.js tests/ai-summary-generator.test.js tests/assignment-service.test.js tests/assignment-routes.test.js tests/notification-service.test.js tests/up-next-widget.test.js"
   },
   "keywords": [
     "express",
