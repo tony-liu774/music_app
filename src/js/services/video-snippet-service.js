@@ -207,6 +207,14 @@ class VideoSnippetService {
     }
 
     /**
+     * Get JWT token from localStorage
+     */
+    getAuthHeader() {
+        const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
+        return token ? { 'Authorization': `Bearer ${token}` } : {};
+    }
+
+    /**
      * Submit a video snippet to the teacher
      */
     async submitSnippet(snippetData) {
@@ -214,7 +222,7 @@ class VideoSnippetService {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-Teacher-Mode': 'false'
+                ...this.getAuthHeader()
             },
             body: JSON.stringify(snippetData)
         });
@@ -233,7 +241,7 @@ class VideoSnippetService {
     async getSnippets(studentId) {
         const response = await fetch(`/api/teacher/snippets/${studentId}`, {
             headers: {
-                'X-Teacher-Mode': 'false'
+                ...this.getAuthHeader()
             }
         });
 
@@ -250,7 +258,7 @@ class VideoSnippetService {
     async getAllSnippets() {
         const response = await fetch('/api/teacher/snippets', {
             headers: {
-                'X-Teacher-Mode': 'true'
+                ...this.getAuthHeader()
             }
         });
 
@@ -269,7 +277,7 @@ class VideoSnippetService {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-Teacher-Mode': 'true'
+                ...this.getAuthHeader()
             },
             body: JSON.stringify({
                 replyText,
@@ -292,7 +300,7 @@ class VideoSnippetService {
         const response = await fetch(`/api/teacher/snippets/${snippetId}`, {
             method: 'DELETE',
             headers: {
-                'X-Teacher-Mode': 'true'
+                ...this.getAuthHeader()
             }
         });
 
@@ -310,7 +318,7 @@ class VideoSnippetService {
         const response = await fetch('/api/teacher/snippets/cleanup', {
             method: 'POST',
             headers: {
-                'X-Teacher-Mode': 'true'
+                ...this.getAuthHeader()
             }
         });
 

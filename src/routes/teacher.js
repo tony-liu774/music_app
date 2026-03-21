@@ -7,11 +7,12 @@
 
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const config = require('../config');
 
 const router = express.Router();
 
 // Get JWT secret from config
-const JWT_SECRET = process.env.JWT_SECRET || 'development-secret-change-in-production';
+const JWT_SECRET = config.jwt.secret;
 
 // In-memory store (would be replaced by a database in production)
 const students = new Map();
@@ -590,7 +591,7 @@ router.post('/snippets/:id/reply', requireAuth, requireTeacher, async (req, res)
  * DELETE /api/teacher/snippets/:id
  * Requires authentication - teachers can delete any, students can delete their own
  */
-router.delete('/snippets/:id', requireAuth, (req, res) => {
+router.delete('/snippets/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
     const isTeacher = req.user.role === 'teacher';
 
@@ -606,8 +607,23 @@ router.delete('/snippets/:id', requireAuth, (req, res) => {
 
     // Delete video from cloud storage if exists
     if (snippet.videoKey) {
-        // In production: delete from S3
-        console.log(`Deleting video from cloud: ${snippet.videoKey}`);
+        try {
+            const videoStorage = require('../services/video-storage');
+            await videoStorage.deleteVideo(snippet.videoKey);
+            console.log(`Deleted video from S3: ${snippet.videoKey}`);
+        } catch (error) {
+            console.error('Failed to delete video from S3:', error);
+        }
+    }
+
+    // Delete thumbnail from cloud storage if exists
+    if (snippet.thumbnailKey) {
+        try {
+            const videoStorage = require('../services/video-storage');
+            await videoStorage.deleteVideo(snippet.thumbnailKey);
+        } catch (error) {
+            console.error('Failed to delete thumbnail from S3:', error);
+        }
     }
 
     videoSnippets.delete(id);
