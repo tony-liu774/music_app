@@ -46,6 +46,31 @@ class AISummaryGenerator {
     }
 
     /**
+     * Log a dynamics deviation from performance
+     * @param {Object} params - Deviation parameters
+     */
+    logDynamicsDeviation(params) {
+        this.sessionLogger.logDynamicsDeviation(params);
+    }
+
+    /**
+     * Log an articulation deviation from performance
+     * @param {Object} params - Deviation parameters
+     */
+    logArticulationDeviation(params) {
+        this.sessionLogger.logArticulationDeviation(params);
+    }
+
+    /**
+     * Log a tone quality deviation from performance
+     * @param {Object} params - Deviation parameters
+     */
+    logToneQualityDeviation(params) {
+        this.sessionLogger.logToneQualityDeviation(params);
+    }
+    }
+
+    /**
      * Generate the complete post-session summary
      * @returns {Promise<Object>} Complete summary with AI insights
      */
@@ -153,4 +178,5 @@ class AISummaryGenerator {
     }
 }
 
-window.AISummaryGenerator = AISummaryGenerator;
+if (typeof window !== 'undefined') { window.AISummaryGenerator = AISummaryGenerator; }
+if (typeof module !== 'undefined' && module.exports) { module.exports = { AISummaryGenerator }; }

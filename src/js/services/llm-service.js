@@ -97,8 +97,8 @@ class LLMService {
 
 **Structure (3 short paragraphs):**
 1. **The Praise**: Start with what went well overall (e.g., "Great energy on this run-through!")
-2. **The Diagnosis**: Identify the 1-2 most significant patterns of error. Group them (e.g., "I noticed your intonation drifts sharp during the shifting passages in measures 14-18," or "Your rhythm tends to rush right before the crescendo in measure 42.")
-3. **The Fix**: Provide one physical or technical piece of advice (e.g., "Keep your bow arm relaxed," "Anticipate the shift with your elbow," or "Subdivide the eighth notes in your head")
+2. **The Diagnosis**: Identify the 1-2 most significant patterns of error. Group them (e.g., "I noticed your intonation drifts sharp during the shifting passages in measures 14-18," or "Your dynamics didn't follow the crescendo in measure 42," or "The staccato passages need shorter, more separated bow strokes.")
+3. **The Fix**: Provide one physical or technical piece of advice (e.g., "Keep your bow arm relaxed," "Use more bow weight for forte passages," or "Lift the bow between staccato notes")
 
 **Constraints:**
 - Never exceed 150 words
@@ -113,6 +113,8 @@ Summary Statistics:
 - Total notes played: ${summary.total_notes_played}
 - Problem measures (highest error counts): ${summary.problem_measures.slice(0, 3).map(m => `measure ${m.measure} (${m.error_count} errors)`).join(', ') || 'none'}
 - Average pitch deviation: ${summary.average_pitch_deviation_cents > 0 ? '+' : ''}${summary.average_pitch_deviation_cents} cents (positive = sharp, negative = flat)
+- Dynamics deviations: ${summary.dynamics_deviation_count || 0} (avg level deviation: ${summary.average_dynamics_deviation || 0})
+- Articulation deviations: ${summary.articulation_deviation_count || 0} (avg accuracy: ${summary.average_articulation_score || 100}%)
 
 Error Log (JSON format):
 ${formattedDeviations}
@@ -144,14 +146,27 @@ Provide your response as JSON:
         // Take last 20 deviations for context
         const recent = deviations.slice(-20);
 
-        return JSON.stringify(recent.map(d => ({
-            measure: d.measure,
-            type: d.type,
-            deviation_cents: d.deviation_cents || 0,
-            deviation_ms: d.deviation_ms || 0,
-            expected_pitch: d.expected_pitch,
-            actual_pitch: d.actual_pitch
-        })), null, 2);
+        return JSON.stringify(recent.map(d => {
+            const entry = { measure: d.measure, type: d.type };
+            if (d.type === 'dynamics') {
+                entry.expected_dynamic = d.expected_dynamic;
+                entry.actual_dynamic = d.actual_dynamic;
+                entry.deviation = d.deviation;
+                entry.expected_direction = d.expected_direction;
+                entry.actual_trend = d.actual_trend;
+            } else if (d.type === 'articulation') {
+                entry.expected_articulation = d.expected_articulation;
+                entry.detected_articulation = d.detected_articulation;
+                entry.score = d.score;
+                entry.feedback = d.feedback;
+            } else {
+                entry.deviation_cents = d.deviation_cents || 0;
+                entry.deviation_ms = d.deviation_ms || 0;
+                entry.expected_pitch = d.expected_pitch;
+                entry.actual_pitch = d.actual_pitch;
+            }
+            return entry;
+        }), null, 2);
     }
 
     /**
@@ -283,4 +298,5 @@ Provide your response as JSON:
     }
 }
 
-window.LLMService = LLMService;
+if (typeof window !== 'undefined') { window.LLMService = LLMService; }
+if (typeof module !== 'undefined' && module.exports) { module.exports = { LLMService }; }
