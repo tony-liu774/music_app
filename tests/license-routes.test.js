@@ -70,7 +70,7 @@ describe('License Routes', () => {
         it('should reject non-existent license key', async () => {
             const response = await makeRequest(app, '/api/licenses/validate', {
                 method: 'POST',
-                body: { licenseKey: 'MCP-ABCD0000-EFGH0000-IJKL0000' }
+                body: { licenseKey: 'MCP-ABCD0000-EFGH-IJKL' }
             });
 
             assert.strictEqual(response.status, 404);

@@ -1111,7 +1111,11 @@ class ConcertmasterApp {
 
         // Initialize license UI
         if (!this.licenseUI) {
-            this.licenseUI = new StudioLicenseUI(this.licenseService, this.authService);
+            this.licenseUI = new StudioLicenseUI(
+                this.licenseService,
+                this.authService,
+                () => this.applyFeatureGating() // Callback to re-apply feature gating on license change
+            );
             await this.licenseUI.init();
         }
 

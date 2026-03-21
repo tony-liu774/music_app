@@ -4,9 +4,10 @@
  */
 
 class StudioLicenseUI {
-    constructor(licenseService, authService) {
+    constructor(licenseService, authService, onLicenseChange) {
         this.licenseService = licenseService;
         this.authService = authService;
+        this.onLicenseChange = onLicenseChange;
         this.container = null;
     }
 
@@ -24,6 +25,10 @@ class StudioLicenseUI {
         // Listen for license changes
         this.licenseService.onLicenseChange((event, license) => {
             this.render();
+            // Notify app to re-apply feature gating
+            if (typeof this.onLicenseChange === 'function') {
+                this.onLicenseChange(license);
+            }
         });
     }
 

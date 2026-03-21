@@ -205,9 +205,15 @@ class LicenseService {
             throw new Error('Valid license key is required');
         }
 
+        const authToken = localStorage.getItem('music_app_auth_token');
+        const headers = { 'Content-Type': 'application/json' };
+        if (authToken) {
+            headers['Authorization'] = `Bearer ${authToken}`;
+        }
+
         const response = await fetch(`${this.apiBaseUrl}/api/licenses/activate`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({ licenseKey: licenseKey.trim() })
         });
 

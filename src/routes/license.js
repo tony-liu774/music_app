@@ -37,7 +37,7 @@ const licenseRateLimiter = rateLimit({
 
 // Input validation helpers
 function isValidLicenseKey(key) {
-    return typeof key === 'string' && /^[A-Z0-9]{4}-[A-Z0-9]{8}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(key);
+    return typeof key === 'string' && /^[A-Z0-9]{3,4}-[A-Z0-9]{8}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(key);
 }
 
 function isValidEmail(email) {
@@ -46,11 +46,12 @@ function isValidEmail(email) {
 
 // Pre-populate some demo license keys for testing
 function initializeDemoLicenses() {
+    const nodeEnv = process.env.NODE_ENV || 'development';
+
     // Pro license (monthly)
     const proKey = generateLicenseKey('MCP');
     licenses.set(proKey, {
         id: uuidv4(),
-        key: proKey,
         type: 'subscription',
         tier: 'pro',
         userId: null,
@@ -66,7 +67,6 @@ function initializeDemoLicenses() {
     const studioKey = generateLicenseKey('MCS');
     licenses.set(studioKey, {
         id: uuidv4(),
-        key: studioKey,
         type: 'one-time',
         tier: 'studio',
         userId: null,
@@ -78,9 +78,12 @@ function initializeDemoLicenses() {
         createdAt: Date.now()
     });
 
-    console.log('Demo license keys generated:');
-    console.log('  Pro (30 days):', proKey);
-    console.log('  Studio (one-time, 30 students):', studioKey);
+    // Only log in non-production environments
+    if (nodeEnv !== 'production') {
+        console.log('Demo license keys generated:');
+        console.log('  Pro (30 days):', proKey);
+        console.log('  Studio (one-time, 30 students):', studioKey);
+    }
 }
 
 // Initialize demo licenses on module load
@@ -192,21 +195,22 @@ router.post('/deactivate', authMiddleware, async (req, res) => {
 
         // Find license belonging to user
         let foundLicense = null;
+        let licenseKey = null;
         for (const [key, license] of licenses) {
             if (license.id === licenseId && license.userId === userId) {
                 foundLicense = license;
-                foundLicense.key = key;
+                licenseKey = key;
                 break;
             }
         }
 
-        if (!foundLicense) {
+        if (!foundLicense || !licenseKey) {
             return res.status(404).json({ error: 'License not found' });
         }
 
         // Remove user association (keep license in system)
         foundLicense.userId = null;
-        licenses.set(foundLicense.key, foundLicense);
+        licenses.set(licenseKey, foundLicense);
 
         res.json({ message: 'License deactivated successfully' });
     } catch (error) {
@@ -240,6 +244,15 @@ router.get('/status', authMiddleware, async (req, res) => {
             });
         }
 
+        // Filter out sensitive data from student list
+        const sanitizedStudents = userLicense.students.map(s => ({
+            id: s.id,
+            email: s.email,
+            invitedAt: s.invitedAt,
+            activatedAt: s.activatedAt,
+            userId: s.userId
+        }));
+
         res.json({
             hasLicense: true,
             id: userLicense.id,
@@ -249,7 +262,7 @@ router.get('/status', authMiddleware, async (req, res) => {
             expiresAt: userLicense.expiresAt,
             studentLimit: userLicense.studentLimit,
             studentCount: userLicense.studentCount,
-            students: userLicense.students
+            students: sanitizedStudents
         });
     } catch (error) {
         res.status(500).json({ error: 'Failed to get license status' });
@@ -271,10 +284,11 @@ router.post('/generate-student-key', authMiddleware, async (req, res) => {
 
         // Find user's studio license
         let studioLicense = null;
+        let licenseKey = null;
         for (const [key, license] of licenses) {
             if (license.userId === userId && license.tier === 'studio' && license.status === 'active') {
                 studioLicense = license;
-                studioLicense.key = key;
+                licenseKey = key;
                 break;
             }
         }
@@ -306,7 +320,7 @@ router.post('/generate-student-key', authMiddleware, async (req, res) => {
         // Add student to license
         studioLicense.students.push(student);
         studioLicense.studentCount++;
-        licenses.set(studioLicense.key, studioLicense);
+        licenses.set(licenseKey, studioLicense);
 
         res.json({
             studentKey,
@@ -316,6 +330,76 @@ router.post('/generate-student-key', authMiddleware, async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ error: 'Failed to generate student key' });
+    }
+});
+
+/**
+ * POST /api/licenses/redeem-student-key
+ * Redeem a student unlock key received from a teacher
+ */
+router.post('/redeem-student-key', authMiddleware, async (req, res) => {
+    try {
+        const { studentKey } = req.body;
+        const userId = req.user.id;
+        const userEmail = req.user.email;
+
+        if (!studentKey || !isValidLicenseKey(studentKey)) {
+            return res.status(400).json({ error: 'Invalid student key format' });
+        }
+
+        // Search all licenses for this student key
+        let foundLicense = null;
+        let licenseKey = null;
+        let studentRecord = null;
+
+        for (const [key, license] of licenses) {
+            const student = license.students?.find(s => s.key === studentKey);
+            if (student) {
+                foundLicense = license;
+                licenseKey = key;
+                studentRecord = student;
+                break;
+            }
+        }
+
+        if (!foundLicense || !studentRecord) {
+            return res.status(404).json({ error: 'Student key not found' });
+        }
+
+        if (foundLicense.status !== 'active') {
+            return res.status(400).json({ error: 'License is not active' });
+        }
+
+        // Check if already redeemed
+        if (studentRecord.userId) {
+            if (studentRecord.userId === userId) {
+                return res.json({
+                    message: 'Key already redeemed',
+                    tier: foundLicense.tier
+                });
+            }
+            return res.status(409).json({ error: 'Key already redeemed by another user' });
+        }
+
+        // Check if email matches (if student record has email)
+        if (studentRecord.email && studentRecord.email !== userEmail) {
+            return res.status(403).json({ error: 'This key was invited for a different email address' });
+        }
+
+        // Redeem the key - add userId to student record
+        studentRecord.userId = userId;
+        studentRecord.activatedAt = Date.now();
+
+        // Update license in Map
+        licenses.set(licenseKey, foundLicense);
+
+        res.json({
+            message: 'Student key redeemed successfully',
+            tier: foundLicense.tier,
+            teacherTier: foundLicense.tier
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to redeem student key' });
     }
 });
 
@@ -340,7 +424,16 @@ router.get('/students', authMiddleware, async (req, res) => {
             return res.status(403).json({ error: 'Studio license required' });
         }
 
-        res.json(studioLicense.students);
+        // Filter out sensitive data
+        const sanitizedStudents = studioLicense.students.map(s => ({
+            id: s.id,
+            email: s.email,
+            invitedAt: s.invitedAt,
+            activatedAt: s.activatedAt,
+            userId: s.userId
+        }));
+
+        res.json(sanitizedStudents);
     } catch (error) {
         res.status(500).json({ error: 'Failed to get students' });
     }
@@ -492,6 +585,7 @@ router.post('/accept-invitation', authMiddleware, async (req, res) => {
     try {
         const { invitationToken } = req.body;
         const userId = req.user.id;
+        const userEmail = req.user.email;
 
         if (!invitationToken) {
             return res.status(400).json({ error: 'Invitation token is required' });
@@ -505,6 +599,11 @@ router.post('/accept-invitation', authMiddleware, async (req, res) => {
 
         if (invitation.expiresAt < Date.now()) {
             return res.status(400).json({ error: 'Invitation has expired' });
+        }
+
+        // Check maxUses limit
+        if (invitation.maxUses !== undefined && invitation.maxUses <= 0) {
+            return res.status(400).json({ error: 'Invitation has reached its usage limit' });
         }
 
         // Find the license
@@ -522,19 +621,51 @@ router.post('/accept-invitation', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: 'License not found or inactive' });
         }
 
-        // Check if user already has access
-        const alreadyHasAccess = license.students.some(s => s.userId === userId);
-        if (alreadyHasAccess) {
+        // Check if user already has access (by userId)
+        const existingStudent = license.students.find(s => s.userId === userId);
+        if (existingStudent) {
             return res.json({
                 message: 'Access already granted',
                 tier: license.tier
             });
         }
 
-        // Find the student by email (we need their email from auth)
-        // In a real app, we'd look up the user's email from the user store
-        // For now, we'll just add the userId to the student record
-        // This would need to be matched by email in production
+        // Check if we can add more students
+        if (license.studentCount >= license.studentLimit) {
+            return res.status(400).json({ error: 'Student limit reached' });
+        }
+
+        // Try to find student by email if provided, otherwise create new record
+        let studentRecord = license.students.find(s => s.email === userEmail);
+        if (studentRecord) {
+            // Update existing student record with userId
+            studentRecord.userId = userId;
+            studentRecord.activatedAt = Date.now();
+        } else {
+            // Create new student record
+            studentRecord = {
+                id: uuidv4(),
+                email: userEmail || '',
+                userId: userId,
+                invitedAt: Date.now(),
+                activatedAt: Date.now()
+            };
+            license.students.push(studentRecord);
+        }
+
+        license.studentCount++;
+
+        // Update the license in the Map
+        licenses.set(licenseKey, license);
+
+        // Decrement maxUses if set
+        if (invitation.maxUses !== undefined) {
+            invitation.maxUses--;
+            invitations.set(invitationToken, invitation);
+        }
+
+        // Delete the invitation after successful use
+        invitations.delete(invitationToken);
 
         res.json({
             message: 'Invitation accepted',
