@@ -1,261 +1,200 @@
 /**
- * Intonation Analyzer - Combines pitch accuracy, rhythm precision, and note transitions
- * for a comprehensive three-axis analysis (pitch, rhythm, intonation)
+ * Intonation Analyzer - Combines pitch and rhythm for overall musicality score
+ * Third axis: Intonation = pitch accuracy + rhythm precision + note transition smoothness
  */
 
 class IntonationAnalyzer {
     constructor() {
-        this.pitchHistory = [];
-        this.timingHistory = [];
-        this.transitionHistory = [];
-        this.previousNote = null;
-        this.previousNoteTime = null;
-
-        // Thresholds for intonation scoring
-        this.pitchThreshold = 10; // cents within which intonation is "good"
-        this.timingThreshold = 50; // ms within which timing is "good"
-        this.transitionThreshold = 100; // ms for smooth note transition
+        this.pitchScores = [];
+        this.rhythmScores = [];
+        this.transitionScores = [];
+        this.noteHistory = [];
+        this.maxHistorySize = 10;
     }
 
     /**
-     * Record a pitch analysis result
-     * @param {Object} noteInfo - Contains frequency, name, octave, centsDeviation
-     * @param {number} timestamp - When the note was detected
+     * Record a note's pitch and timing data
      */
-    recordPitch(noteInfo, timestamp) {
-        const pitchData = {
-            timestamp: timestamp,
-            frequency: noteInfo.frequency,
-            name: noteInfo.name,
-            octave: noteInfo.octave,
-            centsDeviation: noteInfo.centsDeviation || 0,
-            accuracy: this.calculatePitchAccuracy(noteInfo.centsDeviation || 0)
-        };
-        this.pitchHistory.push(pitchData);
-        return pitchData;
-    }
+    recordNote(noteInfo) {
+        const timestamp = Date.now();
 
-    /**
-     * Record timing deviation for a note
-     * @param {number} expectedTime - When the note was expected
-     * @param {number} actualTime - When the note was actually played
-     */
-    recordTiming(expectedTime, actualTime) {
-        const deviation = actualTime - expectedTime;
-        const timingData = {
-            expected: expectedTime,
-            actual: actualTime,
-            deviation: deviation, // positive = late, negative = early
-            absoluteDeviation: Math.abs(deviation),
-            accuracy: this.calculateTimingAccuracy(deviation)
-        };
-        this.timingHistory.push(timingData);
-        return timingData;
-    }
+        // Calculate pitch accuracy (0-100)
+        const pitchAccuracy = this.calculatePitchScore(noteInfo);
 
-    /**
-     * Record a note transition
-     * @param {Object} noteInfo - Current note info
-     * @param {number} timestamp - When the note started
-     */
-    recordTransition(noteInfo, timestamp) {
-        let transitionScore = 100;
+        // Store note data
+        this.noteHistory.push({
+            ...noteInfo,
+            timestamp,
+            pitchScore: pitchAccuracy
+        });
 
-        if (this.previousNote && this.previousNoteTime) {
-            const transitionTime = timestamp - this.previousNoteTime;
-
-            // Calculate transition smoothness based on expected interval
-            const expectedInterval = this.getExpectedInterval(this.previousNote, noteInfo);
-            const transitionDeviation = Math.abs(transitionTime - expectedInterval);
-
-            transitionScore = Math.max(0, 100 - (transitionDeviation / this.transitionThreshold) * 100);
+        // Keep history bounded
+        if (this.noteHistory.length > this.maxHistorySize) {
+            this.noteHistory.shift();
         }
 
-        const transitionData = {
-            from: this.previousNote ? { ...this.previousNote } : null,
-            to: { name: noteInfo.name, octave: noteInfo.octave },
-            timestamp: timestamp,
-            duration: this.previousNoteTime ? timestamp - this.previousNoteTime : 0,
-            score: transitionScore
-        };
+        // Calculate transition score if we have previous notes
+        if (this.noteHistory.length >= 2) {
+            const prevNote = this.noteHistory[this.noteHistory.length - 2];
+            const transitionScore = this.calculateTransitionScore(prevNote, noteInfo);
+            this.transitionScores.push(transitionScore);
+        }
 
-        this.transitionHistory.push(transitionData);
-
-        this.previousNote = { name: noteInfo.name, octave: noteInfo.octave };
-        this.previousNoteTime = timestamp;
-
-        return transitionData;
+        this.pitchScores.push(pitchAccuracy);
     }
 
     /**
-     * Calculate pitch accuracy (0-100)
-     * @param {number} centsDeviation - Deviation in cents
+     * Calculate pitch accuracy score from note info
      */
-    calculatePitchAccuracy(centsDeviation) {
-        const absCents = Math.abs(centsDeviation);
+    calculatePitchScore(noteInfo) {
+        if (!noteInfo || noteInfo.centsDeviation === undefined) {
+            return 75; // Default middle score
+        }
+
+        const cents = Math.abs(noteInfo.centsDeviation);
         // 0 cents = 100%, 50 cents = 0%
-        return Math.max(0, 100 - (absCents * 2));
+        return Math.max(0, Math.min(100, 100 - (cents * 2)));
     }
 
     /**
-     * Calculate timing accuracy (0-100)
-     * @param {number} deviationMs - Deviation in milliseconds
+     * Calculate note transition smoothness
+     * Considers: interval size, timing between notes, pitch direction
      */
-    calculateTimingAccuracy(deviationMs) {
-        const absDeviation = Math.abs(deviationMs);
-        // 0ms = 100%, 100ms = 0%
-        return Math.max(0, 100 - absDeviation);
+    calculateTransitionScore(prevNote, currentNote) {
+        if (!prevNote || !currentNote) {
+            return 75;
+        }
+
+        // Check if both notes have pitch information
+        if (prevNote.frequency === undefined || currentNote.frequency === undefined) {
+            return 75;
+        }
+
+        // Calculate interval between notes
+        const interval = Math.abs(12 * Math.log2(currentNote.frequency / prevNote.frequency));
+
+        // Large intervals are harder to execute smoothly
+        let intervalScore = Math.max(0, 100 - (interval * 5));
+
+        // Check timing gap (too fast or too slow between notes affects smoothness)
+        const timeGap = currentNote.timestamp - prevNote.timestamp;
+        const optimalGap = 200; // ms - typical note separation
+        const timingDeviation = Math.abs(timeGap - optimalGap);
+        const timingScore = Math.max(0, 100 - (timingDeviation / 10));
+
+        // Combined transition score
+        return Math.round((intervalScore * 0.4) + (timingScore * 0.6));
     }
 
     /**
-     * Calculate transition smoothness (0-100)
-     * @param {number} transitionTime - Actual transition time in ms
-     * @param {number} expectedInterval - Expected interval in ms
+     * Record a rhythm/timing score from RhythmAnalyzer
      */
-    calculateTransitionAccuracy(transitionTime, expectedInterval) {
-        if (!expectedInterval || expectedInterval === 0) return 100;
-        const deviation = Math.abs(transitionTime - expectedInterval);
-        return Math.max(0, 100 - (deviation / this.transitionThreshold) * 100);
+    recordRhythmScore(score) {
+        this.rhythmScores.push(score);
     }
 
     /**
-     * Get expected interval between two notes
+     * Calculate the overall intonation score combining all three axes
      */
-    getExpectedInterval(previousNote, currentNote) {
-        // Simplified: assume quarter note at 120 BPM = 500ms
-        // In a real implementation, this would check the score
-        return 500;
-    }
+    calculateIntonationScore() {
+        const pitchScore = this.getAveragePitchScore();
+        const rhythmScore = this.getAverageRhythmScore();
+        const transitionScore = this.getAverageTransitionScore();
 
-    /**
-     * Get the overall pitch score (0-100)
-     */
-    getPitchScore() {
-        if (this.pitchHistory.length === 0) return 0;
-        const sum = this.pitchHistory.reduce((acc, p) => acc + p.accuracy, 0);
-        return sum / this.pitchHistory.length;
-    }
+        // Weighted average: pitch 40%, rhythm 40%, transitions 20%
+        const overall = (pitchScore * 0.4) + (rhythmScore * 0.4) + (transitionScore * 0.2);
 
-    /**
-     * Get the overall rhythm/timing score (0-100)
-     */
-    getRhythmScore() {
-        if (this.timingHistory.length === 0) return 100;
-        const sum = this.timingHistory.reduce((acc, t) => acc + t.accuracy, 0);
-        return sum / this.timingHistory.length;
-    }
-
-    /**
-     * Get the overall transition smoothness score (0-100)
-     */
-    getTransitionScore() {
-        if (this.transitionHistory.length === 0) return 100;
-        const sum = this.transitionHistory.reduce((acc, t) => acc + t.score, 0);
-        return sum / this.transitionHistory.length;
-    }
-
-    /**
-     * Calculate the intonation score combining all three axes
-     * @param {number} pitchWeight - Weight for pitch (default 0.4)
-     * @param {number} rhythmWeight - Weight for rhythm (default 0.4)
-     * @param {number} transitionWeight - Weight for transitions (default 0.2)
-     */
-    getIntonationScore(pitchWeight = 0.4, rhythmWeight = 0.4, transitionWeight = 0.2) {
-        const pitchScore = this.getPitchScore();
-        const rhythmScore = this.getRhythmScore();
-        const transitionScore = this.getTransitionScore();
-
-        return (
-            pitchScore * pitchWeight +
-            rhythmScore * rhythmWeight +
-            transitionScore * transitionWeight
-        );
-    }
-
-    /**
-     * Get detailed breakdown of all three axes
-     */
-    getAxisBreakdown() {
         return {
-            pitch: {
-                score: this.getPitchScore(),
-                history: this.pitchHistory,
-                averageCents: this.pitchHistory.length > 0
-                    ? this.pitchHistory.reduce((a, p) => a + p.centsDeviation, 0) / this.pitchHistory.length
-                    : 0
-            },
-            rhythm: {
-                score: this.getRhythmScore(),
-                history: this.timingHistory,
-                averageDeviation: this.timingHistory.length > 0
-                    ? this.timingHistory.reduce((a, t) => a + t.deviation, 0) / this.timingHistory.length
-                    : 0
-            },
-            intonation: {
-                score: this.getIntonationScore(),
-                pitchScore: this.getPitchScore(),
-                rhythmScore: this.getRhythmScore(),
-                transitionScore: this.getTransitionScore()
-            }
+            overall: Math.round(overall),
+            pitch: Math.round(pitchScore),
+            rhythm: Math.round(rhythmScore),
+            transition: Math.round(transitionScore)
         };
     }
 
     /**
-     * Get the most recent timing deviation in milliseconds
+     * Get average pitch score
      */
-    getLatestTimingDeviation() {
-        if (this.timingHistory.length === 0) return null;
-        return this.timingHistory[this.timingHistory.length - 1].deviation;
+    getAveragePitchScore() {
+        if (this.pitchScores.length === 0) return 75;
+        return this.pitchScores.reduce((a, b) => a + b, 0) / this.pitchScores.length;
     }
 
     /**
-     * Get recommendation based on weakest axis
+     * Get average rhythm score
      */
-    getWeakestAxisRecommendation() {
-        const breakdown = this.getAxisBreakdown();
+    getAverageRhythmScore() {
+        if (this.rhythmScores.length === 0) return 75;
+        return this.rhythmScores.reduce((a, b) => a + b, 0) / this.rhythmScores.length;
+    }
 
+    /**
+     * Get average transition score
+     */
+    getAverageTransitionScore() {
+        if (this.transitionScores.length === 0) return 75;
+        return this.transitionScores.reduce((a, b) => a + b, 0) / this.transitionScores.length;
+    }
+
+    /**
+     * Get the weakest axis for recommendations
+     */
+    getWeakestAxis() {
+        const scores = this.calculateIntonationScore();
         const axes = [
-            { name: 'pitch', score: breakdown.pitch.score },
-            { name: 'rhythm', score: breakdown.rhythm.score },
-            { name: 'intonation', score: breakdown.intonation.score }
+            { name: 'pitch', score: scores.pitch },
+            { name: 'rhythm', score: scores.rhythm },
+            { name: 'intonation', score: scores.transition }
         ];
 
         axes.sort((a, b) => a.score - b.score);
-        const weakest = axes[0];
-
-        const recommendations = {
-            pitch: 'Focus on pitch accuracy. Try using a tuner to calibrate your instrument and practice long tones to develop stable pitch.',
-            rhythm: 'Focus on rhythm precision. Practice with a metronome and try tapping along to establish a steady pulse.',
-            intonation: 'Work on overall musicality. Pay attention to both pitch and timing, and practice connecting notes smoothly.'
-        };
-
-        return {
-            weakestAxis: weakest.name,
-            recommendation: recommendations[weakest.name],
-            scores: axes
-        };
+        return axes[0];
     }
 
     /**
-     * Get historical data for trend visualization
+     * Get color based on score (emerald for good, crimson for poor)
      */
-    getHistoricalTrends() {
-        return {
-            pitch: this.pitchHistory.slice(-20).map(p => p.accuracy),
-            rhythm: this.timingHistory.slice(-20).map(t => t.accuracy),
-            intonation: this.getIntonationScore()
-        };
+    static getScoreColor(score) {
+        if (score >= 80) return '#10b981'; // emerald
+        if (score >= 60) return '#f59e0b'; // amber/warning
+        return '#ef4444'; // crimson/error
     }
 
     /**
-     * Reset all data
+     * Get status based on score
+     */
+    static getScoreStatus(score) {
+        if (score >= 80) return 'excellent';
+        if (score >= 60) return 'good';
+        if (score >= 40) return 'fair';
+        return 'needs-work';
+    }
+
+    /**
+     * Reset all scores
      */
     reset() {
-        this.pitchHistory = [];
-        this.timingHistory = [];
-        this.transitionHistory = [];
-        this.previousNote = null;
-        this.previousNoteTime = null;
+        this.pitchScores = [];
+        this.rhythmScores = [];
+        this.transitionScores = [];
+        this.noteHistory = [];
+    }
+
+    /**
+     * Get current timing deviation in milliseconds
+     * This is used to display in the feedback panel
+     */
+    getTimingDeviation() {
+        if (this.noteHistory.length < 2) return 0;
+
+        const lastNote = this.noteHistory[this.noteHistory.length - 1];
+        const prevNote = this.noteHistory[this.noteHistory.length - 2];
+
+        // Compare actual timing to expected (based on typical note duration)
+        const expectedInterval = 500; // Assume quarter note at 120 BPM
+        const actualInterval = lastNote.timestamp - prevNote.timestamp;
+
+        return Math.round(actualInterval - expectedInterval);
     }
 }
 

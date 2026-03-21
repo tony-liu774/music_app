@@ -554,7 +554,8 @@ a:hover {
 }
 
 .pitch-indicator,
-.timing-indicator {
+.timing-indicator,
+.intonation-indicator {
     display: flex;
     align-items: center;
     gap: var(--space-3);
@@ -599,11 +600,17 @@ a:hover {
 }
 
 .cents-display,
-.timing-display {
+.timing-display,
+.intonation-score {
     font-family: var(--font-mono);
     font-size: var(--text-sm);
     min-width: 50px;
     text-align: right;
+}
+
+.intonation-score {
+    font-weight: 600;
+    color: var(--success);
 }
 
 .score-display {
@@ -1117,6 +1124,32 @@ a:hover {
     align-items: center;
     justify-content: center;
     color: var(--text-muted);
+}
+
+.radar-chart-section {
+    text-align: center;
+    margin-bottom: var(--space-6);
+}
+
+.radar-chart-section h3 {
+    margin-bottom: var(--space-3);
+}
+
+#radar-chart-canvas {
+    display: block;
+    margin: 0 auto;
+    max-width: 100%;
+}
+
+.recommendation {
+    background: var(--bg-elevated);
+    border-left: 3px solid var(--primary);
+    padding: var(--space-4);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-6);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    line-height: 1.6;
 }
 
 .summary-actions {

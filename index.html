@@ -194,6 +194,10 @@
                             <span class="indicator-label">Timing</span>
                             <span class="timing-display" id="timing-display">0ms</span>
                         </div>
+                        <div class="intonation-indicator">
+                            <span class="indicator-label">Intonation</span>
+                            <span class="intonation-score" id="intonation-indicator">--%</span>
+                        </div>
                     </div>
                     <div class="score-display">
                         <span class="score-label">Accuracy</span>
@@ -499,12 +503,12 @@
                             <span class="breakdown-value" id="pitch-accuracy">92%</span>
                         </div>
                         <div class="breakdown-item">
-                            <span class="breakdown-label">Rhythm Accuracy</span>
+                            <span class="breakdown-label">Timing Accuracy</span>
                             <span class="breakdown-value" id="timing-accuracy">78%</span>
                         </div>
                         <div class="breakdown-item">
-                            <span class="breakdown-label">Intonation</span>
-                            <span class="breakdown-value" id="intonation-accuracy">85%</span>
+                            <span class="breakdown-label">Intonation Accuracy</span>
+                            <span class="breakdown-value" id="intonation-accuracy">--%</span>
                         </div>
                         <div class="breakdown-item">
                             <span class="breakdown-label">Duration</span>
@@ -512,15 +516,10 @@
                         </div>
                     </div>
                     <div class="radar-chart-section">
-                        <h3>Performance Profile</h3>
-                        <div class="radar-chart-container" id="radar-chart-container">
-                            <!-- Radar chart will be rendered here -->
-                        </div>
+                        <h3>Three-Axis Analysis</h3>
+                        <canvas id="radar-chart-canvas" width="200" height="200"></canvas>
                     </div>
-                    <div class="recommendation-section">
-                        <h3>Recommendation</h3>
-                        <p class="recommendation-text" id="axis-recommendation">Focus on pitch accuracy. Try using a tuner to calibrate your instrument.</p>
-                    </div>
+                    <div class="recommendation" id="session-recommendation" style="display: none;"></div>
                     <div class="heatmap-section">
                         <h3>Practice Areas</h3>
                         <p class="heatmap-note">Measures colored red need the most practice</p>
@@ -547,7 +546,6 @@
     <script src="src/js/audio/instrument-detector.js"></script>
     <script src="src/js/audio/metronome.js"></script>
     <script src="src/js/analysis/performance-comparator.js"></script>
-    <script src="src/js/analysis/intonation-analyzer.js"></script>
     <script src="src/js/components/sheet-music-renderer.js"></script>
     <script src="src/js/components/heat-map-renderer.js"></script>
     <script src="src/js/components/follow-the-ball.js"></script>
@@ -559,6 +557,7 @@
     <script src="src/js/services/performance-history.js"></script>
     <script src="src/js/metrics/accuracy-scorer.js"></script>
     <script src="src/js/metrics/rhythm-analyzer.js"></script>
+    <script src="src/js/analysis/intonation-analyzer.js"></script>
     <script src="src/js/utils/animations.js"></script>
     <script src="src/js/app.js"></script>
 </body>
