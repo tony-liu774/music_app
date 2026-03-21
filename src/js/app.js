@@ -23,6 +23,10 @@ class ConcertmasterApp {
         this.sessionData = null;
         this.accuracyScorer = null;
         this.intonationAnalyzer = null;
+        this.dynamicsComparator = null;
+        this.sessionLogger = null;
+        this.toneQualityAnalyzer = null;
+        this.aiSummaryGenerator = null;
 
         // UI Components
         this.sheetMusicRenderer = null;
@@ -46,6 +50,10 @@ class ConcertmasterApp {
         // Debounce timer for rhythm analysis
         this.rhythmAnalysisDebounce = null;
 
+        // Tone quality logging throttle
+        this.lastToneQualityLogTime = 0;
+        this.toneQualityLogInterval = 1000; // Log at most once per second
+
         // Screen reader live region
         this.liveRegion = null;
 
@@ -53,6 +61,8 @@ class ConcertmasterApp {
         this.isTeacherMode = false;
         this.teacherService = null;
         this.studioDashboard = null;
+        this.heatMapHistoryService = null;
+        this.heatMapHistoryUI = null;
     }
 
     async init() {
@@ -101,6 +111,10 @@ class ConcertmasterApp {
         this.rhythmAnalyzer = new RhythmAnalyzer();
         this.accuracyScorer = new AccuracyScorer();
         this.intonationAnalyzer = new IntonationAnalyzer();
+        this.dynamicsComparator = new DynamicsComparator();
+        this.sessionLogger = new SessionLogger();
+        this.toneQualityAnalyzer = new ToneQualityAnalyzer();
+        this.aiSummaryGenerator = new AISummaryGenerator();
 
         // Get DOM elements
         this.views = {
@@ -109,7 +123,8 @@ class ConcertmasterApp {
             metronome: document.getElementById('metronome-view'),
             settings: document.getElementById('settings-view'),
             tuner: document.getElementById('tuner-view'),
-            studio: document.getElementById('studio-dashboard-view')
+            studio: document.getElementById('studio-dashboard-view'),
+            'heat-map-history': document.getElementById('heat-map-history-view')
         };
 
         this.toastContainer = document.getElementById('toast-container');
@@ -437,6 +452,11 @@ class ConcertmasterApp {
         const range = this.pitchDetector.getInstrumentRange(this.selectedInstrument);
         this.pitchDetector.minFrequency = range.min;
         this.pitchDetector.maxFrequency = range.max;
+
+        // Also update tone quality analyzer instrument
+        if (this.toneQualityAnalyzer) {
+            this.toneQualityAnalyzer.configure({ instrument: this.selectedInstrument });
+        }
     }
 
     // ============================================
@@ -459,20 +479,63 @@ class ConcertmasterApp {
             link.style.display = enabled ? '' : 'none';
         });
 
+        // Show/hide heatmap (Audits) nav link
+        const heatmapNavLinks = document.querySelectorAll('.heatmap-nav-link');
+        heatmapNavLinks.forEach(link => {
+            link.style.display = enabled ? '' : 'none';
+        });
+
         // Show/hide the studio dashboard view
         const studioView = document.getElementById('studio-dashboard-view');
         if (studioView) {
             studioView.style.display = enabled ? '' : 'none';
         }
 
+        // Show/hide heat map history view
+        const heatmapView = document.getElementById('heat-map-history-view');
+        if (heatmapView) {
+            heatmapView.style.display = enabled ? '' : 'none';
+        }
+
         if (enabled && !this.studioDashboard) {
             // Initialize teacher service and dashboard on first enable
             this.teacherService = new TeacherService();
+            await this.teacherService.init();
+
             this.studioDashboard = new StudioDashboard(this.teacherService);
             await this.studioDashboard.init();
+
+            // Initialize heat map history service and UI
+            this.heatMapHistoryService = new HeatMapHistoryService();
+            await this.heatMapHistoryService.init();
+
+            this.heatMapHistoryUI = new HeatMapHistoryUI(this.heatMapHistoryService, this.teacherService);
+            await this.heatMapHistoryUI.init();
+
+            // Wire up studio dashboard to open heat map view on student selection
+            this._wireUpHeatMapFromDashboard();
         } else if (enabled && this.studioDashboard) {
             await this.studioDashboard.refresh();
         }
+    }
+
+    /**
+     * Wire up studio dashboard to open heat map view when a student is selected
+     */
+    _wireUpHeatMapFromDashboard() {
+        if (!this.studioDashboard || !this.heatMapHistoryUI) return;
+
+        // Listen for student selection events from studio dashboard
+        const originalSelectStudent = this.studioDashboard.selectStudent.bind(this.studioDashboard);
+        this.studioDashboard.selectStudent = async (studentId) => {
+            await originalSelectStudent(studentId);
+
+            // Load heat map for selected student
+            await this.heatMapHistoryUI.loadStudentHeatMaps(studentId);
+
+            // Navigate to heat map history view
+            this.navigateTo('heat-map-history');
+        };
     }
 
     // ============================================
@@ -1292,7 +1355,8 @@ class ConcertmasterApp {
             startTime: Date.now(),
             notes: [],
             pitchAccuracy: [],
-            timingAccuracy: []
+            timingAccuracy: [],
+            toneQuality: []
         };
 
         // Update UI
@@ -1304,7 +1368,19 @@ class ConcertmasterApp {
             </svg>
         `;
 
-        // Start audio processing
+        // Reset analyzers before starting capture so the first frame sees clean state
+        this.rhythmAnalyzer.reset();
+        this.intonationAnalyzer.reset();
+        this.dynamicsComparator.reset();
+        this.sessionLogger.clear();
+        this.sessionLogger.startSession(this.currentScore ? this.currentScore.id || 'unknown' : 'unknown');
+
+        // Load score dynamics/articulation data for comparison
+        if (this.currentScore) {
+            this.dynamicsComparator.loadScore(this.currentScore);
+        }
+
+        // Start audio processing (after reset so first frame has correct state)
         this.audioEngine.startCapture((data) => {
             this.processAudio(data);
         }, 50);
@@ -1312,6 +1388,14 @@ class ConcertmasterApp {
         // Reset analyzers for new session
         this.rhythmAnalyzer.reset();
         this.intonationAnalyzer.reset();
+        if (this.toneQualityAnalyzer) {
+            this.toneQualityAnalyzer.reset();
+        }
+
+        // Start AI summary generator session
+        if (this.aiSummaryGenerator && this.currentScore) {
+            this.aiSummaryGenerator.startSession(this.currentScore.id);
+        }
 
         this.showToast('Practice started - play your instrument', 'success');
     }
@@ -1325,6 +1409,9 @@ class ConcertmasterApp {
 
         // Calculate final scores
         const finalScore = this.accuracyScorer.calculateOverall(this.sessionData);
+
+        // Save to heat map if in teacher mode with selected student
+        this._saveToHeatMap();
 
         // Add session-ended state to sheet music container
         const sheetContainer = document.getElementById('sheet-music-container');
@@ -1351,6 +1438,99 @@ class ConcertmasterApp {
         this.showToast('Practice session ended', 'success');
     }
 
+    /**
+     * Save practice session to heat map (teacher mode)
+     */
+    async _saveToHeatMap() {
+        if (!this.isTeacherMode) return;
+        if (!this.heatMapHistoryService) return;
+        if (!this.studioDashboard?.selectedStudentId) return;
+        if (!this.sessionData || !this.sessionData.notes || this.sessionData.notes.length === 0) return;
+
+        // Convert session notes to deviation format for heat map
+        // Classify each error based on whether it's a pitch or rhythm issue
+        const deviations = this.sessionData.notes
+            .filter(n => n.measure)
+            .map(n => {
+                // Determine error type: pitch error (accuracy) vs rhythm error (timing)
+                // accuracy < 100 means pitch deviation, rhythmScore < 100 means timing issue
+                const isPitchError = n.accuracy !== undefined && n.accuracy < 100;
+                const isRhythmError = n.rhythmScore !== undefined && n.rhythmScore < 100;
+
+                // Prioritize pitch errors if both are present
+                let type = null;
+                if (isPitchError && isRhythmError) {
+                    // If both have issues, classify based on which is worse
+                    type = n.accuracy < n.rhythmScore ? 'pitch' : 'rhythm';
+                } else if (isPitchError) {
+                    type = 'pitch';
+                } else if (isRhythmError) {
+                    type = 'rhythm';
+                }
+
+                if (!type) return null;
+
+                return {
+                    measure: n.measure,
+                    type: type,
+                    deviation_cents: type === 'pitch' ? (100 - (n.accuracy || 0)) : 0,
+                    deviation_ms: type === 'rhythm' ? (100 - (n.rhythmScore || 0)) * 10 : 0,
+                    timestamp: n.timestamp
+                };
+            })
+            .filter(Boolean);
+
+        // Count deviations by type
+        const pitchDeviations = deviations.filter(d => d.type === 'pitch');
+        const rhythmDeviations = deviations.filter(d => d.type === 'rhythm');
+
+        const sessionData = {
+            scoreId: this.sessionData.scoreId,
+            pieceName: this.currentScore?.title || '',
+            duration_ms: this.sessionData.startTime ? Date.now() - this.sessionData.startTime : 0,
+            total_deviations: deviations.length,
+            pitch_deviations: pitchDeviations.length,
+            rhythm_deviations: rhythmDeviations.length,
+            intonation_deviations: 0,
+            deviations: deviations,
+            average_pitch_deviation_cents: pitchDeviations.length > 0
+                ? pitchDeviations.reduce((sum, d) => sum + Math.abs(d.deviation_cents || 0), 0) / pitchDeviations.length
+                : 0,
+            average_rhythm_deviation_ms: rhythmDeviations.length > 0
+                ? rhythmDeviations.reduce((sum, d) => sum + Math.abs(d.deviation_ms || 0), 0) / rhythmDeviations.length
+                : 0,
+            problem_measures: this._extractProblemMeasures(deviations)
+        };
+
+        try {
+            await this.heatMapHistoryService.savePracticeSession(
+                this.studioDashboard.selectedStudentId,
+                sessionData
+            );
+            console.log('Practice session saved to heat map for student:', this.studioDashboard.selectedStudentId);
+        } catch (err) {
+            console.warn('Failed to save practice session to heat map:', err);
+        }
+    }
+
+    /**
+     * Extract problem measures from deviations
+     */
+    _extractProblemMeasures(deviations) {
+        const measureErrors = {};
+        deviations.forEach(d => {
+            if (!measureErrors[d.measure]) {
+                measureErrors[d.measure] = 0;
+            }
+            measureErrors[d.measure]++;
+        });
+
+        return Object.entries(measureErrors)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(([measure]) => parseInt(measure, 10));
+    }
+
     processAudio(data) {
         if (!data.timeData) return;
 
@@ -1366,6 +1546,47 @@ class ConcertmasterApp {
         const result = this.pitchDetector.process(data.timeData);
 
         if (result) {
+            // Analyze tone quality (independent of pitch matching)
+            let toneQualityResult = null;
+            if (this.toneQualityAnalyzer) {
+                // Pass frequency data from AudioEngine if available
+                toneQualityResult = this.toneQualityAnalyzer.analyze(
+                    data.timeData,
+                    result.frequency,
+                    data.frequencyData
+                );
+
+                // Store in session data
+                if (this.sessionData && toneQualityResult) {
+                    this.sessionData.toneQuality.push(toneQualityResult.qualityScore);
+                }
+
+                // Log to session logger for AI summary (throttled to once per second)
+                // Only log when there's a notable issue (low score, wolf tone) AND rate-limited
+                if (this.aiSummaryGenerator && toneQualityResult) {
+                    const now = Date.now();
+                    const score = toneQualityResult.qualityScore ?? 50;
+                    const isNoteworthy = score < 60 || toneQualityResult.wolfToneDetected;
+                    const timeGateElapsed = now - this.lastToneQualityLogTime > this.toneQualityLogInterval;
+
+                    if (isNoteworthy && timeGateElapsed) {
+                        this.aiSummaryGenerator.logToneQualityDeviation({
+                            measure: result.measure || 1,
+                            note: result.name + result.octave,
+                            qualityScore: score,
+                            purityScore: toneQualityResult.purityScore,
+                            harshnessScore: toneQualityResult.harshnessScore,
+                            wolfToneDetected: toneQualityResult.wolfToneDetected,
+                            wolfToneFrequency: toneQualityResult.wolfToneFrequency
+                        });
+                        this.lastToneQualityLogTime = now;
+                    }
+                }
+
+                // Update tone quality display
+                this.updateToneQualityDisplay(toneQualityResult);
+            }
+
             // Record note onset for rhythm analysis
             const noteTimestamp = Date.now();
             this.rhythmAnalyzer.recordNoteOnset(noteTimestamp);
@@ -1402,6 +1623,56 @@ class ConcertmasterApp {
                         const rhythmScore = this.rhythmAnalyzer.calculateOverallTiming();
                         this.intonationAnalyzer.recordRhythmScore(rhythmScore);
 
+                        // Dynamics & articulation analysis
+                        const beat = comparison.expectedNote?.position?.beat || 0;
+                        const dynResult = this.dynamicsComparator.processAudioFrame(
+                            data.level, measure, beat, noteTimestamp
+                        );
+                        this.intonationAnalyzer.recordDynamicsScore(dynResult.combinedScore);
+
+                        // Forward dynamics deviation to session logger
+                        if (Math.abs(dynResult.dynamicDeviation) >= 2 || !dynResult.directionMatch) {
+                            this.sessionLogger.logDynamicsDeviation({
+                                measure,
+                                beat,
+                                expectedDynamic: dynResult.expectedDynamic,
+                                actualDynamic: dynResult.actualDynamic,
+                                deviation: dynResult.dynamicDeviation,
+                                expectedDirection: dynResult.expectedDirection,
+                                actualTrend: dynResult.trend
+                            });
+                        }
+
+                        // Analyze attack envelope for articulation
+                        const attackInfo = this.dynamicsComparator.volumeAnalyzer.analyzeAttack(data.timeData, data.sampleRate);
+                        const expectedDuration = comparison.expectedNote ? comparison.expectedNote.duration * (60000 / (this.currentScore?.tempo || 120)) : 500;
+                        // Use gap since previous note onset as actual duration, fall back to expected
+                        const onsets = this.rhythmAnalyzer.noteOnsets;
+                        const prevOnset = onsets.length >= 2 ? onsets[onsets.length - 2] : null;
+                        const actualDuration = (prevOnset && noteTimestamp > prevOnset) ? noteTimestamp - prevOnset : expectedDuration;
+                        const artResult = this.dynamicsComparator.processNoteArticulation({
+                            timestamp: noteTimestamp,
+                            attackTime: attackInfo.attackTime,
+                            peakAmplitude: attackInfo.peakAmplitude,
+                            decayRate: attackInfo.decayRate,
+                            duration: actualDuration,
+                            expectedDuration: expectedDuration,
+                            measure: measure
+                        }, measure, beat);
+                        this.intonationAnalyzer.recordArticulationScore(artResult.score);
+
+                        // Forward articulation deviation to session logger
+                        if (artResult.expected && !artResult.match) {
+                            this.sessionLogger.logArticulationDeviation({
+                                measure,
+                                beat,
+                                expectedArticulation: artResult.expected,
+                                detectedArticulation: artResult.detected,
+                                score: artResult.score,
+                                feedback: artResult.feedback
+                            });
+                        }
+
                         // Store in session data
                         if (this.sessionData) {
                             this.sessionData.pitchAccuracy.push(accuracy);
@@ -1412,7 +1683,9 @@ class ConcertmasterApp {
                                 measure: measure,
                                 accuracy: accuracy,
                                 rhythmScore: rhythmScore,
-                                matched: comparison.matched
+                                matched: comparison.matched,
+                                dynamicsScore: dynResult.combinedScore,
+                                articulationScore: artResult.score
                             });
                         }
 
@@ -1530,6 +1803,74 @@ class ConcertmasterApp {
     }
 
     /**
+     * Update the tone quality display in the feedback panel
+     */
+    updateToneQualityDisplay(toneQualityResult) {
+        if (!toneQualityResult) return;
+
+        const toneQualityMeter = document.getElementById('tone-quality-meter');
+        const toneQualityBar = document.getElementById('tone-quality-bar');
+        const toneQualityValue = document.getElementById('tone-quality-value');
+        const toneQualityStatus = document.getElementById('tone-quality-status');
+        const toneQualityIndicator = document.getElementById('tone-quality-indicator');
+
+        const score = toneQualityResult.qualityScore ?? 50;
+
+        // Update bar width
+        if (toneQualityBar) {
+            toneQualityBar.style.width = score + '%';
+        }
+
+        // Update value display
+        if (toneQualityValue) {
+            toneQualityValue.textContent = Math.round(score) + '%';
+        }
+
+        // Get status and color
+        const status = ToneQualityAnalyzer.getQualityStatus(score);
+        const color = ToneQualityAnalyzer.getQualityColor(score);
+
+        // Update value color
+        if (toneQualityValue) {
+            toneQualityValue.style.color = color;
+        }
+
+        // Update status text
+        if (toneQualityStatus) {
+            const statusLabels = {
+                'excellent': 'Excellent',
+                'good': 'Good',
+                'acceptable': 'Acceptable',
+                'harsh': 'Harsh',
+                'very_harsh': 'Very Harsh'
+            };
+            toneQualityStatus.textContent = statusLabels[status] || status;
+        }
+
+        // Update container class for styling
+        if (toneQualityIndicator) {
+            toneQualityIndicator.classList.remove('tone-quality-good', 'tone-quality-acceptable', 'tone-quality-harsh', 'tone-quality-very_harsh');
+
+            if (score >= 60) {
+                toneQualityIndicator.classList.add('tone-quality-good');
+            } else if (score >= 40) {
+                toneQualityIndicator.classList.add('tone-quality-acceptable');
+            } else {
+                toneQualityIndicator.classList.add('tone-quality-harsh');
+            }
+        }
+
+        // Show wolf tone warning if detected
+        if (toneQualityResult.wolfToneDetected && toneQualityStatus) {
+            toneQualityStatus.textContent = 'Wolf Tone!';
+            toneQualityStatus.style.color = '#dc2626';
+        } else if (toneQualityStatus) {
+            // Reset color when wolf tone is not detected
+            toneQualityStatus.style.color = '';
+        }
+    }
+
+    /**
      * Animate score value change with smooth transition
      */
     animateScoreChange(element, targetScore) {
@@ -1582,6 +1923,23 @@ class ConcertmasterApp {
         const intonationAccuracyEl = document.getElementById('intonation-accuracy');
         if (intonationAccuracyEl) {
             intonationAccuracyEl.textContent = Math.round(intonationScores.transition) + '%';
+        }
+
+        // Add tone quality score if available
+        const toneQualityEl = document.getElementById('tone-quality-score');
+        if (toneQualityEl && this.sessionData?.toneQuality?.length > 0) {
+            const avgToneQuality = this.sessionData.toneQuality.reduce((a, b) => a + b, 0) / this.sessionData.toneQuality.length;
+            toneQualityEl.textContent = Math.round(avgToneQuality) + '%';
+            // Color based on score
+            if (avgToneQuality >= 60) {
+                toneQualityEl.style.color = '#10b981'; // emerald
+            } else if (avgToneQuality >= 40) {
+                toneQualityEl.style.color = '#f59e0b'; // amber
+            } else {
+                toneQualityEl.style.color = '#dc2626'; // crimson
+            }
+        } else if (toneQualityEl) {
+            toneQualityEl.textContent = '--%';
         }
 
         const duration = this.sessionData?.startTime ? Date.now() - this.sessionData.startTime : 0;

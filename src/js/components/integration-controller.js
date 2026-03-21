@@ -79,6 +79,13 @@ class IntegrationController {
     }
 
     /**
+     * Connect Dynamics Comparator to the app
+     */
+    setDynamicsComparator(dynamicsComparator) {
+        this.dynamicsComparator = dynamicsComparator;
+    }
+
+    /**
      * Setup integration between zoom and cursor movement
      * Library zoom works during cursor movement
      */
@@ -166,11 +173,15 @@ class IntegrationController {
             pitchAccuracy: [],
             rhythmAccuracy: [],
             intonationAccuracy: [],
-            // Three-axis breakdown
+            dynamicsAccuracy: [],
+            articulationAccuracy: [],
+            // Three-axis breakdown (expanded to five axes)
             threeAxis: {
                 pitch: { score: 0, deviations: [] },
                 rhythm: { score: 0, deviations: [] },
-                intonation: { score: 0, deviations: [] }
+                intonation: { score: 0, deviations: [] },
+                dynamics: { score: 0, deviations: [] },
+                articulation: { score: 0, deviations: [] }
             },
             // Zoom level used during session
             zoomLevel: this.lastZoomLevel,
@@ -184,7 +195,7 @@ class IntegrationController {
     /**
      * Record three-axis data point
      */
-    recordThreeAxisData(pitchData, rhythmData, intonationData) {
+    recordThreeAxisData(pitchData, rhythmData, intonationData, dynamicsData, articulationData) {
         if (!this.app.sessionData) return;
 
         // Ensure threeAxis structure exists
@@ -192,7 +203,9 @@ class IntegrationController {
             this.app.sessionData.threeAxis = {
                 pitch: { score: 0, deviations: [] },
                 rhythm: { score: 0, deviations: [] },
-                intonation: { score: 0, deviations: [] }
+                intonation: { score: 0, deviations: [] },
+                dynamics: { score: 0, deviations: [] },
+                articulation: { score: 0, deviations: [] }
             };
         }
 
@@ -212,6 +225,20 @@ class IntegrationController {
         if (intonationData) {
             this.app.sessionData.intonationAccuracy.push(intonationData.score);
             this.app.sessionData.threeAxis.intonation.deviations.push(intonationData.value);
+        }
+
+        // Record dynamics data
+        if (dynamicsData) {
+            if (!this.app.sessionData.dynamicsAccuracy) this.app.sessionData.dynamicsAccuracy = [];
+            this.app.sessionData.dynamicsAccuracy.push(dynamicsData.score);
+            this.app.sessionData.threeAxis.dynamics.deviations.push(dynamicsData.deviation);
+        }
+
+        // Record articulation data
+        if (articulationData) {
+            if (!this.app.sessionData.articulationAccuracy) this.app.sessionData.articulationAccuracy = [];
+            this.app.sessionData.articulationAccuracy.push(articulationData.score);
+            this.app.sessionData.threeAxis.articulation.deviations.push(articulationData.type);
         }
     }
 
@@ -237,6 +264,16 @@ class IntegrationController {
         if (session.intonationAccuracy.length > 0) {
             const avgIntonation = session.intonationAccuracy.reduce((a, b) => a + b, 0) / session.intonationAccuracy.length;
             session.threeAxis.intonation.score = avgIntonation;
+        }
+
+        if (session.dynamicsAccuracy && session.dynamicsAccuracy.length > 0) {
+            const avgDynamics = session.dynamicsAccuracy.reduce((a, b) => a + b, 0) / session.dynamicsAccuracy.length;
+            session.threeAxis.dynamics.score = avgDynamics;
+        }
+
+        if (session.articulationAccuracy && session.articulationAccuracy.length > 0) {
+            const avgArticulation = session.articulationAccuracy.reduce((a, b) => a + b, 0) / session.articulationAccuracy.length;
+            session.threeAxis.articulation.score = avgArticulation;
         }
 
         // Add metadata

@@ -3,324 +3,216 @@
  * Run with: node tests/intonation-analyzer.test.js
  */
 
-// Mock IntonationAnalyzer since it's a browser module
-class IntonationAnalyzer {
-    constructor() {
-        this.pitchHistory = [];
-        this.timingHistory = [];
-        this.transitionHistory = [];
-        this.previousNote = null;
-        this.previousNoteTime = null;
-        this.pitchThreshold = 10;
-        this.timingThreshold = 50;
-        this.transitionThreshold = 100;
-    }
-
-    recordPitch(noteInfo, timestamp) {
-        const pitchData = {
-            timestamp: timestamp,
-            frequency: noteInfo.frequency,
-            name: noteInfo.name,
-            octave: noteInfo.octave,
-            centsDeviation: noteInfo.centsDeviation || 0,
-            accuracy: this.calculatePitchAccuracy(noteInfo.centsDeviation || 0)
-        };
-        this.pitchHistory.push(pitchData);
-        return pitchData;
-    }
-
-    recordTiming(expectedTime, actualTime) {
-        const deviation = actualTime - expectedTime;
-        const timingData = {
-            expected: expectedTime,
-            actual: actualTime,
-            deviation: deviation,
-            absoluteDeviation: Math.abs(deviation),
-            accuracy: this.calculateTimingAccuracy(deviation)
-        };
-        this.timingHistory.push(timingData);
-        return timingData;
-    }
-
-    recordTransition(noteInfo, timestamp) {
-        let transitionScore = 100;
-        if (this.previousNote && this.previousNoteTime) {
-            const transitionTime = timestamp - this.previousNoteTime;
-            const expectedInterval = 500;
-            const transitionDeviation = Math.abs(transitionTime - expectedInterval);
-            transitionScore = Math.max(0, 100 - (transitionDeviation / this.transitionThreshold) * 100);
-        }
-        const transitionData = {
-            from: this.previousNote ? { ...this.previousNote } : null,
-            to: { name: noteInfo.name, octave: noteInfo.octave },
-            timestamp: timestamp,
-            duration: this.previousNoteTime ? timestamp - this.previousNoteTime : 0,
-            score: transitionScore
-        };
-        this.transitionHistory.push(transitionData);
-        this.previousNote = { name: noteInfo.name, octave: noteInfo.octave };
-        this.previousNoteTime = timestamp;
-        return transitionData;
-    }
-
-    calculatePitchAccuracy(centsDeviation) {
-        const absCents = Math.abs(centsDeviation);
-        return Math.max(0, 100 - (absCents * 2));
-    }
-
-    calculateTimingAccuracy(deviationMs) {
-        const absDeviation = Math.abs(deviationMs);
-        return Math.max(0, 100 - absDeviation);
-    }
-
-    getPitchScore() {
-        if (this.pitchHistory.length === 0) return 0;
-        const sum = this.pitchHistory.reduce((acc, p) => acc + p.accuracy, 0);
-        return sum / this.pitchHistory.length;
-    }
-
-    getRhythmScore() {
-        if (this.timingHistory.length === 0) return 100;
-        const sum = this.timingHistory.reduce((acc, t) => acc + t.accuracy, 0);
-        return sum / this.timingHistory.length;
-    }
-
-    getTransitionScore() {
-        if (this.transitionHistory.length === 0) return 100;
-        const sum = this.transitionHistory.reduce((acc, t) => acc + t.score, 0);
-        return sum / this.transitionHistory.length;
-    }
-
-    getIntonationScore(pitchWeight = 0.4, rhythmWeight = 0.4, transitionWeight = 0.2) {
-        const pitchScore = this.getPitchScore();
-        const rhythmScore = this.getRhythmScore();
-        const transitionScore = this.getTransitionScore();
-        return pitchScore * pitchWeight + rhythmScore * rhythmWeight + transitionScore * transitionWeight;
-    }
-
-    getAxisBreakdown() {
-        return {
-            pitch: {
-                score: this.getPitchScore(),
-                history: this.pitchHistory,
-                averageCents: this.pitchHistory.length > 0
-                    ? this.pitchHistory.reduce((a, p) => a + p.centsDeviation, 0) / this.pitchHistory.length
-                    : 0
-            },
-            rhythm: {
-                score: this.getRhythmScore(),
-                history: this.timingHistory,
-                averageDeviation: this.timingHistory.length > 0
-                    ? this.timingHistory.reduce((a, t) => a + t.deviation, 0) / this.timingHistory.length
-                    : 0
-            },
-            intonation: {
-                score: this.getIntonationScore(),
-                pitchScore: this.getPitchScore(),
-                rhythmScore: this.getRhythmScore(),
-                transitionScore: this.getTransitionScore()
-            }
-        };
-    }
-
-    getLatestTimingDeviation() {
-        if (this.timingHistory.length === 0) return null;
-        return this.timingHistory[this.timingHistory.length - 1].deviation;
-    }
-
-    getWeakestAxisRecommendation() {
-        const breakdown = this.getAxisBreakdown();
-        const axes = [
-            { name: 'pitch', score: breakdown.pitch.score },
-            { name: 'rhythm', score: breakdown.rhythm.score },
-            { name: 'intonation', score: breakdown.intonation.score }
-        ];
-        axes.sort((a, b) => a.score - b.score);
-        const weakest = axes[0];
-        const recommendations = {
-            pitch: 'Focus on pitch accuracy.',
-            rhythm: 'Focus on rhythm precision.',
-            intonation: 'Work on overall musicality.'
-        };
-        return {
-            weakestAxis: weakest.name,
-            recommendation: recommendations[weakest.name],
-            scores: axes
-        };
-    }
-
-    reset() {
-        this.pitchHistory = [];
-        this.timingHistory = [];
-        this.transitionHistory = [];
-        this.previousNote = null;
-        this.previousNoteTime = null;
-    }
-}
+const { IntonationAnalyzer } = require('../src/js/analysis/intonation-analyzer');
 
 // Test runner
 function runTests() {
     console.log('Running IntonationAnalyzer Tests...\n');
-
-    let passed = 0;
-    let failed = 0;
+    let passed = 0, failed = 0;
 
     function test(name, fn) {
-        try {
-            fn();
-            console.log(`✓ ${name}`);
-            passed++;
-        } catch (e) {
-            console.log(`✗ ${name}`);
-            console.log(`  Error: ${e.message}`);
-            failed++;
-        }
+        try { fn(); console.log(`✓ ${name}`); passed++; }
+        catch (e) { console.log(`✗ ${name}\n  Error: ${e.message}`); failed++; }
     }
 
-    function assertEqual(actual, expected, message) {
-        if (actual !== expected) {
-            throw new Error(`${message || 'Assertion failed'}: expected ${expected}, got ${actual}`);
-        }
+    function assertEqual(actual, expected, msg) {
+        if (actual !== expected) throw new Error(`${msg}: expected ${expected}, got ${actual}`);
     }
 
-    function assertTrue(value, message) {
-        if (!value) {
-            throw new Error(message || 'Expected true');
-        }
+    function assertTrue(value, msg) {
+        if (!value) throw new Error(msg || 'Expected true');
     }
 
-    // Test 1: Calculate pitch accuracy
-    test('should calculate pitch accuracy correctly', () => {
-        const analyzer = new IntonationAnalyzer();
-        assertEqual(analyzer.calculatePitchAccuracy(0), 100, '0 cents = 100%');
-        assertEqual(analyzer.calculatePitchAccuracy(10), 80, '10 cents = 80%');
-        assertEqual(analyzer.calculatePitchAccuracy(50), 0, '50 cents = 0%');
-        assertEqual(analyzer.calculatePitchAccuracy(-10), 80, '-10 cents = 80%');
+    // --- Pitch scoring ---
+
+    test('calculatePitchScore: 0 cents = 100', () => {
+        const a = new IntonationAnalyzer();
+        assertEqual(a.calculatePitchScore({ centsDeviation: 0 }), 100, '0 cents');
     });
 
-    // Test 2: Calculate timing accuracy
-    test('should calculate timing accuracy correctly', () => {
-        const analyzer = new IntonationAnalyzer();
-        assertEqual(analyzer.calculateTimingAccuracy(0), 100, '0ms = 100%');
-        assertEqual(analyzer.calculateTimingAccuracy(50), 50, '50ms = 50%');
-        assertEqual(analyzer.calculateTimingAccuracy(100), 0, '100ms = 0%');
-        assertEqual(analyzer.calculateTimingAccuracy(-50), 50, '-50ms = 50%');
+    test('calculatePitchScore: 10 cents = 80', () => {
+        const a = new IntonationAnalyzer();
+        assertEqual(a.calculatePitchScore({ centsDeviation: 10 }), 80, '10 cents');
     });
 
-    // Test 3: Record pitch
-    test('should record pitch data', () => {
-        const analyzer = new IntonationAnalyzer();
-        const noteInfo = { name: 'A', octave: 4, frequency: 440, centsDeviation: 5 };
-        const result = analyzer.recordPitch(noteInfo, 1000);
-
-        assertEqual(result.name, 'A', 'Note name stored');
-        assertEqual(result.octave, 4, 'Octave stored');
-        assertEqual(result.centsDeviation, 5, 'Cents deviation stored');
-        assertEqual(result.accuracy, 90, 'Accuracy calculated');
+    test('calculatePitchScore: negative cents uses absolute value', () => {
+        const a = new IntonationAnalyzer();
+        assertEqual(a.calculatePitchScore({ centsDeviation: -25 }), 50, '-25 cents');
     });
 
-    // Test 4: Record timing
-    test('should record timing data', () => {
-        const analyzer = new IntonationAnalyzer();
-        const result = analyzer.recordTiming(1000, 1050);
-
-        assertEqual(result.deviation, 50, 'Deviation calculated');
-        assertEqual(result.accuracy, 50, 'Timing accuracy calculated');
+    test('calculatePitchScore: undefined centsDeviation = 75 default', () => {
+        const a = new IntonationAnalyzer();
+        assertEqual(a.calculatePitchScore({}), 75, 'No cents');
     });
 
-    // Test 5: Get pitch score from history
-    test('should calculate pitch score from history', () => {
-        const analyzer = new IntonationAnalyzer();
-        analyzer.recordPitch({ name: 'A', octave: 4, frequency: 440, centsDeviation: 0 }, 1000);
-        analyzer.recordPitch({ name: 'B', octave: 4, frequency: 493, centsDeviation: 10 }, 1500);
-
-        const score = analyzer.getPitchScore();
-        assertEqual(score, 90, 'Average pitch score');
+    test('calculatePitchScore: 50+ cents clamped to 0', () => {
+        const a = new IntonationAnalyzer();
+        assertEqual(a.calculatePitchScore({ centsDeviation: 60 }), 0, '60 cents');
     });
 
-    // Test 6: Get rhythm score from history
-    test('should calculate rhythm score from history', () => {
-        const analyzer = new IntonationAnalyzer();
-        analyzer.recordTiming(1000, 1020);
-        analyzer.recordTiming(1500, 1540);
+    // --- recordNote + averages ---
 
-        const score = analyzer.getRhythmScore();
-        // (100 - 20 + 100 - 40) / 2 = 70
-        assertEqual(score, 70, 'Average rhythm score');
+    test('recordNote stores pitch score and bounds noteHistory', () => {
+        const a = new IntonationAnalyzer();
+        for (let i = 0; i < 15; i++) {
+            a.recordNote({ centsDeviation: 0, frequency: 440 });
+        }
+        assertTrue(a.noteHistory.length <= a.maxHistorySize, 'History bounded');
+        assertEqual(a.pitchScores.length, 15, 'All pitch scores recorded');
     });
 
-    // Test 7: Get intonation score combining all three axes
-    test('should calculate intonation score combining all axes', () => {
-        const analyzer = new IntonationAnalyzer();
-        analyzer.recordPitch({ name: 'A', octave: 4, frequency: 440, centsDeviation: 0 }, 1000);
-        analyzer.recordTiming(1000, 1000);
-        analyzer.recordTransition({ name: 'A', octave: 4 }, 1000);
-        analyzer.recordPitch({ name: 'B', octave: 4, frequency: 493, centsDeviation: 0 }, 1500);
-        analyzer.recordTiming(1500, 1500);
-        analyzer.recordTransition({ name: 'B', octave: 4 }, 1500);
-
-        const score = analyzer.getIntonationScore();
-        assertTrue(score >= 90, 'Intonation score should be high');
+    test('getAveragePitchScore computes average', () => {
+        const a = new IntonationAnalyzer();
+        a.recordNote({ centsDeviation: 0, frequency: 440 });   // 100
+        a.recordNote({ centsDeviation: 10, frequency: 440 });  // 80
+        assertEqual(a.getAveragePitchScore(), 90, 'Avg pitch');
     });
 
-    // Test 8: Get axis breakdown
-    test('should return axis breakdown', () => {
-        const analyzer = new IntonationAnalyzer();
-        analyzer.recordPitch({ name: 'A', octave: 4, frequency: 440, centsDeviation: 0 }, 1000);
-        analyzer.recordTiming(1000, 1000);
+    // --- Rhythm scoring ---
 
-        const breakdown = analyzer.getAxisBreakdown();
-        assertTrue(breakdown.pitch.score > 0, 'Pitch score exists');
-        assertTrue(breakdown.rhythm.score > 0, 'Rhythm score exists');
-        assertTrue(breakdown.intonation.score > 0, 'Intonation score exists');
+    test('recordRhythmScore and getAverageRhythmScore', () => {
+        const a = new IntonationAnalyzer();
+        a.recordRhythmScore(80);
+        a.recordRhythmScore(60);
+        assertEqual(a.getAverageRhythmScore(), 70, 'Avg rhythm');
     });
 
-    // Test 9: Get weakest axis recommendation
-    test('should recommend based on weakest axis', () => {
-        const analyzer = new IntonationAnalyzer();
-        // Record mostly good pitch but bad timing
-        analyzer.recordPitch({ name: 'A', octave: 4, frequency: 440, centsDeviation: 0 }, 1000);
-        analyzer.recordTiming(1000, 1200); // 200ms late = 0% accuracy
-
-        const recommendation = analyzer.getWeakestAxisRecommendation();
-        assertEqual(recommendation.weakestAxis, 'rhythm', 'Rhythm should be weakest');
+    test('getAverageRhythmScore default is 75', () => {
+        const a = new IntonationAnalyzer();
+        assertEqual(a.getAverageRhythmScore(), 75, 'Default');
     });
 
-    // Test 10: Reset analyzer
-    test('should reset all data', () => {
-        const analyzer = new IntonationAnalyzer();
-        analyzer.recordPitch({ name: 'A', octave: 4, frequency: 440, centsDeviation: 0 }, 1000);
-        analyzer.recordTiming(1000, 1000);
+    // --- Dynamics scoring (5-axis) ---
 
-        analyzer.reset();
-
-        assertEqual(analyzer.pitchHistory.length, 0, 'Pitch history cleared');
-        assertEqual(analyzer.timingHistory.length, 0, 'Timing history cleared');
+    test('recordDynamicsScore and getAverageDynamicsScore', () => {
+        const a = new IntonationAnalyzer();
+        a.recordDynamicsScore(90);
+        a.recordDynamicsScore(70);
+        assertEqual(a.getAverageDynamicsScore(), 80, 'Avg dynamics');
     });
 
-    // Test 11: Get latest timing deviation
-    test('should return latest timing deviation', () => {
-        const analyzer = new IntonationAnalyzer();
-        assertEqual(analyzer.getLatestTimingDeviation(), null, 'Should be null when empty');
-
-        analyzer.recordTiming(1000, 1050);
-        assertEqual(analyzer.getLatestTimingDeviation(), 50, 'Should return latest deviation');
+    test('getAverageDynamicsScore default is 75', () => {
+        const a = new IntonationAnalyzer();
+        assertEqual(a.getAverageDynamicsScore(), 75, 'Default');
     });
 
-    // Test 12: Transition recording
-    test('should record note transitions', () => {
-        const analyzer = new IntonationAnalyzer();
-        analyzer.recordTransition({ name: 'A', octave: 4 }, 1000);
-        analyzer.recordTransition({ name: 'B', octave: 4 }, 1500);
+    // --- Articulation scoring (5-axis) ---
 
-        assertEqual(analyzer.transitionHistory.length, 2, 'Two transitions recorded');
+    test('recordArticulationScore and getAverageArticulationScore', () => {
+        const a = new IntonationAnalyzer();
+        a.recordArticulationScore(100);
+        a.recordArticulationScore(60);
+        assertEqual(a.getAverageArticulationScore(), 80, 'Avg articulation');
+    });
+
+    // --- calculateIntonationScore (3-axis vs 5-axis) ---
+
+    test('3-axis weighting when no dynamics data', () => {
+        const a = new IntonationAnalyzer();
+        a.pitchScores.push(100);
+        a.rhythmScores.push(100);
+        a.transitionScores.push(100);
+        const score = a.calculateIntonationScore();
+        assertEqual(score.overall, 100, 'All 100 = 100');
+        assertTrue(score.dynamics === undefined, 'No dynamics in 3-axis');
+        assertTrue(score.articulation === undefined, 'No articulation in 3-axis');
+    });
+
+    test('5-axis weighting when dynamics data present', () => {
+        const a = new IntonationAnalyzer();
+        a.pitchScores.push(100);
+        a.rhythmScores.push(100);
+        a.transitionScores.push(100);
+        a.dynamicsScores.push(100);
+        a.articulationScores.push(100);
+        const score = a.calculateIntonationScore();
+        assertEqual(score.overall, 100, 'All 100 = 100');
+        assertTrue(score.dynamics !== undefined, 'Has dynamics');
+        assertTrue(score.articulation !== undefined, 'Has articulation');
+    });
+
+    test('5-axis weighting: dynamics pulls down overall', () => {
+        const a = new IntonationAnalyzer();
+        a.pitchScores.push(100);
+        a.rhythmScores.push(100);
+        a.transitionScores.push(100);
+        a.dynamicsScores.push(0);  // Bad dynamics
+        a.articulationScores.push(100);
+        const score = a.calculateIntonationScore();
+        // 100*.3 + 100*.3 + 100*.15 + 0*.15 + 100*.10 = 30+30+15+0+10 = 85
+        assertEqual(score.overall, 85, 'Dynamics pulls score down');
+    });
+
+    // --- getWeakestAxis ---
+
+    test('getWeakestAxis includes dynamics/articulation when available', () => {
+        const a = new IntonationAnalyzer();
+        a.pitchScores.push(90);
+        a.rhythmScores.push(90);
+        a.transitionScores.push(90);
+        a.dynamicsScores.push(20);  // Weakest
+        a.articulationScores.push(90);
+        const weakest = a.getWeakestAxis();
+        assertEqual(weakest.name, 'dynamics', 'Dynamics should be weakest');
+    });
+
+    test('getWeakestAxis without dynamics data', () => {
+        const a = new IntonationAnalyzer();
+        a.pitchScores.push(50);  // Weakest
+        a.rhythmScores.push(90);
+        const weakest = a.getWeakestAxis();
+        assertEqual(weakest.name, 'pitch', 'Pitch should be weakest');
+    });
+
+    // --- Score utilities ---
+
+    test('getScoreColor: green for >=80, amber for >=60, red for <60', () => {
+        assertEqual(IntonationAnalyzer.getScoreColor(85), '#10b981', 'Green');
+        assertEqual(IntonationAnalyzer.getScoreColor(70), '#f59e0b', 'Amber');
+        assertEqual(IntonationAnalyzer.getScoreColor(30), '#ef4444', 'Red');
+    });
+
+    test('getScoreStatus returns correct status', () => {
+        assertEqual(IntonationAnalyzer.getScoreStatus(90), 'excellent', '90');
+        assertEqual(IntonationAnalyzer.getScoreStatus(70), 'good', '70');
+        assertEqual(IntonationAnalyzer.getScoreStatus(50), 'fair', '50');
+        assertEqual(IntonationAnalyzer.getScoreStatus(20), 'needs-work', '20');
+    });
+
+    // --- Array bounding ---
+
+    test('score arrays bounded to maxScoreHistory', () => {
+        const a = new IntonationAnalyzer();
+        a.maxScoreHistory = 5;
+        for (let i = 0; i < 10; i++) {
+            a.recordRhythmScore(i * 10);
+            a.recordDynamicsScore(i * 10);
+            a.recordArticulationScore(i * 10);
+        }
+        assertTrue(a.rhythmScores.length <= 5, 'Rhythm bounded');
+        assertTrue(a.dynamicsScores.length <= 5, 'Dynamics bounded');
+        assertTrue(a.articulationScores.length <= 5, 'Articulation bounded');
+    });
+
+    // --- Reset ---
+
+    test('reset clears all state', () => {
+        const a = new IntonationAnalyzer();
+        a.recordNote({ centsDeviation: 5, frequency: 440 });
+        a.recordRhythmScore(80);
+        a.recordDynamicsScore(70);
+        a.recordArticulationScore(60);
+        a.reset();
+        assertEqual(a.pitchScores.length, 0, 'Pitch cleared');
+        assertEqual(a.rhythmScores.length, 0, 'Rhythm cleared');
+        assertEqual(a.transitionScores.length, 0, 'Transitions cleared');
+        assertEqual(a.dynamicsScores.length, 0, 'Dynamics cleared');
+        assertEqual(a.articulationScores.length, 0, 'Articulation cleared');
+        assertEqual(a.noteHistory.length, 0, 'History cleared');
     });
 
     console.log(`\n${passed} passed, ${failed} failed`);
-
-    if (failed > 0) {
-        process.exit(1);
-    }
+    if (failed > 0) process.exit(1);
 }
 
 runTests();

@@ -11,8 +11,10 @@ class Note {
         this.type = 'note';
         this.tie = null; // 'start', 'stop', 'continue'
         this.dot = false;
-        this.accents = [];
-        this.dynamic = 'mf';
+        this.accents = []; // e.g., ['accent', 'staccato', 'tenuto', 'marcato']
+        this.dynamic = 'mf'; // pp, p, mp, mf, f, ff
+        this.articulation = null; // 'legato', 'staccato', 'pizzicato', 'accent', 'tenuto', 'marcato'
+        this.dynamicDirection = null; // 'crescendo', 'decrescendo', null
     }
 
     getMIDI() {
@@ -53,6 +55,8 @@ class Measure {
         this.clef = null; // 'treble', 'bass', 'alto', 'tenor'
         this.key = { fifths: 0, mode: 'major' };
         this.timeSignature = { beats: 4, beatType: 4 };
+        this.dynamics = []; // [{ type: 'f', beat: 0 }, { type: 'crescendo', startBeat: 0, endBeat: 2 }]
+        this.articulations = []; // [{ type: 'staccato', beat: 0 }]
     }
 
     addElement(element) {
@@ -222,9 +226,14 @@ class ScoreLibrary {
 }
 
 // Export for use in other modules
-window.Note = Note;
-window.Rest = Rest;
-window.Measure = Measure;
-window.Part = Part;
-window.Score = Score;
-window.ScoreLibrary = ScoreLibrary;
+if (typeof window !== 'undefined') {
+    window.Note = Note;
+    window.Rest = Rest;
+    window.Measure = Measure;
+    window.Part = Part;
+    window.Score = Score;
+    window.ScoreLibrary = ScoreLibrary;
+}
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { Note, Rest, Measure, Part, Score, ScoreLibrary };
+}

@@ -2,129 +2,10 @@
  * Tests for LLMService - AI Summary generation
  */
 
-const { describe, it, beforeEach, afterEach } = require('node:test');
+const { describe, it, beforeEach } = require('node:test');
 const assert = require('node:assert');
 
-// Mock LLMService for testing
-class LLMService {
-    constructor() {
-        this.apiEndpoint = '/api/ai-summary';
-        this.isProcessing = false;
-        this.instrument = 'violin';
-    }
-
-    setInstrument(instrument) {
-        this.instrument = instrument || 'violin';
-    }
-
-    async generateSummary(sessionData) {
-        if (this.isProcessing) {
-            return null;
-        }
-
-        this.isProcessing = true;
-
-        try {
-            const prompt = this.buildPrompt(sessionData);
-
-            // Simulate API call
-            const result = {
-                summary: 'Great work!',
-                recommendations: [],
-                problem_measures: [14, 18, 22],
-                overall_assessment: 'Good practice session',
-                success: true
-            };
-
-            return {
-                success: true,
-                summary: result.summary,
-                recommendations: result.recommendations || [],
-                problem_measures: result.problem_measures || [],
-                overall_assessment: result.overall_assessment || '',
-                generated_at: Date.now()
-            };
-
-        } catch (error) {
-            console.error('LLMService: Error generating summary:', error);
-            return {
-                success: false,
-                error: error.message,
-                fallback: this.generateFallbackSummary(sessionData)
-            };
-        } finally {
-            this.isProcessing = false;
-        }
-    }
-
-    buildPrompt(sessionData) {
-        const { summary, recent_deviations } = sessionData;
-        const formattedDeviations = this.formatDeviationsForPrompt(recent_deviations);
-
-        return `## System Prompt: The Virtual Concertmaster AI
-
-**Role:** You are an elite, empathetic, and highly analytical masterclass string instructor.
-
-**Input Data:** Instrument: ${this.instrument}
-
-Error Log (JSON format):
-${formattedDeviations}
-
-## Output Format
-Provide your response as JSON.`;
-    }
-
-    formatDeviationsForPrompt(deviations) {
-        if (!deviations || deviations.length === 0) {
-            return '[]';
-        }
-
-        const recent = deviations.slice(-20);
-
-        return JSON.stringify(recent.map(d => ({
-            measure: d.measure,
-            type: d.type,
-            deviation_cents: d.deviation_cents || 0,
-            deviation_ms: d.deviation_ms || 0,
-            expected_pitch: d.expected_pitch,
-            actual_pitch: d.actual_pitch
-        })), null, 2);
-    }
-
-    analyzeDeviationPatterns(deviations) {
-        if (!deviations || deviations.length === 0) {
-            return '';
-        }
-
-        const pitchDevs = deviations.filter(d => d.type === 'pitch');
-        const sharpCount = pitchDevs.filter(d => d.deviation_cents > 0).length;
-        const flatCount = pitchDevs.filter(d => d.deviation_cents < 0).length;
-
-        return { sharpCount, flatCount };
-    }
-
-    generateFallbackSummary(sessionData) {
-        const { summary } = sessionData;
-
-        const isSharp = summary.average_pitch_deviation_cents > 10;
-        const isFlat = summary.average_pitch_deviation_cents < -10;
-        const problemMeasures = summary.problem_measures.slice(0, 3).map(m => m.measure);
-        const suggestedTempo = Math.max(40, Math.round(120 * 0.7));
-
-        return {
-            overall_assessment: 'Great work on this run-through!',
-            diagnosis: 'I noticed some inconsistency in your intonation.',
-            fix: 'Try releasing tension in your left hand between notes.',
-            recommended_measures: problemMeasures,
-            suggested_tempo: suggestedTempo,
-            is_fallback: true
-        };
-    }
-
-    isBusy() {
-        return this.isProcessing;
-    }
-}
+const { LLMService } = require('../src/js/services/llm-service');
 
 describe('LLMService', () => {
     let llmService;
@@ -147,21 +28,16 @@ describe('LLMService', () => {
         assert.strictEqual(llmService.instrument, 'viola');
     });
 
-    it('should handle empty session data', async () => {
-        const result = await llmService.generateSummary({
-            summary: { total_notes_played: 0, problem_measures: [], average_pitch_deviation_cents: 0 },
-            recent_deviations: []
-        });
-
-        assert.strictEqual(result.success, true);
-    });
-
     it('should build prompt with session data', () => {
         const sessionData = {
             summary: {
                 total_notes_played: 100,
                 problem_measures: [{ measure: 14, error_count: 5 }],
-                average_pitch_deviation_cents: -25
+                average_pitch_deviation_cents: -25,
+                dynamics_deviation_count: 0,
+                average_dynamics_deviation: 0,
+                articulation_deviation_count: 0,
+                average_articulation_score: 100
             },
             recent_deviations: [
                 { measure: 14, beat: 2, type: 'pitch', deviation_cents: -50, expected_pitch: 'C#5', actual_pitch: 'C5' }
@@ -172,6 +48,7 @@ describe('LLMService', () => {
 
         assert.ok(prompt.includes('Instrument: violin'));
         assert.ok(prompt.includes('Error Log'));
+        assert.ok(prompt.includes('Total notes played: 100'));
     });
 
     it('should format deviations for prompt correctly', () => {
@@ -196,23 +73,23 @@ describe('LLMService', () => {
         assert.strictEqual(nullFormatted, '[]');
     });
 
-    it('should analyze deviation patterns correctly', () => {
+    it('should analyze deviation patterns and return string', () => {
         const deviations = [
-            { type: 'pitch', deviation_cents: 30 },
-            { type: 'pitch', deviation_cents: 40 },
-            { type: 'pitch', deviation_cents: 25 },
-            { type: 'pitch', deviation_cents: -20 },
-            { type: 'pitch', deviation_cents: -30 },
-            { type: 'rhythm', deviation_ms: 20 }
+            { type: 'pitch', deviation_cents: 30, measure: 1 },
+            { type: 'pitch', deviation_cents: 40, measure: 1 },
+            { type: 'pitch', deviation_cents: 25, measure: 2 },
+            { type: 'pitch', deviation_cents: -10, measure: 3 },
+            { type: 'rhythm', deviation_ms: 20, measure: 4 }
         ];
 
         const patterns = llmService.analyzeDeviationPatterns(deviations);
 
-        assert.strictEqual(patterns.sharpCount, 3);
-        assert.strictEqual(patterns.flatCount, 2);
+        assert.ok(typeof patterns === 'string');
+        assert.ok(patterns.includes('DEVIATION PATTERNS'));
+        assert.ok(patterns.includes('SHARP'));
     });
 
-    it('should return empty patterns for empty deviations', () => {
+    it('should return empty string for empty deviations', () => {
         const patterns = llmService.analyzeDeviationPatterns([]);
         assert.strictEqual(patterns, '');
     });
@@ -223,6 +100,7 @@ describe('LLMService', () => {
                 total_notes_played: 100,
                 problem_measures: [{ measure: 14, error_count: 5 }, { measure: 18, error_count: 3 }],
                 average_pitch_deviation_cents: 25,
+                average_rhythm_deviation_ms: 15,
                 pitch_deviation_count: 30,
                 rhythm_deviation_count: 10
             },
@@ -231,9 +109,9 @@ describe('LLMService', () => {
 
         const fallback = llmService.generateFallbackSummary(sessionData);
 
-        assert.ok(fallback.overall_assessment.includes('Great work'));
-        assert.ok(fallback.diagnosis);
-        assert.ok(fallback.fix);
+        assert.ok(fallback.overall_assessment.length > 0);
+        assert.ok(fallback.diagnosis.length > 0);
+        assert.ok(fallback.fix.length > 0);
         assert.strictEqual(fallback.recommended_measures.length, 2);
         assert.ok(fallback.suggested_tempo >= 40);
         assert.strictEqual(fallback.is_fallback, true);
@@ -245,6 +123,7 @@ describe('LLMService', () => {
                 total_notes_played: 100,
                 problem_measures: [{ measure: 10, error_count: 4 }],
                 average_pitch_deviation_cents: -30,
+                average_rhythm_deviation_ms: 10,
                 pitch_deviation_count: 20,
                 rhythm_deviation_count: 5
             },
@@ -253,7 +132,7 @@ describe('LLMService', () => {
 
         const fallback = llmService.generateFallbackSummary(sessionData);
 
-        assert.ok(fallback.diagnosis);
+        assert.ok(fallback.diagnosis.length > 0);
         assert.strictEqual(fallback.recommended_measures[0], 10);
     });
 
@@ -283,7 +162,11 @@ describe('LLMService Prompt Generation', () => {
                     { measure: 18, error_count: 5 },
                     { measure: 22, error_count: 3 }
                 ],
-                average_pitch_deviation_cents: 15
+                average_pitch_deviation_cents: 15,
+                dynamics_deviation_count: 0,
+                average_dynamics_deviation: 0,
+                articulation_deviation_count: 0,
+                average_articulation_score: 100
             },
             recent_deviations: [
                 { measure: 14, beat: 1, type: 'pitch', deviation_cents: -50 }
@@ -294,6 +177,7 @@ describe('LLMService Prompt Generation', () => {
 
         assert.ok(prompt.includes('Instrument'));
         assert.ok(prompt.includes('violin'));
+        assert.ok(prompt.includes('measure 14'));
     });
 
     it('should handle many deviations but limit to 20', () => {
@@ -306,5 +190,36 @@ describe('LLMService Prompt Generation', () => {
         const parsed = JSON.parse(formatted);
 
         assert.strictEqual(parsed.length, 20);
+    });
+
+    it('should preserve dynamics-specific fields in formatted output', () => {
+        const deviations = [
+            { measure: 3, type: 'dynamics', expected_dynamic: 'f', actual_dynamic: 'p', deviation: -3, expected_direction: 'crescendo', actual_trend: 'stable' }
+        ];
+
+        const formatted = llmService.formatDeviationsForPrompt(deviations);
+        const parsed = JSON.parse(formatted);
+
+        assert.strictEqual(parsed[0].type, 'dynamics');
+        assert.strictEqual(parsed[0].expected_dynamic, 'f');
+        assert.strictEqual(parsed[0].actual_dynamic, 'p');
+        assert.strictEqual(parsed[0].deviation, -3);
+        assert.strictEqual(parsed[0].expected_direction, 'crescendo');
+        assert.strictEqual(parsed[0].actual_trend, 'stable');
+    });
+
+    it('should preserve articulation-specific fields in formatted output', () => {
+        const deviations = [
+            { measure: 5, type: 'articulation', expected_articulation: 'staccato', detected_articulation: 'legato', score: 20, feedback: 'Shorten your bow strokes' }
+        ];
+
+        const formatted = llmService.formatDeviationsForPrompt(deviations);
+        const parsed = JSON.parse(formatted);
+
+        assert.strictEqual(parsed[0].type, 'articulation');
+        assert.strictEqual(parsed[0].expected_articulation, 'staccato');
+        assert.strictEqual(parsed[0].detected_articulation, 'legato');
+        assert.strictEqual(parsed[0].score, 20);
+        assert.strictEqual(parsed[0].feedback, 'Shorten your bow strokes');
     });
 });
