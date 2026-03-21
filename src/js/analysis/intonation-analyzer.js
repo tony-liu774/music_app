@@ -267,4 +267,9 @@ class IntonationAnalyzer {
     }
 }
 
-window.IntonationAnalyzer = IntonationAnalyzer;
+if (typeof window !== 'undefined') {
+    window.IntonationAnalyzer = IntonationAnalyzer;
+}
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { IntonationAnalyzer };
+}

@@ -357,4 +357,9 @@ class DynamicsComparator {
     }
 }
 
-window.DynamicsComparator = DynamicsComparator;
+if (typeof window !== 'undefined') {
+    window.DynamicsComparator = DynamicsComparator;
+}
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { DynamicsComparator };
+}

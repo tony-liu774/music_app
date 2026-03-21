@@ -1343,12 +1343,7 @@ class ConcertmasterApp {
             </svg>
         `;
 
-        // Start audio processing
-        this.audioEngine.startCapture((data) => {
-            this.processAudio(data);
-        }, 50);
-
-        // Reset analyzers for new session
+        // Reset analyzers before starting capture so the first frame sees clean state
         this.rhythmAnalyzer.reset();
         this.intonationAnalyzer.reset();
         this.dynamicsComparator.reset();
@@ -1358,6 +1353,11 @@ class ConcertmasterApp {
         if (this.currentScore) {
             this.dynamicsComparator.loadScore(this.currentScore);
         }
+
+        // Start audio processing (after reset so first frame has correct state)
+        this.audioEngine.startCapture((data) => {
+            this.processAudio(data);
+        }, 50);
 
         this.showToast('Practice started - play your instrument', 'success');
     }

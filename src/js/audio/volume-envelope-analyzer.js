@@ -231,4 +231,9 @@ class VolumeEnvelopeAnalyzer {
     }
 }
 
-window.VolumeEnvelopeAnalyzer = VolumeEnvelopeAnalyzer;
+if (typeof window !== 'undefined') {
+    window.VolumeEnvelopeAnalyzer = VolumeEnvelopeAnalyzer;
+}
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { VolumeEnvelopeAnalyzer };
+}

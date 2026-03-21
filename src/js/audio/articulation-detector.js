@@ -304,4 +304,9 @@ class ArticulationDetector {
     }
 }
 
-window.ArticulationDetector = ArticulationDetector;
+if (typeof window !== 'undefined') {
+    window.ArticulationDetector = ArticulationDetector;
+}
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { ArticulationDetector };
+}

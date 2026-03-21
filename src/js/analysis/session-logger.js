@@ -242,4 +242,9 @@ class SessionLogger {
     }
 }
 
-window.SessionLogger = SessionLogger;
+if (typeof window !== 'undefined') {
+    window.SessionLogger = SessionLogger;
+}
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { SessionLogger };
+}
