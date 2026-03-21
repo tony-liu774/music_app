@@ -95,10 +95,19 @@ class ToneQualityAnalyzer {
         let fft, frequencies;
 
         if (frequencyData && frequencyData.length > 0) {
-            // Convert Uint8Array to Float32Array if needed
+            // Convert Uint8Array (dB-scaled) to linear amplitude
+            // AnalyserNode.getByteFrequencyData maps dB range [minDecibels, maxDecibels] to [0, 255]
+            // Default range: -100 dBFS to -30 dBFS
+            const minDecibels = -100;
+            const maxDecibels = -30;
+            const dbRange = maxDecibels - minDecibels;
+
             fft = new Float32Array(frequencyData.length);
             for (let i = 0; i < frequencyData.length; i++) {
-                fft[i] = frequencyData[i] / 255;
+                // Convert byte to dB, then to linear amplitude
+                const db = (frequencyData[i] / 255) * dbRange + minDecibels;
+                // Convert dB to linear: linear = 10^(dB/20)
+                fft[i] = Math.pow(10, db / 20);
             }
             frequencies = this.frequencyBins || this.computeFrequencyBins();
         } else if (!buffer || buffer.length < 1024) {
@@ -372,15 +381,16 @@ class ToneQualityAnalyzer {
 
     /**
      * Detect harsh/scratchy bowing based on high-frequency energy
-     * Extended range to 3-8 kHz for actual bow harshness detection
+     * Range: 50 Hz - 3 kHz (low-mid) vs 3-8 kHz (high)
+     * Bow harshness/noise typically appears above 3 kHz
      */
     detectHarshness(fft, frequencies, range) {
         // Calculate energy in different frequency bands
-        // Low-mid: instrument range up to 2 kHz
-        // High: 2-8 kHz (where bow noise actually appears)
+        // Low-mid: 50 Hz to 3 kHz (musical content)
+        // High: 3 kHz to 8 kHz (where bow noise appears)
         const lowMidStart = Math.floor(50 * this.fftSize / this.sampleRate);
-        const lowMidEnd = Math.floor(2000 * this.fftSize / this.sampleRate);
-        const highStart = Math.floor(2000 * this.fftSize / this.sampleRate);
+        const lowMidEnd = Math.floor(3000 * this.fftSize / this.sampleRate);
+        const highStart = Math.floor(3000 * this.fftSize / this.sampleRate);
         const highEnd = Math.floor(8000 * this.fftSize / this.sampleRate);
 
         let lowMidEnergy = 0;

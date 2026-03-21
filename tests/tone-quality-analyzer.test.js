@@ -131,8 +131,8 @@ describe('ToneQualityAnalyzer', () => {
 
         const violinRange = analyzer.instrumentRanges.violin;
         const lowMidStart = Math.floor(50 * analyzer.fftSize / analyzer.sampleRate);
-        const lowMidEnd = Math.floor(2000 * analyzer.fftSize / analyzer.sampleRate);
-        const highStart = Math.floor(2000 * analyzer.fftSize / analyzer.sampleRate);
+        const lowMidEnd = Math.floor(3000 * analyzer.fftSize / analyzer.sampleRate);
+        const highStart = Math.floor(3000 * analyzer.fftSize / analyzer.sampleRate);
         const highEnd = Math.floor(8000 * analyzer.fftSize / analyzer.sampleRate);
 
         // Weak low-mid, strong high = harsh tone

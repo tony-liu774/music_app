@@ -87,19 +87,52 @@ describe('SessionLogger', () => {
         assert.strictEqual(logger.deviations[0].issue, 'position_shift');
     });
 
+    it('should log tone quality deviations correctly', () => {
+        logger.startSession('test-score');
+        logger.logToneQualityDeviation({
+            measure: 1,
+            note: 'A4',
+            qualityScore: 75,
+            purityScore: 80,
+            harshnessScore: 85,
+            wolfToneDetected: false,
+            wolfToneFrequency: null
+        });
+        logger.logToneQualityDeviation({
+            measure: 2,
+            note: 'E5',
+            qualityScore: 45,
+            purityScore: 50,
+            harshnessScore: 40,
+            wolfToneDetected: true,
+            wolfToneFrequency: 659
+        });
+
+        assert.strictEqual(logger.deviations.length, 2);
+        assert.strictEqual(logger.deviations[0].type, 'tone_quality');
+        assert.strictEqual(logger.deviations[0].note, 'A4');
+        assert.strictEqual(logger.deviations[0].quality_score, 75);
+        assert.strictEqual(logger.deviations[0].wolf_tone_detected, false);
+        assert.strictEqual(logger.deviations[1].wolf_tone_detected, true);
+        assert.strictEqual(logger.deviations[1].wolf_tone_frequency, 659);
+    });
+
     it('should generate correct session log', () => {
         logger.startSession('test-score');
         logger.logPitchDeviation({ measure: 1, deviationCents: -10 });
         logger.logPitchDeviation({ measure: 2, deviationCents: -20 });
         logger.logRhythmDeviation({ measure: 3, deviationMs: 30 });
+        logger.logToneQualityDeviation({ measure: 4, qualityScore: 75 });
 
         const log = logger.getSessionLog();
 
         assert.strictEqual(log.session_id, 'test-score');
-        assert.strictEqual(log.total_deviations, 3);
+        assert.strictEqual(log.total_deviations, 4);
         assert.strictEqual(log.pitch_deviations, 2);
         assert.strictEqual(log.rhythm_deviations, 1);
         assert.strictEqual(log.intonation_deviations, 0);
+        assert.strictEqual(log.tone_quality_deviations, 1);
+        assert.strictEqual(log.tone_quality_average, 75);
     });
 
     it('should calculate summary statistics correctly', () => {

@@ -50,6 +50,10 @@ class ConcertmasterApp {
         // Debounce timer for rhythm analysis
         this.rhythmAnalysisDebounce = null;
 
+        // Tone quality logging throttle
+        this.lastToneQualityLogTime = 0;
+        this.toneQualityLogInterval = 1000; // Log at most once per second
+
         // Screen reader live region
         this.liveRegion = null;
 
@@ -1044,17 +1048,27 @@ class ConcertmasterApp {
                     this.sessionData.toneQuality.push(toneQualityResult.qualityScore);
                 }
 
-                // Log to session logger for AI summary
+                // Log to session logger for AI summary (throttled to once per second)
+                // Only log when there's a notable issue (low score) or significant change
                 if (this.aiSummaryGenerator && toneQualityResult) {
-                    this.aiSummaryGenerator.logToneQualityDeviation({
-                        measure: result.measure || 1,
-                        note: result.name + result.octave,
-                        qualityScore: toneQualityResult.qualityScore,
-                        purityScore: toneQualityResult.purityScore,
-                        harshnessScore: toneQualityResult.harshnessScore,
-                        wolfToneDetected: toneQualityResult.wolfToneDetected,
-                        wolfToneFrequency: toneQualityResult.wolfToneFrequency
-                    });
+                    const now = Date.now();
+                    const score = toneQualityResult.qualityScore ?? 50;
+                    const shouldLog = score < 60 || // Log when tone is poor
+                        toneQualityResult.wolfToneDetected || // Always log wolf tones
+                        (now - this.lastToneQualityLogTime > this.toneQualityLogInterval); // Or throttle
+
+                    if (shouldLog) {
+                        this.aiSummaryGenerator.logToneQualityDeviation({
+                            measure: result.measure || 1,
+                            note: result.name + result.octave,
+                            qualityScore: score,
+                            purityScore: toneQualityResult.purityScore,
+                            harshnessScore: toneQualityResult.harshnessScore,
+                            wolfToneDetected: toneQualityResult.wolfToneDetected,
+                            wolfToneFrequency: toneQualityResult.wolfToneFrequency
+                        });
+                        this.lastToneQualityLogTime = now;
+                    }
                 }
 
                 // Update tone quality display
@@ -1288,7 +1302,7 @@ class ConcertmasterApp {
         const toneQualityStatus = document.getElementById('tone-quality-status');
         const toneQualityIndicator = document.getElementById('tone-quality-indicator');
 
-        const score = toneQualityResult.qualityScore || 50;
+        const score = toneQualityResult.qualityScore ?? 50;
 
         // Update bar width
         if (toneQualityBar) {
