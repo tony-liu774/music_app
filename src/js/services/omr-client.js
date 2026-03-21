@@ -65,7 +65,10 @@ class OMRClient {
      * Process uploaded file (image or PDF)
      */
     async processFile(file, onProgress) {
-        this.onProgress(onProgress);
+        // Only set progress callback if provided; don't overwrite existing one
+        if (onProgress) {
+            this.onProgress(onProgress);
+        }
 
         // Validate file
         this.validateFile(file);
@@ -144,35 +147,33 @@ class OMRClient {
      * Process image file with perspective correction
      */
     async processImage(imageFile) {
-        return new Promise(async (resolve, reject) => {
-            try {
-                this.reportProgress(10, 'Loading image...');
+        try {
+            this.reportProgress(10, 'Loading image...');
 
-                // Load image
-                const imageDataUrl = await this._loadImage(imageFile);
-                this.reportProgress(20, 'Applying perspective correction...');
+            // Load image
+            const imageDataUrl = await this._loadImage(imageFile);
+            this.reportProgress(20, 'Applying perspective correction...');
 
-                // Apply perspective correction
-                const correctedImage = await this._applyPerspectiveCorrection(imageDataUrl);
-                this.reportProgress(40, 'Preprocessing for optimal recognition...');
+            // Apply perspective correction
+            const correctedImageDataUrl = await this._applyPerspectiveCorrection(imageDataUrl);
+            this.reportProgress(40, 'Preprocessing for optimal recognition...');
 
-                // Preprocess image (contrast, thresholding)
-                const preprocessed = await this.preprocessImage(imageFile);
-                this.reportProgress(50, 'Preprocessing complete');
+            // Preprocess the CORRECTED image (not the original)
+            const preprocessed = await this.preprocessImageFromDataUrl(correctedImageDataUrl);
+            this.reportProgress(50, 'Preprocessing complete');
 
-                // Send to server for OMR processing
-                this.reportProgress(60, 'Analyzing musical notation...');
-                const score = await this._sendToOMRService(preprocessed, imageFile.name);
+            // Send to server for OMR processing
+            this.reportProgress(60, 'Analyzing musical notation...');
+            const score = await this._sendToOMRService(preprocessed, imageFile.name);
 
-                this.reportProgress(100, 'Complete');
+            this.reportProgress(100, 'Complete');
 
-                resolve(score);
+            return score;
 
-            } catch (error) {
-                this.reportProgress(0, 'Error');
-                reject(error);
-            }
-        });
+        } catch (error) {
+            this.reportProgress(100, 'Error');
+            throw error;
+        }
     }
 
     /**
@@ -380,6 +381,48 @@ class OMRClient {
     }
 
     /**
+     * Preprocess image from data URL (for already-loaded images like corrected ones)
+     */
+    async preprocessImageFromDataUrl(imageDataUrl) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+
+                let width = img.width;
+                let height = img.height;
+
+                // Resize if too large
+                if (width > this.maxImageSize || height > this.maxImageSize) {
+                    const ratio = Math.min(
+                        this.maxImageSize / width,
+                        this.maxImageSize / height
+                    );
+                    width = Math.floor(width * ratio);
+                    height = Math.floor(height * ratio);
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // Apply preprocessing
+                const imageData = ctx.getImageData(0, 0, width, height);
+                const processed = this._enhanceContrast(imageData);
+
+                ctx.putImageData(processed, 0, 0);
+
+                resolve(canvas.toDataURL('image/jpeg', 0.9));
+            };
+
+            img.onerror = () => reject(new Error('Failed to load image for preprocessing'));
+            img.src = imageDataUrl;
+        });
+    }
+
+    /**
      * Enhance contrast for better note detection
      */
     _enhanceContrast(imageData) {
@@ -470,6 +513,8 @@ class OMRClient {
         // Merge by combining all parts
         const merged = new Score('Merged Score', pages[0]?.composer || 'Unknown');
 
+        // Calculate measure offset for each page based on actual measure counts
+        let measureOffset = 0;
         pages.forEach((page, pageIndex) => {
             page.parts.forEach((part, partIndex) => {
                 let mergedPart = merged.parts[partIndex];
@@ -479,9 +524,9 @@ class OMRClient {
                     merged.addPart(mergedPart);
                 }
 
-                // Add measures from this page
+                // Add measures from this page with correct offset
                 part.measures.forEach(measure => {
-                    const newMeasure = new Measure(measure.number + (pageIndex * 4));
+                    const newMeasure = new Measure(measure.number + measureOffset);
                     newMeasure.clef = measure.clef;
                     newMeasure.key = measure.key;
                     newMeasure.timeSignature = measure.timeSignature;
@@ -494,6 +539,10 @@ class OMRClient {
                     mergedPart.addMeasure(newMeasure);
                 });
             });
+
+            // Update measure offset based on actual measure count of this page
+            const pageMeasureCount = page.parts[0]?.measures?.length || 0;
+            measureOffset += pageMeasureCount;
         });
 
         return merged;
@@ -583,8 +632,25 @@ class OMRClient {
      * Convert data URL to Blob
      */
     dataURLToBlob(dataURL) {
+        if (!dataURL || typeof dataURL !== 'string') {
+            throw new Error('Invalid data URL: must be a non-empty string');
+        }
+
         const parts = dataURL.split(',');
-        const mime = parts[0].match(/:(.*?);/)[1];
+        if (parts.length !== 2) {
+            throw new Error('Invalid data URL: missing comma separator');
+        }
+
+        const mimeMatch = parts[0].match(/:(.*?);/);
+        if (!mimeMatch) {
+            throw new Error('Invalid data URL: missing MIME type');
+        }
+        const mime = mimeMatch[1];
+
+        if (!parts[1]) {
+            throw new Error('Invalid data URL: missing data');
+        }
+
         const bstr = atob(parts[1]);
         let n = bstr.length;
         const u8arr = new Uint8Array(n);

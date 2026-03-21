@@ -1824,7 +1824,8 @@ class ConcertmasterApp {
         // Clear file selection
         document.getElementById('upload-zone')?.style.removeProperty('display');
         document.getElementById('selected-file')?.style.setProperty('display', 'none');
-        document.getElementById('scanner-file-input').value = '';
+        const fileInput = document.getElementById('scanner-file-input');
+        if (fileInput) fileInput.value = '';
 
         // Reset process button
         const processBtn = document.getElementById('process-scan-btn');
@@ -1854,12 +1855,13 @@ class ConcertmasterApp {
     }
 
     showScannerContent(type) {
-        // Hide all content sections
+        // Hide all content sections and actions
         document.getElementById('scanner-upload-content')?.style.setProperty('display', 'none');
         document.getElementById('scanner-camera-content')?.style.setProperty('display', 'none');
         document.getElementById('scanner-processing')?.style.setProperty('display', 'none');
         document.getElementById('scanner-error')?.style.setProperty('display', 'none');
         document.getElementById('scanner-success')?.style.setProperty('display', 'none');
+        document.getElementById('scanner-actions')?.style.setProperty('display', 'none');
 
         // Show requested content
         if (type === 'upload' || type === 'camera') {
@@ -1867,11 +1869,13 @@ class ConcertmasterApp {
             document.getElementById('scanner-actions')?.style.removeProperty('display');
         } else if (type === 'processing') {
             document.getElementById('scanner-processing')?.style.removeProperty('display');
+            // Keep actions hidden during processing
         } else if (type === 'error') {
             document.getElementById('scanner-error')?.style.removeProperty('display');
             document.getElementById('scanner-actions')?.style.removeProperty('display');
         } else if (type === 'success') {
             document.getElementById('scanner-success')?.style.removeProperty('display');
+            // Keep actions hidden during success (use success-specific buttons)
         }
     }
 
@@ -1980,6 +1984,8 @@ class ConcertmasterApp {
     }
 
     retryScan() {
+        // Clear file and show empty upload state (user must re-select)
+        this.scannerFile = null;
         this.showScannerContent('upload');
     }
 
@@ -2018,8 +2024,9 @@ class ConcertmasterApp {
             const processBtn = document.getElementById('process-scan-btn');
             if (processBtn) processBtn.disabled = false;
 
-            // Switch back to upload tab
+            // Switch back to upload tab and show upload content
             this.switchScannerTab('upload');
+            this.showScannerContent('upload');
 
         } catch (error) {
             if (error.message !== 'Camera scan cancelled') {
