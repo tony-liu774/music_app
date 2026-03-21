@@ -8,6 +8,7 @@ const rateLimiter = require('./middleware/rateLimiter');
 const healthRoutes = require('./routes/health');
 const imslpRoutes = require('./routes/imslp');
 const omrRoutes = require('./routes/omr');
+const teacherRoutes = require('./routes/teacher');
 
 const app = express();
 
@@ -61,6 +62,9 @@ app.use('/api/imslp', imslpRoutes);
 
 // OMR (Optical Music Recognition) routes
 app.use('/api/omr', upload.single('image'), omrRoutes);
+
+// Teacher (Studio Dashboard) routes
+app.use('/api/teacher', teacherRoutes);
 
 // API routes (placeholder for future routes)
 app.use('/api', (req, res) => {
