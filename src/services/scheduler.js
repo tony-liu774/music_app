@@ -124,6 +124,18 @@ class SchedulerService {
                     }
                 }
 
+                // Delete associated thumbnail from storage
+                if (snippet.thumbnailKey) {
+                    try {
+                        const storageService = require('./video-storage');
+                        if (storageService && storageService.deleteVideo) {
+                            await storageService.deleteVideo(snippet.thumbnailKey);
+                        }
+                    } catch (error) {
+                        console.error(`Failed to delete thumbnail for snippet ${id}:`, error);
+                    }
+                }
+
                 videoSnippets.delete(id);
                 deletedCount++;
                 expiredIds.push(id);

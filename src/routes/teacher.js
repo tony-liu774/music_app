@@ -78,6 +78,11 @@ function requireTeacher(req, res, next) {
  * Middleware: require X-Teacher-Mode header to access teacher routes
  */
 function requireTeacherMode(req, res, next) {
+    // Skip if path is not available (e.g., in some test scenarios)
+    if (!req.path) {
+        return next();
+    }
+
     // Allow snippet routes without teacher mode for students
     if (req.path.startsWith('/snippets')) {
         return next();
@@ -635,18 +640,40 @@ router.delete('/snippets/:id', requireAuth, async (req, res) => {
  * POST /api/teacher/snippets/cleanup
  * Requires teacher authentication
  */
-router.post('/snippets/cleanup', requireAuth, requireTeacher, (req, res) => {
+router.post('/snippets/cleanup', requireAuth, requireTeacher, async (req, res) => {
     const now = Date.now();
     let deletedCount = 0;
+    let deleteErrors = 0;
+
+    const videoStorage = require('../services/video-storage');
 
     for (const [id, snippet] of videoSnippets.entries()) {
         if (snippet.expiresAt && snippet.expiresAt < now) {
+            // Delete video from S3 if exists
+            if (snippet.videoKey) {
+                try {
+                    await videoStorage.deleteVideo(snippet.videoKey);
+                } catch (error) {
+                    console.error(`Failed to delete video ${snippet.videoKey}:`, error);
+                    deleteErrors++;
+                }
+            }
+
+            // Delete thumbnail from S3 if exists
+            if (snippet.thumbnailKey) {
+                try {
+                    await videoStorage.deleteVideo(snippet.thumbnailKey);
+                } catch (error) {
+                    console.error(`Failed to delete thumbnail ${snippet.thumbnailKey}:`, error);
+                }
+            }
+
             videoSnippets.delete(id);
             deletedCount++;
         }
     }
 
-    res.json({ deletedCount, remaining: videoSnippets.size });
+    res.json({ deletedCount, deleteErrors, remaining: videoSnippets.size });
 });
 
 /**
