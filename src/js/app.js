@@ -23,15 +23,24 @@ class ConcertmasterApp {
         this.sessionData = null;
         this.accuracyScorer = null;
         this.intonationAnalyzer = null;
-        this.dynamicsComparator = null;
-        this.sessionLogger = null;
-        this.toneQualityAnalyzer = null;
-        this.aiSummaryGenerator = null;
 
         // UI Components
         this.sheetMusicRenderer = null;
         this.heatMapRenderer = null;
         this.followTheBall = null;
+
+        // Scale Engine (warm-up generator)
+        this.scaleEngine = null;
+        this.scaleEngineUI = null;
+
+        // Annotations
+        this.annotationCanvas = null;
+        this.annotationService = null;
+        this.annotationCanvasClickHandler = null;
+
+        // Onboarding
+        this.onboardingService = null;
+        this.onboardingUI = null;
 
         // DOM Elements
         this.views = {};
@@ -50,10 +59,6 @@ class ConcertmasterApp {
         // Debounce timer for rhythm analysis
         this.rhythmAnalysisDebounce = null;
 
-        // Tone quality logging throttle
-        this.lastToneQualityLogTime = 0;
-        this.toneQualityLogInterval = 1000; // Log at most once per second
-
         // Screen reader live region
         this.liveRegion = null;
 
@@ -61,8 +66,6 @@ class ConcertmasterApp {
         this.isTeacherMode = false;
         this.teacherService = null;
         this.studioDashboard = null;
-        this.heatMapHistoryService = null;
-        this.heatMapHistoryUI = null;
     }
 
     async init() {
@@ -82,6 +85,9 @@ class ConcertmasterApp {
 
             // Initialize accessibility features
             this.initAccessibility();
+
+            // Initialize onboarding
+            this.initOnboarding();
 
             // Initialize audio engine
             await this.initializeAudio();
@@ -111,10 +117,6 @@ class ConcertmasterApp {
         this.rhythmAnalyzer = new RhythmAnalyzer();
         this.accuracyScorer = new AccuracyScorer();
         this.intonationAnalyzer = new IntonationAnalyzer();
-        this.dynamicsComparator = new DynamicsComparator();
-        this.sessionLogger = new SessionLogger();
-        this.toneQualityAnalyzer = new ToneQualityAnalyzer();
-        this.aiSummaryGenerator = new AISummaryGenerator();
 
         // Get DOM elements
         this.views = {
@@ -123,8 +125,7 @@ class ConcertmasterApp {
             metronome: document.getElementById('metronome-view'),
             settings: document.getElementById('settings-view'),
             tuner: document.getElementById('tuner-view'),
-            studio: document.getElementById('studio-dashboard-view'),
-            'heat-map-history': document.getElementById('heat-map-history-view')
+            studio: document.getElementById('studio-dashboard-view')
         };
 
         this.toastContainer = document.getElementById('toast-container');
@@ -137,6 +138,12 @@ class ConcertmasterApp {
 
         // Initialize renderers
         this.initRenderers();
+
+        // Initialize annotations
+        this.initAnnotations();
+
+        // Initialize scale engine
+        this.initScaleEngine();
     }
 
     initRenderers() {
@@ -171,6 +178,224 @@ class ConcertmasterApp {
         this.integrationController.setFollowTheBall(this.followTheBall);
         this.integrationController.setBluetoothHIDListener(this.bluetoothHIDListener);
         this.integrationController.init();
+    }
+
+    /**
+     * Initialize Annotation Canvas and Service
+     */
+    initAnnotations() {
+        const sheetWrapper = document.getElementById('sheet-music-wrapper');
+        if (sheetWrapper && typeof AnnotationCanvas !== 'undefined') {
+            this.annotationCanvas = new AnnotationCanvas(sheetWrapper);
+            this.annotationCanvas.init();
+
+            if (typeof AnnotationService !== 'undefined') {
+                this.annotationService = new AnnotationService();
+                this.annotationService.init(this.annotationCanvas, null);
+
+                this.setupAnnotationToolbar();
+            }
+        }
+    }
+
+    /**
+     * Setup annotation toolbar event handlers
+     */
+    setupAnnotationToolbar() {
+        if (!this.annotationCanvas) return;
+
+        // Tool buttons with symbol placement support
+        document.querySelectorAll('.annotation-tool-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.annotation-tool-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const tool = btn.dataset.tool;
+                this.annotationCanvas.setTool(tool);
+
+                // For symbol tools, set up click handler on canvas for placement
+                if (['upbow', 'downbow', 'fingering'].includes(tool)) {
+                    this.enableSymbolPlacement(tool);
+                } else {
+                    this.disableSymbolPlacement();
+                }
+            });
+        });
+
+        // Color picker with validation
+        const colorPicker = document.getElementById('annotation-color');
+        if (colorPicker) {
+            colorPicker.addEventListener('input', e => {
+                const color = e.target.value;
+                // Color input type already validates format, but validate anyway
+                if (/^#[0-9a-fA-F]{6}$/.test(color)) {
+                    this.annotationCanvas.setColor(color);
+                }
+            });
+        }
+
+        // Line width with bounds checking
+        const lineWidthSlider = document.getElementById('annotation-line-width');
+        if (lineWidthSlider) {
+            lineWidthSlider.addEventListener('input', e => {
+                const width = parseInt(e.target.value);
+                if (!isNaN(width) && width >= 1 && width <= 8) {
+                    this.annotationCanvas.setLineWidth(width);
+                }
+            });
+        }
+
+        // Undo/Redo
+        const undoBtn = document.getElementById('annotation-undo-btn');
+        if (undoBtn) {
+            undoBtn.addEventListener('click', () => this.annotationCanvas.undo());
+        }
+
+        const redoBtn = document.getElementById('annotation-redo-btn');
+        if (redoBtn) {
+            redoBtn.addEventListener('click', () => this.annotationCanvas.redo());
+        }
+
+        const clearBtn = document.getElementById('annotation-clear-btn');
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+                this.annotationCanvas.clearAll();
+                if (this.annotationService) {
+                    this.annotationService.clearAll();
+                }
+            });
+        }
+
+        // Keyboard shortcuts (don't trigger in input fields)
+        document.addEventListener('keydown', e => {
+            // Check if user is typing in an input/textarea
+            if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+                return;
+            }
+
+            if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                this.annotationCanvas.undo();
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey) {
+                e.preventDefault();
+                this.annotationCanvas.redo();
+            }
+        });
+
+        // Layer toggles
+        document.querySelectorAll('#annotation-layers input[data-layer]').forEach(cb => {
+            cb.addEventListener('change', () => {
+                this.annotationCanvas.setLayerVisible(cb.dataset.layer, cb.checked);
+            });
+        });
+
+        // Sync status from AnnotationService
+        if (this.annotationService) {
+            this.annotationService.on('syncStatus', status => {
+                const el = document.getElementById('annotation-sync-status');
+                if (el) {
+                    el.style.color = status === 'synced' ? '#00d4ff' : '#c9a227';
+                    el.title = status === 'synced' ? 'Synced' : 'Syncing...';
+                }
+            });
+
+            this.annotationService.on('quotaExceeded', data => {
+                this.showToast(data.message, 'error');
+            });
+        }
+    }
+
+    enableSymbolPlacement(tool) {
+        if (!this.annotationCanvas || !this.annotationCanvas.canvas) return;
+
+        const canvas = this.annotationCanvas.canvas;
+        const handler = (e) => {
+            if (this.annotationCanvas.currentTool !== tool) {
+                canvas.removeEventListener('click', handler);
+                return;
+            }
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            this.annotationCanvas.placeSymbol(x, y, tool);
+        };
+
+        canvas.addEventListener('click', handler);
+        this.annotationCanvasClickHandler = handler;
+    }
+
+    disableSymbolPlacement() {
+        if (!this.annotationCanvas || !this.annotationCanvas.canvas) return;
+        if (this.annotationCanvasClickHandler) {
+            this.annotationCanvas.canvas.removeEventListener('click', this.annotationCanvasClickHandler);
+            this.annotationCanvasClickHandler = null;
+        }
+    }
+
+    /**
+     * Initialize Scale Engine warm-up generator
+     */
+    initScaleEngine() {
+        this.scaleEngine = new ScaleEngine();
+
+        const scaleContainer = document.getElementById('scale-engine-container');
+        if (scaleContainer) {
+            this.scaleEngineUI = new ScaleEngineUI(scaleContainer);
+            this.scaleEngineUI.init(this.scaleEngine);
+            this.scaleEngineUI.connectModules({
+                metronome: this.metronome,
+                followTheBall: this.followTheBall,
+                intonationAnalyzer: this.intonationAnalyzer,
+                sheetMusicRenderer: this.sheetMusicRenderer
+            });
+        }
+    }
+
+    /**
+     * Initialize onboarding flow
+     */
+    initOnboarding() {
+        // Create onboarding service
+        this.onboardingService = new OnboardingService();
+
+        // Load saved instrument if available
+        const savedInstrument = localStorage.getItem('selected_instrument');
+        if (savedInstrument && this.onboardingService.instrumentRanges[savedInstrument]) {
+            this.selectedInstrument = savedInstrument;
+        }
+
+        // Create onboarding UI
+        this.onboardingUI = new OnboardingUI(this.onboardingService);
+
+        // Set up completion callback to apply calibration
+        this.onboardingService.setOnComplete((data) => {
+            // Apply instrument calibration to audio engine
+            if (this.audioEngine && data.instrument) {
+                this.audioEngine.setInstrumentCalibration(data.instrument);
+                this.selectedInstrument = data.instrument;
+            }
+
+            // Request microphone access if not already granted
+            if (data.permissions?.microphone) {
+                this.requestMicrophoneAccess();
+            }
+        });
+
+        // Initialize UI
+        this.onboardingUI.init();
+    }
+
+    /**
+     * Request microphone access
+     */
+    async requestMicrophoneAccess() {
+        if (this.audioEngine) {
+            try {
+                await this.audioEngine.requestMicrophoneAccess();
+            } catch (error) {
+                console.warn('Microphone access not granted:', error);
+            }
+        }
     }
 
     async initializeAudio() {
@@ -279,10 +504,336 @@ class ConcertmasterApp {
             });
         });
 
-        // Library search
+        // Library search - Global search (local + IMSLP)
         document.getElementById('library-search-input')?.addEventListener('input', (e) => {
-            this.filterLibrary(e.target.value);
+            this.globalSearch(e.target.value);
         });
+
+        // Search source toggle (local only vs global)
+        document.getElementById('search-local-only')?.addEventListener('change', (e) => {
+            const query = document.getElementById('library-search-input').value;
+            this.globalSearch(query);
+        });
+
+        // Filter chips - Instrument
+        document.getElementById('instrument-chips')?.addEventListener('click', (e) => {
+            if (e.target.classList.contains('chip')) {
+                document.querySelectorAll('#instrument-chips .chip').forEach(c => c.classList.remove('active'));
+                e.target.classList.add('active');
+                this.applyFilters();
+            }
+        });
+
+        // Filter chips - Difficulty
+        document.getElementById('difficulty-chips')?.addEventListener('click', (e) => {
+            if (e.target.classList.contains('chip')) {
+                document.querySelectorAll('#difficulty-chips .chip').forEach(c => c.classList.remove('active'));
+                e.target.classList.add('active');
+                this.applyFilters();
+            }
+        });
+
+        // Composer filter dropdown
+        document.getElementById('composer-filter')?.addEventListener('change', (e) => {
+            this.applyFilters();
+        });
+
+        // Populate composer filter from library
+        this.populateComposerFilter();
+    }
+
+    /**
+     * Global search - queries both local library and IMSLP
+     */
+    async globalSearch(query) {
+        const searchLocalOnly = document.getElementById('search-local-only')?.checked ?? true;
+        const localResults = this.filterLibrary(query);
+
+        if (searchLocalOnly) {
+            this.renderLibrary(localResults);
+            return;
+        }
+
+        if (query && query.trim().length > 0) {
+            try {
+                const imslpResults = await this.searchIMSLP(query);
+                const allResults = [...localResults, ...imslpResults.map(item => ({
+                    ...item,
+                    isIMSLP: true
+                }))];
+                this.renderLibrary(allResults);
+            } catch (error) {
+                console.error('IMSLP search error:', error);
+                this.renderLibrary(localResults);
+            }
+        } else {
+            this.renderLibrary(localResults);
+        }
+    }
+
+    /**
+     * Search IMSLP database
+     */
+    async searchIMSLP(query) {
+        try {
+            const imslpClient = new IMSLPClient();
+            const results = await imslpClient.search(query);
+            return results.map(item => ({
+                id: item.id || item.scoreId,
+                title: item.title || item.compositionTitle,
+                composer: item.composer || 'Unknown',
+                instrument: item.instrument || 'violin',
+                difficulty: 3,
+                addedAt: new Date().toISOString(),
+                isIMSLP: true,
+                thumbnail: item.thumbnail || null,
+                source: 'IMSLP'
+            }));
+        } catch (error) {
+            console.error('IMSLP search failed:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Apply all filters (instrument, difficulty, composer)
+     */
+    applyFilters() {
+        const query = document.getElementById('library-search-input').value;
+        let results = this.scoreLibrary.scores;
+
+        if (query) {
+            results = this.scoreLibrary.search(query);
+        }
+
+        // Apply instrument filter
+        const activeInstrument = document.querySelector('#instrument-chips .chip.active');
+        const instrumentFilter = activeInstrument?.dataset.value || 'all';
+        if (instrumentFilter !== 'all') {
+            results = results.filter(score =>
+                score.instrument?.toLowerCase() === instrumentFilter.toLowerCase()
+            );
+        }
+
+        // Apply difficulty filter
+        const activeDifficulty = document.querySelector('#difficulty-chips .chip.active');
+        const difficultyFilter = activeDifficulty?.dataset.value || 'all';
+        if (difficultyFilter !== 'all') {
+            const diffLevel = parseInt(difficultyFilter);
+            results = results.filter(score => score.difficulty === diffLevel);
+        }
+
+        // Apply composer filter
+        const composerFilter = document.getElementById('composer-filter')?.value || 'all';
+        if (composerFilter !== 'all') {
+            results = results.filter(score =>
+                score.composer?.toLowerCase() === composerFilter.toLowerCase()
+            );
+        }
+
+        this.renderLibrary(results);
+    }
+
+    /**
+     * Populate composer filter dropdown from library
+     */
+    populateComposerFilter() {
+        const scores = this.scoreLibrary?.scores || [];
+        const composers = [...new Set(scores.map(s => s.composer).filter(Boolean))].sort();
+
+        const select = document.getElementById('composer-filter');
+        if (!select) return;
+
+        select.innerHTML = '<option value="all">All Composers</option>';
+        composers.forEach(composer => {
+            const option = document.createElement('option');
+            option.value = composer;
+            option.textContent = composer;
+            select.appendChild(option);
+        });
+    }
+
+    filterLibrary(query) {
+        return this.scoreLibrary.search(query);
+    }
+
+    /**
+     * Generate difficulty stars HTML
+     */
+    generateDifficultyStars(difficulty = 3) {
+        const stars = [];
+        for (let i = 1; i <= 5; i++) {
+            stars.push(`<span class="${i <= difficulty ? 'star-filled' : 'star-empty'}">★</span>`);
+        }
+        return stars.join('');
+    }
+
+    /**
+     * Format last practiced date
+     */
+    formatLastPracticed(dateString) {
+        if (!dateString) return 'Never practiced';
+        const date = new Date(dateString);
+        const now = new Date();
+        const diff = now - date;
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+        if (days === 0) return 'Today';
+        if (days === 1) return 'Yesterday';
+        if (days < 7) return `${days} days ago`;
+        if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+        return date.toLocaleDateString();
+    }
+
+    /**
+     * Render library - accepts optional scores array
+     */
+    renderLibrary(scores = null) {
+        const grid = document.getElementById('library-grid');
+        if (!grid) return;
+
+        const displayScores = scores !== null ? scores : this.scoreLibrary.scores;
+
+        if (displayScores.length === 0) {
+            grid.innerHTML = `
+                <div class="empty-state">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M9 18V5l12-2v13"/>
+                        <circle cx="6" cy="18" r="3"/>
+                        <circle cx="18" cy="16" r="3"/>
+                    </svg>
+                    <h3>No scores found</h3>
+                    <p>${scores !== null ? 'Try adjusting your filters' : 'Import sheet music to get started with practice'}</p>
+                </div>
+            `;
+            return;
+        }
+
+        grid.innerHTML = displayScores.map((score, index) => `
+            <div class="library-card ${score.isIMSLP ? 'imslp-card' : ''}" data-id="${score.id}" data-index="${index}" tabindex="0" role="option">
+                <div class="library-card-thumbnail">
+                    ${score.thumbnail ? `<img data-src="${score.thumbnail}" alt="" class="lazy-thumbnail" loading="lazy">` : `
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                    `}
+                    ${score.isIMSLP ? '<span class="imslp-badge">IMSLP</span>' : ''}
+                </div>
+                <h3 class="library-card-title">${score.title}</h3>
+                <p class="library-card-composer">${score.composer}</p>
+                <div class="library-card-meta">
+                    <span class="instrument-badge">${score.instrument || 'Violin'}</span>
+                    <span class="difficulty-stars">${this.generateDifficultyStars(score.difficulty)}</span>
+                    <button class="share-btn" data-id="${score.id}" title="Share score" aria-label="Share ${score.title}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="18" cy="5" r="3"/>
+                            <circle cx="6" cy="12" r="3"/>
+                            <circle cx="18" cy="19" r="3"/>
+                            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="library-card-stats">
+                    <span class="practice-count">${score.practiceCount || 0} practices</span>
+                    <span class="last-practiced">${this.formatLastPracticed(score.lastPracticed)}</span>
+                </div>
+            </div>
+        `).join('');
+
+        this.setupLazyLoading();
+
+        grid.querySelectorAll('.library-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                if (e.target.closest('.share-btn')) return;
+                const id = card.dataset.id;
+                const isIMSLP = card.classList.contains('imslp-card');
+                if (isIMSLP) {
+                    this.handleIMSLPCardClick(card, id);
+                } else {
+                    this.selectScore(id);
+                }
+            });
+        });
+
+        grid.querySelectorAll('.share-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const id = btn.dataset.id;
+                this.shareScore(id);
+            });
+        });
+    }
+
+    /**
+     * Handle IMSLP card click
+     */
+    async handleIMSLPCardClick(cardElement, imslpId) {
+        const confirmed = confirm('Add this IMSLP score to your local library?');
+        if (confirmed) {
+            alert('IMSLP download functionality - Score added to library!');
+        }
+    }
+
+    /**
+     * Share a score from the library
+     */
+    async shareScore(id) {
+        const score = this.scoreLibrary.scores.find(s => s.id === id);
+        if (!score) {
+            alert('Score not found');
+            return;
+        }
+
+        const shareData = {
+            title: score.title,
+            composer: score.composer,
+            instrument: score.instrument,
+            difficulty: score.difficulty
+        };
+
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: `${shareData.title} by ${shareData.composer}`,
+                    text: `Check out this sheet music: ${shareData.title}`,
+                    url: window.location.href
+                });
+                return;
+            } catch (err) {
+                console.log('Share cancelled:', err);
+            }
+        }
+
+        const shareText = `${shareData.title} by ${shareData.composer} (${shareData.instrument}, ${shareData.difficulty} stars)`;
+        try {
+            await navigator.clipboard.writeText(shareText);
+            alert('Score info copied to clipboard!');
+        } catch (err) {
+            prompt('Copy this to share:', shareText);
+        }
+    }
+
+    setupLazyLoading() {
+        if ('IntersectionObserver' in window) {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const img = entry.target.querySelector('.lazy-thumbnail');
+                        if (img && img.dataset.src) {
+                            img.src = img.dataset.src;
+                            img.classList.add('loaded');
+                            observer.unobserve(entry.target);
+                        }
+                    }
+                });
+            }, { rootMargin: '50px' });
+
+            document.querySelectorAll('.library-card').forEach(card => {
+                observer.observe(card);
+            });
+        }
     }
 
     setupPracticeControls() {
@@ -452,11 +1003,6 @@ class ConcertmasterApp {
         const range = this.pitchDetector.getInstrumentRange(this.selectedInstrument);
         this.pitchDetector.minFrequency = range.min;
         this.pitchDetector.maxFrequency = range.max;
-
-        // Also update tone quality analyzer instrument
-        if (this.toneQualityAnalyzer) {
-            this.toneQualityAnalyzer.configure({ instrument: this.selectedInstrument });
-        }
     }
 
     // ============================================
@@ -479,63 +1025,20 @@ class ConcertmasterApp {
             link.style.display = enabled ? '' : 'none';
         });
 
-        // Show/hide heatmap (Audits) nav link
-        const heatmapNavLinks = document.querySelectorAll('.heatmap-nav-link');
-        heatmapNavLinks.forEach(link => {
-            link.style.display = enabled ? '' : 'none';
-        });
-
         // Show/hide the studio dashboard view
         const studioView = document.getElementById('studio-dashboard-view');
         if (studioView) {
             studioView.style.display = enabled ? '' : 'none';
         }
 
-        // Show/hide heat map history view
-        const heatmapView = document.getElementById('heat-map-history-view');
-        if (heatmapView) {
-            heatmapView.style.display = enabled ? '' : 'none';
-        }
-
         if (enabled && !this.studioDashboard) {
             // Initialize teacher service and dashboard on first enable
             this.teacherService = new TeacherService();
-            await this.teacherService.init();
-
             this.studioDashboard = new StudioDashboard(this.teacherService);
             await this.studioDashboard.init();
-
-            // Initialize heat map history service and UI
-            this.heatMapHistoryService = new HeatMapHistoryService();
-            await this.heatMapHistoryService.init();
-
-            this.heatMapHistoryUI = new HeatMapHistoryUI(this.heatMapHistoryService, this.teacherService);
-            await this.heatMapHistoryUI.init();
-
-            // Wire up studio dashboard to open heat map view on student selection
-            this._wireUpHeatMapFromDashboard();
         } else if (enabled && this.studioDashboard) {
             await this.studioDashboard.refresh();
         }
-    }
-
-    /**
-     * Wire up studio dashboard to open heat map view when a student is selected
-     */
-    _wireUpHeatMapFromDashboard() {
-        if (!this.studioDashboard || !this.heatMapHistoryUI) return;
-
-        // Listen for student selection events from studio dashboard
-        const originalSelectStudent = this.studioDashboard.selectStudent.bind(this.studioDashboard);
-        this.studioDashboard.selectStudent = async (studentId) => {
-            await originalSelectStudent(studentId);
-
-            // Load heat map for selected student
-            await this.heatMapHistoryUI.loadStudentHeatMaps(studentId);
-
-            // Navigate to heat map history view
-            this.navigateTo('heat-map-history');
-        };
     }
 
     // ============================================
@@ -1263,6 +1766,11 @@ class ConcertmasterApp {
             sheetContainer.classList.remove('session-ended');
         }
 
+        // Set annotation score ID for cloud sync
+        if (this.annotationService) {
+            this.annotationService.setScoreId(score.id || score.title);
+        }
+
         // Set up performance comparator with the score
         this.performanceComparator.setScore(score);
 
@@ -1355,8 +1863,7 @@ class ConcertmasterApp {
             startTime: Date.now(),
             notes: [],
             pitchAccuracy: [],
-            timingAccuracy: [],
-            toneQuality: []
+            timingAccuracy: []
         };
 
         // Update UI
@@ -1368,19 +1875,7 @@ class ConcertmasterApp {
             </svg>
         `;
 
-        // Reset analyzers before starting capture so the first frame sees clean state
-        this.rhythmAnalyzer.reset();
-        this.intonationAnalyzer.reset();
-        this.dynamicsComparator.reset();
-        this.sessionLogger.clear();
-        this.sessionLogger.startSession(this.currentScore ? this.currentScore.id || 'unknown' : 'unknown');
-
-        // Load score dynamics/articulation data for comparison
-        if (this.currentScore) {
-            this.dynamicsComparator.loadScore(this.currentScore);
-        }
-
-        // Start audio processing (after reset so first frame has correct state)
+        // Start audio processing
         this.audioEngine.startCapture((data) => {
             this.processAudio(data);
         }, 50);
@@ -1388,14 +1883,6 @@ class ConcertmasterApp {
         // Reset analyzers for new session
         this.rhythmAnalyzer.reset();
         this.intonationAnalyzer.reset();
-        if (this.toneQualityAnalyzer) {
-            this.toneQualityAnalyzer.reset();
-        }
-
-        // Start AI summary generator session
-        if (this.aiSummaryGenerator && this.currentScore) {
-            this.aiSummaryGenerator.startSession(this.currentScore.id);
-        }
 
         this.showToast('Practice started - play your instrument', 'success');
     }
@@ -1409,9 +1896,6 @@ class ConcertmasterApp {
 
         // Calculate final scores
         const finalScore = this.accuracyScorer.calculateOverall(this.sessionData);
-
-        // Save to heat map if in teacher mode with selected student
-        this._saveToHeatMap();
 
         // Add session-ended state to sheet music container
         const sheetContainer = document.getElementById('sheet-music-container');
@@ -1438,99 +1922,6 @@ class ConcertmasterApp {
         this.showToast('Practice session ended', 'success');
     }
 
-    /**
-     * Save practice session to heat map (teacher mode)
-     */
-    async _saveToHeatMap() {
-        if (!this.isTeacherMode) return;
-        if (!this.heatMapHistoryService) return;
-        if (!this.studioDashboard?.selectedStudentId) return;
-        if (!this.sessionData || !this.sessionData.notes || this.sessionData.notes.length === 0) return;
-
-        // Convert session notes to deviation format for heat map
-        // Classify each error based on whether it's a pitch or rhythm issue
-        const deviations = this.sessionData.notes
-            .filter(n => n.measure)
-            .map(n => {
-                // Determine error type: pitch error (accuracy) vs rhythm error (timing)
-                // accuracy < 100 means pitch deviation, rhythmScore < 100 means timing issue
-                const isPitchError = n.accuracy !== undefined && n.accuracy < 100;
-                const isRhythmError = n.rhythmScore !== undefined && n.rhythmScore < 100;
-
-                // Prioritize pitch errors if both are present
-                let type = null;
-                if (isPitchError && isRhythmError) {
-                    // If both have issues, classify based on which is worse
-                    type = n.accuracy < n.rhythmScore ? 'pitch' : 'rhythm';
-                } else if (isPitchError) {
-                    type = 'pitch';
-                } else if (isRhythmError) {
-                    type = 'rhythm';
-                }
-
-                if (!type) return null;
-
-                return {
-                    measure: n.measure,
-                    type: type,
-                    deviation_cents: type === 'pitch' ? (100 - (n.accuracy || 0)) : 0,
-                    deviation_ms: type === 'rhythm' ? (100 - (n.rhythmScore || 0)) * 10 : 0,
-                    timestamp: n.timestamp
-                };
-            })
-            .filter(Boolean);
-
-        // Count deviations by type
-        const pitchDeviations = deviations.filter(d => d.type === 'pitch');
-        const rhythmDeviations = deviations.filter(d => d.type === 'rhythm');
-
-        const sessionData = {
-            scoreId: this.sessionData.scoreId,
-            pieceName: this.currentScore?.title || '',
-            duration_ms: this.sessionData.startTime ? Date.now() - this.sessionData.startTime : 0,
-            total_deviations: deviations.length,
-            pitch_deviations: pitchDeviations.length,
-            rhythm_deviations: rhythmDeviations.length,
-            intonation_deviations: 0,
-            deviations: deviations,
-            average_pitch_deviation_cents: pitchDeviations.length > 0
-                ? pitchDeviations.reduce((sum, d) => sum + Math.abs(d.deviation_cents || 0), 0) / pitchDeviations.length
-                : 0,
-            average_rhythm_deviation_ms: rhythmDeviations.length > 0
-                ? rhythmDeviations.reduce((sum, d) => sum + Math.abs(d.deviation_ms || 0), 0) / rhythmDeviations.length
-                : 0,
-            problem_measures: this._extractProblemMeasures(deviations)
-        };
-
-        try {
-            await this.heatMapHistoryService.savePracticeSession(
-                this.studioDashboard.selectedStudentId,
-                sessionData
-            );
-            console.log('Practice session saved to heat map for student:', this.studioDashboard.selectedStudentId);
-        } catch (err) {
-            console.warn('Failed to save practice session to heat map:', err);
-        }
-    }
-
-    /**
-     * Extract problem measures from deviations
-     */
-    _extractProblemMeasures(deviations) {
-        const measureErrors = {};
-        deviations.forEach(d => {
-            if (!measureErrors[d.measure]) {
-                measureErrors[d.measure] = 0;
-            }
-            measureErrors[d.measure]++;
-        });
-
-        return Object.entries(measureErrors)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 5)
-            .map(([measure]) => parseInt(measure, 10));
-    }
-
     processAudio(data) {
         if (!data.timeData) return;
 
@@ -1546,47 +1937,6 @@ class ConcertmasterApp {
         const result = this.pitchDetector.process(data.timeData);
 
         if (result) {
-            // Analyze tone quality (independent of pitch matching)
-            let toneQualityResult = null;
-            if (this.toneQualityAnalyzer) {
-                // Pass frequency data from AudioEngine if available
-                toneQualityResult = this.toneQualityAnalyzer.analyze(
-                    data.timeData,
-                    result.frequency,
-                    data.frequencyData
-                );
-
-                // Store in session data
-                if (this.sessionData && toneQualityResult) {
-                    this.sessionData.toneQuality.push(toneQualityResult.qualityScore);
-                }
-
-                // Log to session logger for AI summary (throttled to once per second)
-                // Only log when there's a notable issue (low score, wolf tone) AND rate-limited
-                if (this.aiSummaryGenerator && toneQualityResult) {
-                    const now = Date.now();
-                    const score = toneQualityResult.qualityScore ?? 50;
-                    const isNoteworthy = score < 60 || toneQualityResult.wolfToneDetected;
-                    const timeGateElapsed = now - this.lastToneQualityLogTime > this.toneQualityLogInterval;
-
-                    if (isNoteworthy && timeGateElapsed) {
-                        this.aiSummaryGenerator.logToneQualityDeviation({
-                            measure: result.measure || 1,
-                            note: result.name + result.octave,
-                            qualityScore: score,
-                            purityScore: toneQualityResult.purityScore,
-                            harshnessScore: toneQualityResult.harshnessScore,
-                            wolfToneDetected: toneQualityResult.wolfToneDetected,
-                            wolfToneFrequency: toneQualityResult.wolfToneFrequency
-                        });
-                        this.lastToneQualityLogTime = now;
-                    }
-                }
-
-                // Update tone quality display
-                this.updateToneQualityDisplay(toneQualityResult);
-            }
-
             // Record note onset for rhythm analysis
             const noteTimestamp = Date.now();
             this.rhythmAnalyzer.recordNoteOnset(noteTimestamp);
@@ -1623,56 +1973,6 @@ class ConcertmasterApp {
                         const rhythmScore = this.rhythmAnalyzer.calculateOverallTiming();
                         this.intonationAnalyzer.recordRhythmScore(rhythmScore);
 
-                        // Dynamics & articulation analysis
-                        const beat = comparison.expectedNote?.position?.beat || 0;
-                        const dynResult = this.dynamicsComparator.processAudioFrame(
-                            data.level, measure, beat, noteTimestamp
-                        );
-                        this.intonationAnalyzer.recordDynamicsScore(dynResult.combinedScore);
-
-                        // Forward dynamics deviation to session logger
-                        if (Math.abs(dynResult.dynamicDeviation) >= 2 || !dynResult.directionMatch) {
-                            this.sessionLogger.logDynamicsDeviation({
-                                measure,
-                                beat,
-                                expectedDynamic: dynResult.expectedDynamic,
-                                actualDynamic: dynResult.actualDynamic,
-                                deviation: dynResult.dynamicDeviation,
-                                expectedDirection: dynResult.expectedDirection,
-                                actualTrend: dynResult.trend
-                            });
-                        }
-
-                        // Analyze attack envelope for articulation
-                        const attackInfo = this.dynamicsComparator.volumeAnalyzer.analyzeAttack(data.timeData, data.sampleRate);
-                        const expectedDuration = comparison.expectedNote ? comparison.expectedNote.duration * (60000 / (this.currentScore?.tempo || 120)) : 500;
-                        // Use gap since previous note onset as actual duration, fall back to expected
-                        const onsets = this.rhythmAnalyzer.noteOnsets;
-                        const prevOnset = onsets.length >= 2 ? onsets[onsets.length - 2] : null;
-                        const actualDuration = (prevOnset && noteTimestamp > prevOnset) ? noteTimestamp - prevOnset : expectedDuration;
-                        const artResult = this.dynamicsComparator.processNoteArticulation({
-                            timestamp: noteTimestamp,
-                            attackTime: attackInfo.attackTime,
-                            peakAmplitude: attackInfo.peakAmplitude,
-                            decayRate: attackInfo.decayRate,
-                            duration: actualDuration,
-                            expectedDuration: expectedDuration,
-                            measure: measure
-                        }, measure, beat);
-                        this.intonationAnalyzer.recordArticulationScore(artResult.score);
-
-                        // Forward articulation deviation to session logger
-                        if (artResult.expected && !artResult.match) {
-                            this.sessionLogger.logArticulationDeviation({
-                                measure,
-                                beat,
-                                expectedArticulation: artResult.expected,
-                                detectedArticulation: artResult.detected,
-                                score: artResult.score,
-                                feedback: artResult.feedback
-                            });
-                        }
-
                         // Store in session data
                         if (this.sessionData) {
                             this.sessionData.pitchAccuracy.push(accuracy);
@@ -1683,9 +1983,7 @@ class ConcertmasterApp {
                                 measure: measure,
                                 accuracy: accuracy,
                                 rhythmScore: rhythmScore,
-                                matched: comparison.matched,
-                                dynamicsScore: dynResult.combinedScore,
-                                articulationScore: artResult.score
+                                matched: comparison.matched
                             });
                         }
 
@@ -1803,74 +2101,6 @@ class ConcertmasterApp {
     }
 
     /**
-     * Update the tone quality display in the feedback panel
-     */
-    updateToneQualityDisplay(toneQualityResult) {
-        if (!toneQualityResult) return;
-
-        const toneQualityMeter = document.getElementById('tone-quality-meter');
-        const toneQualityBar = document.getElementById('tone-quality-bar');
-        const toneQualityValue = document.getElementById('tone-quality-value');
-        const toneQualityStatus = document.getElementById('tone-quality-status');
-        const toneQualityIndicator = document.getElementById('tone-quality-indicator');
-
-        const score = toneQualityResult.qualityScore ?? 50;
-
-        // Update bar width
-        if (toneQualityBar) {
-            toneQualityBar.style.width = score + '%';
-        }
-
-        // Update value display
-        if (toneQualityValue) {
-            toneQualityValue.textContent = Math.round(score) + '%';
-        }
-
-        // Get status and color
-        const status = ToneQualityAnalyzer.getQualityStatus(score);
-        const color = ToneQualityAnalyzer.getQualityColor(score);
-
-        // Update value color
-        if (toneQualityValue) {
-            toneQualityValue.style.color = color;
-        }
-
-        // Update status text
-        if (toneQualityStatus) {
-            const statusLabels = {
-                'excellent': 'Excellent',
-                'good': 'Good',
-                'acceptable': 'Acceptable',
-                'harsh': 'Harsh',
-                'very_harsh': 'Very Harsh'
-            };
-            toneQualityStatus.textContent = statusLabels[status] || status;
-        }
-
-        // Update container class for styling
-        if (toneQualityIndicator) {
-            toneQualityIndicator.classList.remove('tone-quality-good', 'tone-quality-acceptable', 'tone-quality-harsh', 'tone-quality-very_harsh');
-
-            if (score >= 60) {
-                toneQualityIndicator.classList.add('tone-quality-good');
-            } else if (score >= 40) {
-                toneQualityIndicator.classList.add('tone-quality-acceptable');
-            } else {
-                toneQualityIndicator.classList.add('tone-quality-harsh');
-            }
-        }
-
-        // Show wolf tone warning if detected
-        if (toneQualityResult.wolfToneDetected && toneQualityStatus) {
-            toneQualityStatus.textContent = 'Wolf Tone!';
-            toneQualityStatus.style.color = '#dc2626';
-        } else if (toneQualityStatus) {
-            // Reset color when wolf tone is not detected
-            toneQualityStatus.style.color = '';
-        }
-    }
-
-    /**
      * Animate score value change with smooth transition
      */
     animateScoreChange(element, targetScore) {
@@ -1923,23 +2153,6 @@ class ConcertmasterApp {
         const intonationAccuracyEl = document.getElementById('intonation-accuracy');
         if (intonationAccuracyEl) {
             intonationAccuracyEl.textContent = Math.round(intonationScores.transition) + '%';
-        }
-
-        // Add tone quality score if available
-        const toneQualityEl = document.getElementById('tone-quality-score');
-        if (toneQualityEl && this.sessionData?.toneQuality?.length > 0) {
-            const avgToneQuality = this.sessionData.toneQuality.reduce((a, b) => a + b, 0) / this.sessionData.toneQuality.length;
-            toneQualityEl.textContent = Math.round(avgToneQuality) + '%';
-            // Color based on score
-            if (avgToneQuality >= 60) {
-                toneQualityEl.style.color = '#10b981'; // emerald
-            } else if (avgToneQuality >= 40) {
-                toneQualityEl.style.color = '#f59e0b'; // amber
-            } else {
-                toneQualityEl.style.color = '#dc2626'; // crimson
-            }
-        } else if (toneQualityEl) {
-            toneQualityEl.textContent = '--%';
         }
 
         const duration = this.sessionData?.startTime ? Date.now() - this.sessionData.startTime : 0;
