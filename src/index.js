@@ -8,6 +8,7 @@ const rateLimiter = require('./middleware/rateLimiter');
 const healthRoutes = require('./routes/health');
 const imslpRoutes = require('./routes/imslp');
 const omrRoutes = require('./routes/omr');
+const assignmentRoutes = require('./routes/assignments');
 
 const app = express();
 
@@ -62,6 +63,9 @@ app.use('/api/imslp', imslpRoutes);
 // OMR (Optical Music Recognition) routes
 app.use('/api/omr', upload.single('image'), omrRoutes);
 
+// Assignment routes (Smart Assignments & Routine Builder)
+app.use('/api/assignments', assignmentRoutes);
+
 // API routes (placeholder for future routes)
 app.use('/api', (req, res) => {
   res.status(200).json({
@@ -72,6 +76,8 @@ app.use('/api', (req, res) => {
       healthDetailed: '/health/detailed',
       imslpSearch: '/api/imslp/search',
       imslpDownload: '/api/imslp/download/:id',
+      assignments: '/api/assignments',
+      assignmentNotifications: '/api/assignments/notifications/stream',
     },
   });
 });

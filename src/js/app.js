@@ -52,6 +52,12 @@ class ConcertmasterApp {
 
         // Screen reader live region
         this.liveRegion = null;
+
+        // Smart Assignments
+        this.assignmentService = null;
+        this.notificationService = null;
+        this.upNextWidget = null;
+        this.assignmentCreator = null;
     }
 
     async init() {
@@ -81,6 +87,9 @@ class ConcertmasterApp {
             // Load library
             await this.loadLibrary();
 
+            // Initialize Smart Assignments
+            await this.initAssignments();
+
             console.log('Concertmaster initialized successfully');
         } catch (error) {
             console.error('Initialization error:', error);
@@ -103,6 +112,7 @@ class ConcertmasterApp {
             library: document.getElementById('library-view'),
             practice: document.getElementById('practice-view'),
             metronome: document.getElementById('metronome-view'),
+            assignments: document.getElementById('assignments-view'),
             settings: document.getElementById('settings-view')
         };
 
@@ -178,6 +188,187 @@ class ConcertmasterApp {
                 console.warn('Microphone access not granted:', error);
             }
         }
+    }
+
+    /**
+     * Initialize Smart Assignments & Routine Builder
+     */
+    async initAssignments() {
+        try {
+            // Initialize assignment service
+            this.assignmentService = new AssignmentService();
+            await this.assignmentService.init();
+
+            // Ensure user has an ID
+            let userId = localStorage.getItem('user_id');
+            if (!userId) {
+                userId = crypto.randomUUID();
+                localStorage.setItem('user_id', userId);
+            }
+            if (!localStorage.getItem('user_role')) {
+                localStorage.setItem('user_role', 'student');
+            }
+
+            // Initialize Up Next widget
+            const upNextContainer = document.getElementById('up-next-container');
+            if (upNextContainer) {
+                this.upNextWidget = new UpNextWidget(upNextContainer, {
+                    assignmentService: this.assignmentService,
+                    onPractice: (assignment) => this.practiceAssignment(assignment),
+                    onViewAll: () => this.showView('assignments-view'),
+                    onViewAssignment: (assignment) => this.viewAssignmentDetails(assignment)
+                });
+                await this.upNextWidget.init();
+            }
+
+            // Initialize notification service
+            this.notificationService = new NotificationService();
+            await this.notificationService.init(userId);
+
+            // Listen for notifications to refresh UI
+            this.notificationService.onNotification((notification) => {
+                if (notification.type === 'new_assignment') {
+                    this.showToast(notification.message, 'info');
+                    if (this.upNextWidget) {
+                        this.upNextWidget.refresh();
+                    }
+                }
+            });
+
+            // Setup assignment creation button
+            const createBtn = document.getElementById('create-assignment-btn');
+            if (createBtn) {
+                createBtn.addEventListener('click', () => this.openAssignmentCreator());
+            }
+
+            // Setup modal backdrop close
+            const backdrop = document.getElementById('assignment-modal-backdrop');
+            if (backdrop) {
+                backdrop.addEventListener('click', () => this.closeAssignmentCreator());
+            }
+
+            console.log('Smart Assignments initialized');
+        } catch (error) {
+            console.error('Failed to initialize assignments:', error);
+        }
+    }
+
+    /**
+     * Open the assignment creator modal
+     */
+    openAssignmentCreator() {
+        const modal = document.getElementById('assignment-creator-modal');
+        const container = document.getElementById('assignment-creator-container');
+        if (!modal || !container) return;
+
+        // Initialize the library service for score selection
+        const libraryService = typeof LibraryService !== 'undefined' ? new LibraryService() : null;
+
+        this.assignmentCreator = new AssignmentCreator(container, {
+            assignmentService: this.assignmentService,
+            libraryService: libraryService,
+            onAssignmentCreated: (assignment) => {
+                this.showToast(`Assignment "${assignment.title}" sent!`, 'success');
+                if (this.upNextWidget) {
+                    this.upNextWidget.refresh();
+                }
+                this.closeAssignmentCreator();
+                this.loadAssignmentsList();
+            },
+            onClose: () => this.closeAssignmentCreator()
+        });
+
+        if (libraryService) {
+            libraryService.init().then(() => {
+                this.assignmentCreator.init();
+            });
+        } else {
+            this.assignmentCreator.init();
+        }
+
+        modal.style.display = 'flex';
+    }
+
+    /**
+     * Close the assignment creator modal
+     */
+    closeAssignmentCreator() {
+        const modal = document.getElementById('assignment-creator-modal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    /**
+     * Load assignments list for the assignments view
+     */
+    async loadAssignmentsList() {
+        if (!this.assignmentService) return;
+
+        const listContainer = document.getElementById('assignments-list');
+        if (!listContainer) return;
+
+        const userId = this.assignmentService.getCurrentUserId();
+        const role = this.assignmentService.getCurrentUserRole();
+
+        let assignments;
+        if (role === 'teacher') {
+            assignments = await this.assignmentService.getTeacherAssignments(userId);
+        } else {
+            assignments = await this.assignmentService.getStudentAssignments(userId);
+        }
+
+        if (assignments.length === 0) {
+            listContainer.innerHTML = `
+                <div class="up-next-empty-state">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                        <path d="M2 17l10 5 10-5"/>
+                        <path d="M2 12l10 5 10-5"/>
+                    </svg>
+                    <p>No assignments yet</p>
+                </div>
+            `;
+            return;
+        }
+
+        listContainer.innerHTML = assignments.map(a => {
+            const progress = this.assignmentService.calculateProgress(a);
+            const isOverdue = this.assignmentService.isOverdue(a);
+            return `
+                <div class="assignment-list-item" data-id="${a.id}">
+                    <div class="assignment-list-info">
+                        <span class="assignment-list-title">${a.title}</span>
+                        <span class="assignment-list-meta">
+                            ${a.measures.start}${a.measures.end ? '-' + a.measures.end : '+'} | ${a.target.bpm} BPM
+                            ${a.dueDate ? ' | Due: ' + new Date(a.dueDate).toLocaleDateString() : ''}
+                        </span>
+                    </div>
+                    <div class="assignment-list-progress">
+                        <span class="assignment-status-badge status-${a.status}">
+                            ${a.status === 'completed' ? 'Done' : a.status === 'in_progress' ? 'Active' : 'New'}
+                        </span>
+                        ${isOverdue ? '<span class="assignment-due overdue">Overdue</span>' : ''}
+                        <span class="progress-text">${progress}%</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    /**
+     * Navigate to practice with assignment context
+     */
+    practiceAssignment(assignment) {
+        if (!assignment) return;
+        this.showView('practice-view');
+        this.showToast(`Practicing: ${assignment.title}`, 'info');
+    }
+
+    /**
+     * View assignment details
+     */
+    viewAssignmentDetails(assignment) {
+        if (!assignment) return;
+        this.showView('assignments-view');
     }
 
     async initializeAudio() {
