@@ -105,9 +105,14 @@ class CloudSyncService {
 
     /**
      * Process all items in the offline queue
+     * Requires authentication - skips processing if not authenticated
      * @returns {Promise<Object>} Processing results
      */
     async processOfflineQueue() {
+        if (!this.authService.isAuthenticated()) {
+            return { processed: 0, failed: 0, skipped: true };
+        }
+
         const queue = this.getOfflineQueue();
         if (queue.length === 0) return { processed: 0, failed: 0 };
 
@@ -182,8 +187,8 @@ class CloudSyncService {
     }
 
     /**
-     * Resolve conflicts between local and server data
-     * Uses last-write-wins with timestamp comparison
+     * Resolve conflicts between local and server data using last-write-wins.
+     * Starts from serverData, then replaces with local items when local is newer.
      * @param {Object} localData - Local data
      * @param {Object} serverData - Server data
      * @param {Array} conflicts - Conflict list from server
@@ -192,23 +197,32 @@ class CloudSyncService {
      */
     _resolveConflicts(localData, serverData, conflicts = []) {
         const resolved = {
-            sessions: serverData?.sessions || [],
-            library: serverData?.library || [],
-            preferences: serverData?.preferences || {},
-            progress: serverData?.progress || []
+            sessions: [...(serverData?.sessions || [])],
+            library: [...(serverData?.library || [])],
+            preferences: { ...(serverData?.preferences || {}) },
+            progress: [...(serverData?.progress || [])]
         };
 
-        // For each conflict, pick the version with the most recent timestamp
+        // For each conflict, replace server version with local version when local wins
         for (const conflict of conflicts) {
             const localItem = conflict.local;
             const serverItem = conflict.server;
             const localTime = localItem?.updatedAt || 0;
             const serverTime = serverItem?.updatedAt || 0;
 
-            // Last-write-wins strategy
             if (localTime > serverTime) {
-                // Local wins - server already has the push, no action needed
-                continue;
+                // Local wins - replace the server item in resolved data
+                const type = conflict.type;
+                if (type === 'preferences') {
+                    resolved.preferences = { ...localItem };
+                } else if (resolved[type] && Array.isArray(resolved[type])) {
+                    const idx = resolved[type].findIndex(item => item.id === serverItem.id);
+                    if (idx >= 0) {
+                        resolved[type][idx] = localItem;
+                    } else {
+                        resolved[type].push(localItem);
+                    }
+                }
             }
             // Server wins - already in resolved data from serverData
         }
@@ -233,6 +247,12 @@ class CloudSyncService {
         try {
             const sessions = JSON.parse(localStorage.getItem('music_app_sessions') || '[]');
             data.sessions = sessions;
+        } catch { /* empty */ }
+
+        // Collect library data
+        try {
+            const library = JSON.parse(localStorage.getItem('music_app_library') || '[]');
+            data.library = library;
         } catch { /* empty */ }
 
         // Collect user preferences
@@ -265,6 +285,12 @@ class CloudSyncService {
             const existing = JSON.parse(localStorage.getItem('music_app_sessions') || '[]');
             const merged = this._mergeArrayById(existing, resolved.sessions);
             localStorage.setItem('music_app_sessions', JSON.stringify(merged));
+        }
+
+        if (resolved.library && resolved.library.length > 0) {
+            const existing = JSON.parse(localStorage.getItem('music_app_library') || '[]');
+            const merged = this._mergeArrayById(existing, resolved.library);
+            localStorage.setItem('music_app_library', JSON.stringify(merged));
         }
 
         if (resolved.preferences && Object.keys(resolved.preferences).length > 0) {
@@ -315,12 +341,15 @@ class CloudSyncService {
     }
 
     /**
-     * Generate a unique ID
+     * Generate a unique ID using crypto when available, fallback to timestamp+random
      * @returns {string}
      * @private
      */
     _generateId() {
-        return Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
+        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+            return crypto.randomUUID();
+        }
+        return Date.now().toString(36) + Math.random().toString(36).substring(2, 10);
     }
 
     /**

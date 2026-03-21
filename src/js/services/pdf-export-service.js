@@ -1,12 +1,15 @@
 /**
  * PDF Export Service - Generates professional teacher reports from session data
- * Uses jsPDF for PDF generation
+ * Uses jsPDF for real PDF generation
  * Includes session summary, error log, heat map, and teacher notes
  */
 
+// jsPDF loaded via script tag in browser, or via require in Node
+const jsPDFModule = (typeof require !== 'undefined') ? (() => { try { return require('jspdf'); } catch { return null; } })() : null;
+
 class PDFExportService {
     constructor() {
-        // Midnight Conservatory theme colors
+        // Midnight Conservatory theme colors (RGB)
         this.colors = {
             deepBg: [10, 10, 18],          // #0a0a12
             surface: [20, 20, 32],           // #141420
@@ -37,7 +40,7 @@ class PDFExportService {
      * @param {string} options.teacherNotes - Free-text teacher notes
      * @param {string} options.studentName - Student name
      * @param {Array} options.heatMapData - Heat map data array
-     * @returns {Object} PDF document (jsPDF instance or data URL)
+     * @returns {Object} PDF document result
      */
     generateReport(options = {}) {
         const {
@@ -72,38 +75,241 @@ class PDFExportService {
     }
 
     /**
-     * Render the PDF document
+     * Render the PDF document using jsPDF
      * @param {Object} report - Structured report data
      * @returns {Object} PDF result with dataUrl and pages
      * @private
      */
     _renderPDF(report) {
-        // Simulate jsPDF-style rendering with structured pages
+        // Try to use jsPDF for real PDF generation
+        const jsPDF = this._getJsPDF();
+
+        if (jsPDF) {
+            return this._renderWithJsPDF(jsPDF, report);
+        }
+
+        // Fallback: structured page data for environments without jsPDF
+        return this._renderStructured(report);
+    }
+
+    /**
+     * Get the jsPDF constructor
+     * @returns {Function|null}
+     * @private
+     */
+    _getJsPDF() {
+        // Browser: loaded via script tag
+        if (typeof window !== 'undefined' && window.jspdf && window.jspdf.jsPDF) {
+            return window.jspdf.jsPDF;
+        }
+        // Node.js: loaded via require
+        if (jsPDFModule) {
+            return jsPDFModule.jsPDF || jsPDFModule;
+        }
+        return null;
+    }
+
+    /**
+     * Render a real PDF using jsPDF
+     * @param {Function} jsPDF - jsPDF constructor
+     * @param {Object} report - Report data
+     * @returns {Object} PDF result
+     * @private
+     */
+    _renderWithJsPDF(jsPDF, report) {
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        const m = this.margin;
+        const w = this.contentWidth;
+
+        // Set document properties
+        doc.setProperties({
+            title: report.title,
+            subject: `Practice Report for ${report.student}`,
+            author: 'Music App - Virtual Concertmaster',
+            creator: 'PDFExportService'
+        });
+
+        // --- Page 1: Title & Summary ---
+        let y = m;
+
+        // Title
+        doc.setFontSize(24);
+        doc.setTextColor(...this.colors.primary);
+        doc.text(report.title, m, y + 8);
+        y += 14;
+
+        // Subtitle
+        doc.setFontSize(10);
+        doc.setTextColor(...this.colors.textSecondary);
+        doc.text(`Generated: ${report.generatedAt}`, m, y + 4);
+        y += 12;
+
+        // Divider
+        doc.setDrawColor(...this.colors.primary);
+        doc.setLineWidth(0.5);
+        doc.line(m, y, m + w, y);
+        y += 8;
+
+        // Student info section
+        y = this._addSection(doc, 'Student Information', [
+            `Student: ${report.student}`,
+            `Piece: ${report.score.title || 'Unknown'}`,
+            `Composer: ${report.score.composer || 'Unknown'}`,
+            `Instrument: ${report.score.instrument || 'Not specified'}`,
+            ...(report.dateRange ? [`Period: ${report.dateRange}`] : [])
+        ], y, m);
+
+        y += 5;
+
+        // Session summary
+        y = this._addSection(doc, 'Session Summary', report.sessionSummary, y, m);
+        y += 5;
+
+        // Statistics
+        doc.setFontSize(12);
+        doc.setTextColor(...this.colors.primary);
+        doc.text('Performance Statistics', m, y);
+        y += 6;
+
+        for (const stat of report.statistics) {
+            const colorKey = stat.color || 'textPrimary';
+            const color = this.colors[colorKey] || this.colors.textPrimary;
+            doc.setFontSize(10);
+            doc.setTextColor(...this.colors.textSecondary);
+            doc.text(`${stat.label}:`, m + 2, y);
+            doc.setTextColor(...color);
+            doc.text(stat.value, m + 70, y);
+            y += 5;
+        }
+
+        // --- Page 2: Error Log & Heat Map ---
+        doc.addPage();
+        y = m;
+
+        y = this._addSection(doc, 'Error Log Summary', report.errorLog, y, m);
+        y += 10;
+
+        // Heat map visualization
+        doc.setFontSize(12);
+        doc.setTextColor(...this.colors.primary);
+        doc.text('Performance Heat Map', m, y);
+        y += 8;
+
+        if (report.heatMapSummary.available) {
+            const measures = report.heatMapSummary.measures;
+            const cellSize = Math.min(8, (w - 4) / Math.max(measures.length, 1));
+            const cols = Math.floor(w / cellSize);
+
+            for (let i = 0; i < measures.length; i++) {
+                const col = i % cols;
+                const row = Math.floor(i / cols);
+                const x = m + col * cellSize;
+                const cy = y + row * cellSize;
+
+                const colorKey = measures[i].color;
+                const color = this.colors[colorKey] || this.colors.textSecondary;
+                doc.setFillColor(...color);
+                doc.rect(x, cy, cellSize - 1, cellSize - 1, 'F');
+
+                doc.setFontSize(5);
+                doc.setTextColor(...this.colors.white);
+                doc.text(String(measures[i].measure), x + 1, cy + cellSize - 2);
+            }
+
+            y += (Math.ceil(measures.length / cols) + 1) * cellSize + 5;
+        } else {
+            doc.setFontSize(10);
+            doc.setTextColor(...this.colors.textSecondary);
+            doc.text('No heat map data available.', m + 2, y);
+            y += 8;
+        }
+
+        // Legend
+        const legend = report.heatMapSummary.legend;
+        for (const item of legend) {
+            doc.setFillColor(...item.color);
+            doc.rect(m + 2, y - 3, 4, 4, 'F');
+            doc.setFontSize(8);
+            doc.setTextColor(...this.colors.textSecondary);
+            doc.text(item.label, m + 9, y);
+            y += 6;
+        }
+
+        // --- Page 3: Teacher Notes & Recommendations ---
+        if (report.teacherNotes || report.recommendations.length > 0) {
+            doc.addPage();
+            y = m;
+
+            if (report.teacherNotes) {
+                y = this._addSection(doc, 'Teacher Notes', [report.teacherNotes], y, m);
+                y += 10;
+            }
+
+            if (report.recommendations.length > 0) {
+                y = this._addSection(doc, 'Recommendations', report.recommendations.map((r, i) => `${i + 1}. ${r}`), y, m);
+            }
+        }
+
+        const pageCount = doc.internal.getNumberOfPages();
+        const dataUrl = doc.output('datauristring');
+
+        return {
+            pages: Array.from({ length: pageCount }, (_, i) => ({ pageNumber: i + 1 })),
+            pageCount,
+            dataUrl,
+            report,
+            download: (filename) => {
+                doc.save(filename || 'practice-report.pdf');
+            }
+        };
+    }
+
+    /**
+     * Add a section with title and content lines to the jsPDF doc
+     * @param {Object} doc - jsPDF document
+     * @param {string} title - Section title
+     * @param {Array<string>} lines - Content lines
+     * @param {number} y - Current Y position
+     * @param {number} m - Margin
+     * @returns {number} New Y position
+     * @private
+     */
+    _addSection(doc, title, lines, y, m) {
+        doc.setFontSize(12);
+        doc.setTextColor(...this.colors.primary);
+        doc.text(title, m, y);
+        y += 6;
+
+        doc.setFontSize(10);
+        doc.setTextColor(...this.colors.textPrimary);
+        for (const line of lines) {
+            // Word-wrap long lines
+            const wrapped = doc.splitTextToSize(line, this.contentWidth - 4);
+            for (const wl of wrapped) {
+                doc.text(wl, m + 2, y);
+                y += 5;
+            }
+        }
+
+        return y;
+    }
+
+    /**
+     * Fallback structured rendering when jsPDF is not available
+     * @param {Object} report - Report data
+     * @returns {Object} Structured page result
+     * @private
+     */
+    _renderStructured(report) {
         const pages = [];
         let currentPage = { elements: [], pageNumber: 1 };
 
-        // --- Page 1: Title & Summary ---
-        currentPage.elements.push({
-            type: 'header',
-            text: report.title,
-            color: this.colors.primary,
-            fontSize: 24,
-            y: this.margin
-        });
+        currentPage.elements.push({ type: 'header', text: report.title, color: this.colors.primary, fontSize: 24, y: this.margin });
+        currentPage.elements.push({ type: 'subtitle', text: `Generated: ${report.generatedAt}`, color: this.colors.textSecondary, fontSize: 10, y: this.margin + 12 });
 
-        currentPage.elements.push({
-            type: 'subtitle',
-            text: `Generated: ${report.generatedAt}`,
-            color: this.colors.textSecondary,
-            fontSize: 10,
-            y: this.margin + 12
-        });
-
-        // Student & Score info
         let y = this.margin + 25;
         currentPage.elements.push({
-            type: 'section',
-            title: 'Student Information',
+            type: 'section', title: 'Student Information',
             content: [
                 `Student: ${report.student}`,
                 `Piece: ${report.score.title || 'Unknown'}`,
@@ -114,76 +320,33 @@ class PDFExportService {
             y
         });
 
-        // Session Summary
         y += 50;
-        currentPage.elements.push({
-            type: 'section',
-            title: 'Session Summary',
-            content: report.sessionSummary,
-            y
-        });
-
-        // Statistics
+        currentPage.elements.push({ type: 'section', title: 'Session Summary', content: report.sessionSummary, y });
         y += 55;
-        currentPage.elements.push({
-            type: 'statistics',
-            title: 'Performance Statistics',
-            data: report.statistics,
-            y
-        });
-
+        currentPage.elements.push({ type: 'statistics', title: 'Performance Statistics', data: report.statistics, y });
         pages.push(currentPage);
 
-        // --- Page 2: Error Log & Heat Map ---
         currentPage = { elements: [], pageNumber: 2 };
         y = this.margin;
-
-        currentPage.elements.push({
-            type: 'section',
-            title: 'Error Log Summary',
-            content: report.errorLog,
-            y
-        });
-
+        currentPage.elements.push({ type: 'section', title: 'Error Log Summary', content: report.errorLog, y });
         y += 80;
-        currentPage.elements.push({
-            type: 'heatmap',
-            title: 'Performance Heat Map',
-            data: report.heatMapSummary,
-            y
-        });
-
+        currentPage.elements.push({ type: 'heatmap', title: 'Performance Heat Map', data: report.heatMapSummary, y });
         pages.push(currentPage);
 
-        // --- Page 3: Teacher Notes & Recommendations ---
         if (report.teacherNotes || report.recommendations.length > 0) {
             currentPage = { elements: [], pageNumber: 3 };
             y = this.margin;
-
             if (report.teacherNotes) {
-                currentPage.elements.push({
-                    type: 'notes',
-                    title: 'Teacher Notes',
-                    content: report.teacherNotes,
-                    y
-                });
+                currentPage.elements.push({ type: 'notes', title: 'Teacher Notes', content: report.teacherNotes, y });
                 y += 60;
             }
-
             if (report.recommendations.length > 0) {
-                currentPage.elements.push({
-                    type: 'section',
-                    title: 'Recommendations',
-                    content: report.recommendations,
-                    y
-                });
+                currentPage.elements.push({ type: 'section', title: 'Recommendations', content: report.recommendations, y });
             }
-
             pages.push(currentPage);
         }
 
-        // Generate a data URL representation
-        const dataUrl = this._generateDataUrl(report, pages);
+        const dataUrl = this._generateFallbackDataUrl(report, pages);
 
         return {
             pages,
@@ -195,15 +358,13 @@ class PDFExportService {
     }
 
     /**
-     * Generate a base64 data URL for the PDF
-     * In real implementation, this uses jsPDF. Here we create a structured representation.
+     * Generate fallback data URL when jsPDF is unavailable
      * @param {Object} report - Report data
      * @param {Array} pages - Page data
      * @returns {string} Data URL
      * @private
      */
-    _generateDataUrl(report, pages) {
-        // Create structured text representation that could be rendered by jsPDF
+    _generateFallbackDataUrl(report, pages) {
         const content = {
             metadata: {
                 title: report.title,
@@ -212,21 +373,17 @@ class PDFExportService {
                 creator: 'PDFExportService',
                 createdAt: report.generatedAt
             },
-            pages: pages.map(p => ({
-                pageNumber: p.pageNumber,
-                elements: p.elements
-            }))
+            pages: pages.map(p => ({ pageNumber: p.pageNumber, elements: p.elements }))
         };
 
-        // Encode as base64 data URL
         const jsonStr = JSON.stringify(content);
         if (typeof btoa !== 'undefined') {
-            return `data:application/pdf;base64,${btoa(jsonStr)}`;
+            return `data:application/json;base64,${btoa(jsonStr)}`;
         }
         if (typeof Buffer !== 'undefined') {
-            return `data:application/pdf;base64,${Buffer.from(jsonStr).toString('base64')}`;
+            return `data:application/json;base64,${Buffer.from(jsonStr).toString('base64')}`;
         }
-        return `data:application/pdf;content,${encodeURIComponent(jsonStr)}`;
+        return `data:application/json;content,${encodeURIComponent(jsonStr)}`;
     }
 
     /**
@@ -304,11 +461,7 @@ class PDFExportService {
                 value: `${stats.average_pitch_deviation_cents || 0} cents`,
                 color: (stats.average_pitch_deviation_cents || 0) > 20 ? 'error' : 'success'
             });
-            entries.push({
-                label: 'Pitch Error Count',
-                value: String(stats.pitch_deviation_count || 0),
-                color: 'textPrimary'
-            });
+            entries.push({ label: 'Pitch Error Count', value: String(stats.pitch_deviation_count || 0), color: 'textPrimary' });
         }
 
         if (metrics.rhythm) {
@@ -317,27 +470,15 @@ class PDFExportService {
                 value: `${stats.average_rhythm_deviation_ms || 0} ms`,
                 color: (stats.average_rhythm_deviation_ms || 0) > 30 ? 'error' : 'success'
             });
-            entries.push({
-                label: 'Rhythm Error Count',
-                value: String(stats.rhythm_deviation_count || 0),
-                color: 'textPrimary'
-            });
+            entries.push({ label: 'Rhythm Error Count', value: String(stats.rhythm_deviation_count || 0), color: 'textPrimary' });
         }
 
         if (metrics.intonation) {
-            entries.push({
-                label: 'Intonation Issues',
-                value: String(stats.intonation_deviation_count || 0),
-                color: 'textPrimary'
-            });
+            entries.push({ label: 'Intonation Issues', value: String(stats.intonation_deviation_count || 0), color: 'textPrimary' });
         }
 
         if (stats.worst_measure) {
-            entries.push({
-                label: 'Most Problematic Measure',
-                value: `Measure ${stats.worst_measure}`,
-                color: 'error'
-            });
+            entries.push({ label: 'Most Problematic Measure', value: `Measure ${stats.worst_measure}`, color: 'error' });
         }
 
         return entries;
@@ -359,7 +500,6 @@ class PDFExportService {
             return lines;
         }
 
-        // Group by measure
         const byMeasure = {};
         for (const dev of deviations) {
             if (!metrics[dev.type]) continue;
@@ -370,7 +510,6 @@ class PDFExportService {
             byMeasure[dev.measure].total++;
         }
 
-        // Sort by error count descending
         const sorted = Object.entries(byMeasure)
             .sort((a, b) => b[1].total - a[1].total)
             .slice(0, 10);
@@ -384,7 +523,6 @@ class PDFExportService {
             lines.push(`  Measure ${measure}: ${parts.join(', ')} (${counts.total} total)`);
         }
 
-        // Sharp/flat tendency
         const pitchDevs = deviations.filter(d => d.type === 'pitch');
         if (pitchDevs.length > 0 && metrics.pitch) {
             const avgCents = pitchDevs.reduce((s, d) => s + (d.deviation_cents || 0), 0) / pitchDevs.length;
@@ -392,7 +530,6 @@ class PDFExportService {
             lines.push(`Overall pitch tendency: ${tendency} (avg ${Math.round(avgCents)} cents)`);
         }
 
-        // Timing tendency
         const rhythmDevs = deviations.filter(d => d.type === 'rhythm');
         if (rhythmDevs.length > 0 && metrics.rhythm) {
             const avgMs = rhythmDevs.reduce((s, d) => s + (d.deviation_ms || 0), 0) / rhythmDevs.length;
@@ -460,23 +597,18 @@ class PDFExportService {
         if ((stats.average_pitch_deviation_cents || 0) > 20) {
             recommendations.push('Focus on intonation exercises - use the tuner module for targeted pitch practice.');
         }
-
         if ((stats.average_rhythm_deviation_ms || 0) > 30) {
             recommendations.push('Practice with the metronome at a slower tempo to build rhythmic accuracy.');
         }
-
         if (stats.worst_measure) {
             recommendations.push(`Isolate measure ${stats.worst_measure} and practice it slowly with the practice loop feature.`);
         }
-
         if (stats.problem_measures && stats.problem_measures.length > 3) {
             recommendations.push('Consider breaking the piece into smaller sections for focused practice.');
         }
-
         if ((stats.intonation_deviation_count || 0) > 5) {
             recommendations.push('Work on position shifts and string crossings with slow, deliberate practice.');
         }
-
         if (recommendations.length === 0) {
             recommendations.push('Great work! Continue practicing to maintain consistency.');
         }
@@ -485,9 +617,9 @@ class PDFExportService {
     }
 
     /**
-     * Generate a shareable link for the report
+     * Generate a shareable link for the report (uses summary only, no PII in URL)
      * @param {Object} reportData - Report data to encode
-     * @returns {string} Shareable URL
+     * @returns {string} Shareable URL with minimal data
      */
     generateShareLink(reportData) {
         const compressed = JSON.stringify({
@@ -497,8 +629,9 @@ class PDFExportService {
             stats: reportData.statistics
         });
 
+        const origin = (typeof location !== 'undefined' && location?.origin) || '';
         if (typeof btoa !== 'undefined') {
-            return `${location?.origin || ''}/report?data=${btoa(compressed)}`;
+            return `${origin}/report?data=${btoa(compressed)}`;
         }
         if (typeof Buffer !== 'undefined') {
             return `/report?data=${Buffer.from(compressed).toString('base64')}`;
@@ -507,10 +640,12 @@ class PDFExportService {
     }
 
     /**
-     * Send report via email (triggers mailto or API)
+     * Open the user's email client with report details.
+     * Note: This opens a mailto link - actual sending depends on the user's mail client.
      * @param {string} email - Recipient email
      * @param {Object} reportResult - PDF generation result
      * @param {string} message - Optional message
+     * @returns {Object} Status indicating the mailto link was opened
      */
     shareViaEmail(email, reportResult, message = '') {
         const subject = encodeURIComponent(
@@ -524,7 +659,7 @@ class PDFExportService {
             window.open(`mailto:${email}?subject=${subject}&body=${body}`);
         }
 
-        return { email, subject: decodeURIComponent(subject), sent: true };
+        return { email, subject: decodeURIComponent(subject), mailtoOpened: true };
     }
 }
 

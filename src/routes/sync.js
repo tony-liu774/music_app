@@ -3,6 +3,9 @@ const { authMiddleware } = require('./auth');
 
 const router = express.Router();
 
+// Allowed data types for sync - whitelist to prevent prototype pollution
+const ALLOWED_SYNC_TYPES = ['sessions', 'library', 'preferences', 'progress'];
+
 // In-memory data store per user (in production, use a database)
 const userDataStore = new Map();
 
@@ -134,10 +137,12 @@ router.post('/queue', authMiddleware, (req, res) => {
             return res.status(400).json({ error: 'type, action, and data are required' });
         }
 
-        const collection = store[type];
-        if (!collection && type !== 'preferences') {
+        // Whitelist check to prevent prototype pollution
+        if (!ALLOWED_SYNC_TYPES.includes(type)) {
             return res.status(400).json({ error: `Invalid data type: ${type}` });
         }
+
+        const collection = store[type];
 
         switch (action) {
             case 'create':
@@ -201,3 +206,4 @@ router.get('/status', authMiddleware, (req, res) => {
 module.exports = router;
 module.exports.userDataStore = userDataStore;
 module.exports.getUserStore = getUserStore;
+module.exports.ALLOWED_SYNC_TYPES = ALLOWED_SYNC_TYPES;

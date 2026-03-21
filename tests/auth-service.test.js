@@ -1,11 +1,12 @@
 /**
  * Tests for AuthService - Client-side authentication
+ * Imports the actual source file with global mocks for localStorage and fetch
  */
 
 const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert');
 
-// Mock localStorage
+// Mock localStorage (set up before requiring AuthService)
 const localStorageMock = (() => {
     let store = {};
     return {
@@ -15,142 +16,22 @@ const localStorageMock = (() => {
         clear: () => { store = {}; }
     };
 })();
+global.localStorage = localStorageMock;
 
-// Mock fetch
-let fetchMock;
+// Mock fetch - configurable per test
+let fetchMockFn;
+global.fetch = async (...args) => fetchMockFn(...args);
+
 function setupFetch(response, ok = true, status = 200) {
-    fetchMock = async () => ({
+    fetchMockFn = async () => ({
         ok,
         status,
         json: async () => response
     });
 }
 
-// Inline AuthService for testing (same pattern as session-logger.test.js)
-class AuthService {
-    constructor(apiBaseUrl = '') {
-        this.apiBaseUrl = apiBaseUrl;
-        this.tokenKey = 'music_app_auth_token';
-        this.refreshTokenKey = 'music_app_refresh_token';
-        this.userKey = 'music_app_user';
-        this.listeners = [];
-    }
-
-    async register(email, password, displayName) {
-        if (!email || !password) throw new Error('Email and password are required');
-        if (password.length < 8) throw new Error('Password must be at least 8 characters');
-
-        const response = await fetchMock(`${this.apiBaseUrl}/api/auth/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password, displayName })
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Registration failed');
-        }
-
-        const data = await response.json();
-        this._storeAuth(data);
-        this._notifyListeners('login', data.user);
-        return data.user;
-    }
-
-    async login(email, password) {
-        if (!email || !password) throw new Error('Email and password are required');
-
-        const response = await fetchMock(`${this.apiBaseUrl}/api/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Login failed');
-        }
-
-        const data = await response.json();
-        this._storeAuth(data);
-        this._notifyListeners('login', data.user);
-        return data.user;
-    }
-
-    logout() {
-        localStorageMock.removeItem(this.tokenKey);
-        localStorageMock.removeItem(this.refreshTokenKey);
-        localStorageMock.removeItem(this.userKey);
-        this._notifyListeners('logout', null);
-    }
-
-    async getToken() {
-        const token = localStorageMock.getItem(this.tokenKey);
-        if (!token) return null;
-        if (this._isTokenExpired(token)) return this._refreshToken();
-        return token;
-    }
-
-    getCurrentUser() {
-        const userJson = localStorageMock.getItem(this.userKey);
-        if (!userJson) return null;
-        try { return JSON.parse(userJson); } catch { return null; }
-    }
-
-    isAuthenticated() {
-        return !!localStorageMock.getItem(this.tokenKey);
-    }
-
-    onAuthStateChange(callback) {
-        this.listeners.push(callback);
-        return () => { this.listeners = this.listeners.filter(l => l !== callback); };
-    }
-
-    async getAuthHeaders() {
-        const token = await this.getToken();
-        if (!token) return {};
-        return { Authorization: `Bearer ${token}` };
-    }
-
-    async _refreshToken() {
-        const refreshToken = localStorageMock.getItem(this.refreshTokenKey);
-        if (!refreshToken) { this.logout(); return null; }
-
-        try {
-            const response = await fetchMock(`${this.apiBaseUrl}/api/auth/refresh`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ refreshToken })
-            });
-
-            if (!response.ok) { this.logout(); return null; }
-
-            const data = await response.json();
-            localStorageMock.setItem(this.tokenKey, data.token);
-            if (data.refreshToken) localStorageMock.setItem(this.refreshTokenKey, data.refreshToken);
-            return data.token;
-        } catch { this.logout(); return null; }
-    }
-
-    _isTokenExpired(token) {
-        try {
-            const parts = token.split('.');
-            if (parts.length !== 3) return true;
-            const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
-            return payload.exp * 1000 < Date.now() + 60000;
-        } catch { return true; }
-    }
-
-    _storeAuth(data) {
-        localStorageMock.setItem(this.tokenKey, data.token);
-        if (data.refreshToken) localStorageMock.setItem(this.refreshTokenKey, data.refreshToken);
-        if (data.user) localStorageMock.setItem(this.userKey, JSON.stringify(data.user));
-    }
-
-    _notifyListeners(event, user) {
-        this.listeners.forEach(cb => cb(event, user));
-    }
-}
+// Now import the actual AuthService from source
+const AuthService = require('../src/js/services/auth-service');
 
 // Helper to create a mock JWT
 function createMockJWT(payload = {}, expInSeconds = 3600) {
@@ -246,7 +127,7 @@ describe('AuthService', () => {
         assert.strictEqual(auth.getCurrentUser(), null);
     });
 
-    it('should get current user from storage', async () => {
+    it('should get current user from storage', () => {
         localStorageMock.setItem('music_app_user', JSON.stringify({
             id: 'user1', email: 'test@test.com', displayName: 'Test'
         }));
@@ -335,6 +216,68 @@ describe('AuthService', () => {
             () => auth.login('', 'password123'),
             { message: 'Email and password are required' }
         );
+    });
+
+    it('should share refresh promise across concurrent getToken calls', async () => {
+        // Set up an expired token and refresh token
+        const expiredToken = createMockJWT({ id: 'user1' }, -100);
+        localStorageMock.setItem('music_app_auth_token', expiredToken);
+        localStorageMock.setItem('music_app_refresh_token', 'refresh-token-123');
+
+        let fetchCallCount = 0;
+        const newToken = createMockJWT({ id: 'user1' }, 3600);
+        fetchMockFn = async () => {
+            fetchCallCount++;
+            return {
+                ok: true,
+                json: async () => ({ token: newToken, refreshToken: 'new-refresh' })
+            };
+        };
+
+        // Make concurrent getToken calls
+        const [result1, result2] = await Promise.all([
+            auth.getToken(),
+            auth.getToken()
+        ]);
+
+        // Both should resolve to the same new token
+        assert.strictEqual(result1, newToken);
+        assert.strictEqual(result2, newToken);
+        // Only one fetch call should have been made (shared promise)
+        assert.strictEqual(fetchCallCount, 1);
+    });
+
+    it('should clear refresh promise on logout', async () => {
+        const expiredToken = createMockJWT({ id: 'user1' }, -100);
+        localStorageMock.setItem('music_app_auth_token', expiredToken);
+        localStorageMock.setItem('music_app_refresh_token', 'refresh-token-123');
+
+        auth.logout();
+        assert.strictEqual(auth._refreshPromise, null);
+    });
+
+    it('should refresh token when expired', async () => {
+        const expiredToken = createMockJWT({ id: 'user1' }, -100);
+        const newToken = createMockJWT({ id: 'user1' }, 3600);
+        localStorageMock.setItem('music_app_auth_token', expiredToken);
+        localStorageMock.setItem('music_app_refresh_token', 'refresh-token-123');
+
+        setupFetch({ token: newToken, refreshToken: 'new-refresh' });
+
+        const token = await auth.getToken();
+        assert.strictEqual(token, newToken);
+    });
+
+    it('should logout when refresh fails', async () => {
+        const expiredToken = createMockJWT({ id: 'user1' }, -100);
+        localStorageMock.setItem('music_app_auth_token', expiredToken);
+        localStorageMock.setItem('music_app_refresh_token', 'refresh-token-123');
+
+        setupFetch({ error: 'Invalid refresh token' }, false, 401);
+
+        const token = await auth.getToken();
+        assert.strictEqual(token, null);
+        assert.strictEqual(auth.isAuthenticated(), false);
     });
 });
 

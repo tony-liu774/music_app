@@ -10,6 +10,7 @@ class AuthService {
         this.refreshTokenKey = 'music_app_refresh_token';
         this.userKey = 'music_app_user';
         this.listeners = [];
+        this._refreshPromise = null;
     }
 
     /**
@@ -79,20 +80,27 @@ class AuthService {
         localStorage.removeItem(this.tokenKey);
         localStorage.removeItem(this.refreshTokenKey);
         localStorage.removeItem(this.userKey);
+        this._refreshPromise = null;
         this._notifyListeners('logout', null);
     }
 
     /**
-     * Get the current auth token, refreshing if expired
+     * Get the current auth token, refreshing if expired.
+     * Concurrent calls share the same refresh promise to prevent race conditions.
      * @returns {Promise<string|null>} Valid auth token or null
      */
     async getToken() {
         const token = localStorage.getItem(this.tokenKey);
         if (!token) return null;
 
-        // Check if token is expired
         if (this._isTokenExpired(token)) {
-            return this._refreshToken();
+            // Cache the refresh promise so concurrent callers share one request
+            if (!this._refreshPromise) {
+                this._refreshPromise = this._refreshToken().finally(() => {
+                    this._refreshPromise = null;
+                });
+            }
+            return this._refreshPromise;
         }
 
         return token;
@@ -180,6 +188,7 @@ class AuthService {
 
     /**
      * Check if a JWT token is expired
+     * Adds a 60-second buffer so we refresh before actual expiry
      * @param {string} token - JWT token
      * @returns {boolean}
      * @private
@@ -187,7 +196,6 @@ class AuthService {
     _isTokenExpired(token) {
         try {
             const payload = JSON.parse(atob(token.split('.')[1]));
-            // Add 60 second buffer
             return payload.exp * 1000 < Date.now() + 60000;
         } catch {
             return true;

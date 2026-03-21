@@ -1,11 +1,12 @@
 /**
  * Tests for CloudSyncService - Cross-device synchronization
+ * Imports the actual source file with global mocks for localStorage and fetch
  */
 
 const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert');
 
-// Mock localStorage
+// Mock localStorage (set up before requiring CloudSyncService)
 const localStorageMock = (() => {
     let store = {};
     return {
@@ -15,11 +16,9 @@ const localStorageMock = (() => {
         clear: () => { store = {}; }
     };
 })();
+global.localStorage = localStorageMock;
 
-// Global localStorage replacement for the service
-const localStorage = localStorageMock;
-
-// Mock fetch
+// Mock fetch - configurable per test
 let fetchResponses = [];
 let fetchCallCount = 0;
 
@@ -28,7 +27,7 @@ function setupFetchSequence(responses) {
     fetchCallCount = 0;
 }
 
-async function mockFetch() {
+global.fetch = async () => {
     const idx = Math.min(fetchCallCount, fetchResponses.length - 1);
     fetchCallCount++;
     const resp = fetchResponses[idx];
@@ -37,7 +36,10 @@ async function mockFetch() {
         status: resp.status || 200,
         json: async () => resp.data
     };
-}
+};
+
+// Now import the actual CloudSyncService from source
+const CloudSyncService = require('../src/js/services/cloud-sync-service');
 
 // Mock AuthService
 class MockAuthService {
@@ -51,201 +53,14 @@ class MockAuthService {
     }
 }
 
-// Inline CloudSyncService for testing
-class CloudSyncService {
-    constructor(authService, apiBaseUrl = '') {
-        this.authService = authService;
-        this.apiBaseUrl = apiBaseUrl;
-        this.syncQueueKey = 'music_app_sync_queue';
-        this.lastSyncKey = 'music_app_last_sync';
-        this.syncInProgress = false;
-        this.listeners = [];
-        this.retryDelay = 5000;
-        this.maxRetries = 3;
-    }
-
-    async syncAll() {
-        if (this.syncInProgress) return { status: 'already_syncing' };
-        if (!this.authService.isAuthenticated()) return { status: 'not_authenticated' };
-
-        this.syncInProgress = true;
-        this._notifyListeners('sync_start', null);
-
-        try {
-            await this.processOfflineQueue();
-
-            const headers = await this.authService.getAuthHeaders();
-            headers['Content-Type'] = 'application/json';
-
-            const lastSync = this.getLastSyncTimestamp();
-            const localData = this._collectLocalData();
-
-            const response = await mockFetch(`${this.apiBaseUrl}/api/sync`, {
-                method: 'POST', headers,
-                body: JSON.stringify({ lastSync, data: localData })
-            });
-
-            if (!response.ok) throw new Error(`Sync failed: ${response.status}`);
-
-            const result = await response.json();
-            const resolved = this._resolveConflicts(localData, result.serverData, result.conflicts);
-            this._applyResolvedData(resolved);
-            this._setLastSyncTimestamp(Date.now());
-
-            this._notifyListeners('sync_complete', {
-                pushed: result.pushed || 0,
-                pulled: result.pulled || 0,
-                conflicts: (result.conflicts || []).length
-            });
-
-            return {
-                status: 'success',
-                pushed: result.pushed || 0,
-                pulled: result.pulled || 0,
-                conflicts: (result.conflicts || []).length
-            };
-        } catch (error) {
-            this._notifyListeners('sync_error', error.message);
-            return { status: 'error', error: error.message };
-        } finally {
-            this.syncInProgress = false;
-        }
-    }
-
-    queueOfflineChange(type, action, data) {
-        const queue = this.getOfflineQueue();
-        queue.push({
-            id: this._generateId(),
-            type, action, data,
-            timestamp: Date.now(),
-            retries: 0
-        });
-        localStorage.setItem(this.syncQueueKey, JSON.stringify(queue));
-    }
-
-    async processOfflineQueue() {
-        const queue = this.getOfflineQueue();
-        if (queue.length === 0) return { processed: 0, failed: 0 };
-
-        let processed = 0;
-        let failed = 0;
-        const remaining = [];
-
-        for (const item of queue) {
-            try {
-                const response = await mockFetch(`${this.apiBaseUrl}/api/sync/queue`, {
-                    method: 'POST',
-                    body: JSON.stringify(item)
-                });
-                if (response.ok) {
-                    processed++;
-                } else if (item.retries < this.maxRetries) {
-                    item.retries++;
-                    remaining.push(item);
-                    failed++;
-                } else {
-                    failed++;
-                }
-            } catch {
-                if (item.retries < this.maxRetries) {
-                    item.retries++;
-                    remaining.push(item);
-                }
-                failed++;
-            }
-        }
-
-        localStorage.setItem(this.syncQueueKey, JSON.stringify(remaining));
-        return { processed, failed, remaining: remaining.length };
-    }
-
-    getOfflineQueue() {
-        try { return JSON.parse(localStorage.getItem(this.syncQueueKey) || '[]'); }
-        catch { return []; }
-    }
-
-    getLastSyncTimestamp() {
-        const ts = localStorage.getItem(this.lastSyncKey);
-        return ts ? parseInt(ts, 10) : null;
-    }
-
-    onSyncEvent(callback) {
-        this.listeners.push(callback);
-        return () => { this.listeners = this.listeners.filter(l => l !== callback); };
-    }
-
-    _resolveConflicts(localData, serverData, conflicts = []) {
-        return {
-            sessions: serverData?.sessions || [],
-            library: serverData?.library || [],
-            preferences: serverData?.preferences || {},
-            progress: serverData?.progress || []
-        };
-    }
-
-    _collectLocalData() {
-        const data = { sessions: [], library: [], preferences: {}, progress: [] };
-        try { data.sessions = JSON.parse(localStorage.getItem('music_app_sessions') || '[]'); } catch {}
-        try {
-            data.preferences = {
-                instrument: localStorage.getItem('music_app_instrument'),
-                theme: localStorage.getItem('music_app_theme'),
-                updatedAt: parseInt(localStorage.getItem('music_app_prefs_updated') || '0', 10)
-            };
-        } catch {}
-        try { data.progress = JSON.parse(localStorage.getItem('music_app_progress') || '[]'); } catch {}
-        return data;
-    }
-
-    _applyResolvedData(resolved) {
-        if (resolved.sessions && resolved.sessions.length > 0) {
-            const existing = JSON.parse(localStorage.getItem('music_app_sessions') || '[]');
-            const merged = this._mergeArrayById(existing, resolved.sessions);
-            localStorage.setItem('music_app_sessions', JSON.stringify(merged));
-        }
-        if (resolved.preferences && Object.keys(resolved.preferences).length > 0) {
-            const prefs = resolved.preferences;
-            if (prefs.instrument) localStorage.setItem('music_app_instrument', prefs.instrument);
-            if (prefs.theme) localStorage.setItem('music_app_theme', prefs.theme);
-        }
-        if (resolved.progress && resolved.progress.length > 0) {
-            const existing = JSON.parse(localStorage.getItem('music_app_progress') || '[]');
-            const merged = this._mergeArrayById(existing, resolved.progress);
-            localStorage.setItem('music_app_progress', JSON.stringify(merged));
-        }
-    }
-
-    _mergeArrayById(existing, incoming) {
-        const map = new Map();
-        for (const item of existing) { if (item.id) map.set(item.id, item); }
-        for (const item of incoming) {
-            if (item.id) {
-                const ex = map.get(item.id);
-                if (!ex || (item.updatedAt || 0) >= (ex.updatedAt || 0)) map.set(item.id, item);
-            }
-        }
-        return Array.from(map.values());
-    }
-
-    _setLastSyncTimestamp(timestamp) {
-        localStorage.setItem(this.lastSyncKey, String(timestamp));
-    }
-
-    _generateId() {
-        return Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
-    }
-
-    _notifyListeners(event, data) {
-        this.listeners.forEach(cb => cb(event, data));
-    }
-}
-
 describe('CloudSyncService', () => {
     let syncService;
     let authService;
 
     beforeEach(() => {
         localStorageMock.clear();
+        fetchResponses = [];
+        fetchCallCount = 0;
         authService = new MockAuthService();
         syncService = new CloudSyncService(authService, 'http://localhost:3000');
     });
@@ -322,8 +137,6 @@ describe('CloudSyncService', () => {
 
     it('should sync successfully with server', async () => {
         setupFetchSequence([
-            // processOfflineQueue returns empty since no queue items
-            // Then syncAll fetch:
             {
                 data: {
                     pushed: 2,
@@ -413,16 +226,27 @@ describe('CloudSyncService', () => {
     });
 
     it('should collect local data from localStorage', () => {
-        localStorage.setItem('music_app_sessions', JSON.stringify([{ id: 's1' }]));
-        localStorage.setItem('music_app_instrument', 'violin');
-        localStorage.setItem('music_app_theme', 'midnight');
-        localStorage.setItem('music_app_progress', JSON.stringify([{ id: 'p1' }]));
+        localStorageMock.setItem('music_app_sessions', JSON.stringify([{ id: 's1' }]));
+        localStorageMock.setItem('music_app_instrument', 'violin');
+        localStorageMock.setItem('music_app_theme', 'midnight');
+        localStorageMock.setItem('music_app_progress', JSON.stringify([{ id: 'p1' }]));
 
         const data = syncService._collectLocalData();
         assert.strictEqual(data.sessions.length, 1);
         assert.strictEqual(data.preferences.instrument, 'violin');
         assert.strictEqual(data.preferences.theme, 'midnight');
         assert.strictEqual(data.progress.length, 1);
+    });
+
+    it('should collect library data from localStorage', () => {
+        localStorageMock.setItem('music_app_library', JSON.stringify([
+            { id: 'lib1', title: 'Bach Suite No. 1' },
+            { id: 'lib2', title: 'Sonata in G' }
+        ]));
+
+        const data = syncService._collectLocalData();
+        assert.strictEqual(data.library.length, 2);
+        assert.strictEqual(data.library[0].title, 'Bach Suite No. 1');
     });
 
     it('should merge arrays by ID preferring newer items', () => {
@@ -452,15 +276,30 @@ describe('CloudSyncService', () => {
 
         syncService._applyResolvedData(resolved);
 
-        const sessions = JSON.parse(localStorage.getItem('music_app_sessions'));
+        const sessions = JSON.parse(localStorageMock.getItem('music_app_sessions'));
         assert.strictEqual(sessions.length, 1);
         assert.strictEqual(sessions[0].score, 'Bach Suite');
 
-        assert.strictEqual(localStorage.getItem('music_app_instrument'), 'cello');
-        assert.strictEqual(localStorage.getItem('music_app_theme'), 'midnight');
+        assert.strictEqual(localStorageMock.getItem('music_app_instrument'), 'cello');
+        assert.strictEqual(localStorageMock.getItem('music_app_theme'), 'midnight');
 
-        const progress = JSON.parse(localStorage.getItem('music_app_progress'));
+        const progress = JSON.parse(localStorageMock.getItem('music_app_progress'));
         assert.strictEqual(progress.length, 1);
+    });
+
+    it('should apply library data to localStorage', () => {
+        const resolved = {
+            sessions: [],
+            library: [{ id: 'lib1', title: 'Sonata' }],
+            preferences: {},
+            progress: []
+        };
+
+        syncService._applyResolvedData(resolved);
+
+        const library = JSON.parse(localStorageMock.getItem('music_app_library'));
+        assert.strictEqual(library.length, 1);
+        assert.strictEqual(library[0].title, 'Sonata');
     });
 
     it('should handle empty offline queue processing', async () => {
@@ -473,6 +312,80 @@ describe('CloudSyncService', () => {
         const id1 = syncService._generateId();
         const id2 = syncService._generateId();
         assert.notStrictEqual(id1, id2);
+    });
+
+    it('should skip processOfflineQueue when not authenticated', async () => {
+        syncService.queueOfflineChange('sessions', 'create', { id: 's1' });
+        authService._authenticated = false;
+
+        const result = await syncService.processOfflineQueue();
+        assert.strictEqual(result.skipped, true);
+        assert.strictEqual(result.processed, 0);
+
+        // Queue should remain untouched
+        const queue = syncService.getOfflineQueue();
+        assert.strictEqual(queue.length, 1);
+    });
+
+    it('should resolve conflicts with local wins when local is newer', () => {
+        const localData = {
+            sessions: [{ id: 's1', name: 'local-session', updatedAt: 200 }],
+            library: [],
+            preferences: {},
+            progress: []
+        };
+        const serverData = {
+            sessions: [{ id: 's1', name: 'server-session', updatedAt: 100 }],
+            library: [],
+            preferences: {},
+            progress: []
+        };
+        const conflicts = [{
+            type: 'sessions',
+            local: { id: 's1', name: 'local-session', updatedAt: 200 },
+            server: { id: 's1', name: 'server-session', updatedAt: 100 }
+        }];
+
+        const resolved = syncService._resolveConflicts(localData, serverData, conflicts);
+        assert.strictEqual(resolved.sessions[0].name, 'local-session');
+    });
+
+    it('should resolve conflicts with server wins when server is newer', () => {
+        const localData = {
+            sessions: [{ id: 's1', name: 'local-session', updatedAt: 100 }]
+        };
+        const serverData = {
+            sessions: [{ id: 's1', name: 'server-session', updatedAt: 200 }],
+            library: [],
+            preferences: {},
+            progress: []
+        };
+        const conflicts = [{
+            type: 'sessions',
+            local: { id: 's1', name: 'local-session', updatedAt: 100 },
+            server: { id: 's1', name: 'server-session', updatedAt: 200 }
+        }];
+
+        const resolved = syncService._resolveConflicts(localData, serverData, conflicts);
+        assert.strictEqual(resolved.sessions[0].name, 'server-session');
+    });
+
+    it('should resolve preferences conflicts with local wins', () => {
+        const localData = { preferences: { theme: 'dark', updatedAt: 200 } };
+        const serverData = {
+            sessions: [],
+            library: [],
+            preferences: { theme: 'light', updatedAt: 100 },
+            progress: []
+        };
+        const conflicts = [{
+            type: 'preferences',
+            local: { theme: 'dark', updatedAt: 200 },
+            server: { theme: 'light', updatedAt: 100 }
+        }];
+
+        const resolved = syncService._resolveConflicts(localData, serverData, conflicts);
+        assert.strictEqual(resolved.preferences.theme, 'dark');
     });
 });
 

@@ -57,6 +57,7 @@ class TeacherReport {
 
     /**
      * Render the teacher report UI
+     * Uses DOM API instead of innerHTML to prevent XSS
      */
     render() {
         if (!this.container || !this.visible) return;
@@ -66,16 +67,18 @@ class TeacherReport {
 
         // Header
         const header = this._createElement('div', 'teacher-report-header');
-        header.innerHTML = `
-            <h2 style="color: var(--primary, #c9a227); margin: 0; font-family: 'Playfair Display', serif;">
-                Practice Report
-            </h2>
-            <button class="teacher-report-close" aria-label="Close report panel">&times;</button>
-        `;
-        this.container.appendChild(header);
+        const h2 = document.createElement('h2');
+        h2.style.cssText = "color: var(--primary, #c9a227); margin: 0; font-family: 'Playfair Display', serif;";
+        h2.textContent = 'Practice Report';
+        header.appendChild(h2);
 
-        const closeBtn = header.querySelector('.teacher-report-close');
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'teacher-report-close';
+        closeBtn.setAttribute('aria-label', 'Close report panel');
+        closeBtn.textContent = '\u00D7';
         closeBtn.addEventListener('click', () => this.hide());
+        header.appendChild(closeBtn);
+        this.container.appendChild(header);
 
         // Form container
         const form = this._createElement('div', 'teacher-report-form');
@@ -85,45 +88,78 @@ class TeacherReport {
 
         // Date range
         const dateSection = this._createElement('div', 'teacher-report-date-range');
-        dateSection.innerHTML = `
-            <label style="color: var(--text-secondary, #a0a0b0); font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">
-                Date Range
-            </label>
-            <div style="display: flex; gap: 10px; margin-top: 5px;">
-                <input type="date" class="report-date-start" value="${this.options.dateRange.start || ''}"
-                    style="flex: 1; background: var(--bg-elevated, #1a1a28); color: var(--text-primary, #f5f5dc); border: 1px solid var(--primary, #c9a227); border-radius: 4px; padding: 8px;">
-                <span style="color: var(--text-secondary, #a0a0b0); align-self: center;">to</span>
-                <input type="date" class="report-date-end" value="${this.options.dateRange.end || ''}"
-                    style="flex: 1; background: var(--bg-elevated, #1a1a28); color: var(--text-primary, #f5f5dc); border: 1px solid var(--primary, #c9a227); border-radius: 4px; padding: 8px;">
-            </div>
-        `;
+        const dateLabel = document.createElement('label');
+        dateLabel.style.cssText = 'color: var(--text-secondary, #a0a0b0); font-size: 12px; text-transform: uppercase; letter-spacing: 1px;';
+        dateLabel.textContent = 'Date Range';
+        dateSection.appendChild(dateLabel);
+
+        const dateRow = document.createElement('div');
+        dateRow.style.cssText = 'display: flex; gap: 10px; margin-top: 5px;';
+
+        const startInput = document.createElement('input');
+        startInput.type = 'date';
+        startInput.className = 'report-date-start';
+        startInput.value = this.options.dateRange.start || '';
+        startInput.style.cssText = 'flex: 1; background: var(--bg-elevated, #1a1a28); color: var(--text-primary, #f5f5dc); border: 1px solid var(--primary, #c9a227); border-radius: 4px; padding: 8px;';
+
+        const toSpan = document.createElement('span');
+        toSpan.style.cssText = 'color: var(--text-secondary, #a0a0b0); align-self: center;';
+        toSpan.textContent = 'to';
+
+        const endInput = document.createElement('input');
+        endInput.type = 'date';
+        endInput.className = 'report-date-end';
+        endInput.value = this.options.dateRange.end || '';
+        endInput.style.cssText = 'flex: 1; background: var(--bg-elevated, #1a1a28); color: var(--text-primary, #f5f5dc); border: 1px solid var(--primary, #c9a227); border-radius: 4px; padding: 8px;';
+
+        dateRow.appendChild(startInput);
+        dateRow.appendChild(toSpan);
+        dateRow.appendChild(endInput);
+        dateSection.appendChild(dateRow);
         form.appendChild(dateSection);
 
         // Metric toggles
         const metricsSection = this._createElement('div', 'teacher-report-metrics');
-        metricsSection.innerHTML = `
-            <label style="color: var(--text-secondary, #a0a0b0); font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">
-                Include Metrics
-            </label>
-            <div style="display: flex; gap: 15px; margin-top: 8px;">
-                ${this._createToggle('Pitch', 'pitch', this.options.metrics.pitch)}
-                ${this._createToggle('Rhythm', 'rhythm', this.options.metrics.rhythm)}
-                ${this._createToggle('Intonation', 'intonation', this.options.metrics.intonation)}
-            </div>
-        `;
+        const metricsLabel = document.createElement('label');
+        metricsLabel.style.cssText = 'color: var(--text-secondary, #a0a0b0); font-size: 12px; text-transform: uppercase; letter-spacing: 1px;';
+        metricsLabel.textContent = 'Include Metrics';
+        metricsSection.appendChild(metricsLabel);
+
+        const metricsRow = document.createElement('div');
+        metricsRow.style.cssText = 'display: flex; gap: 15px; margin-top: 8px;';
+
+        for (const [metric, checked] of [['Pitch', this.options.metrics.pitch], ['Rhythm', this.options.metrics.rhythm], ['Intonation', this.options.metrics.intonation]]) {
+            const toggleLabel = document.createElement('label');
+            toggleLabel.className = 'metric-toggle';
+            toggleLabel.style.cssText = "display: flex; align-items: center; gap: 5px; color: var(--text-primary, #f5f5dc); cursor: pointer;";
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.dataset.metric = metric.toLowerCase();
+            checkbox.checked = checked;
+            checkbox.style.cssText = 'accent-color: var(--primary, #c9a227);';
+
+            toggleLabel.appendChild(checkbox);
+            toggleLabel.appendChild(document.createTextNode(metric));
+            metricsRow.appendChild(toggleLabel);
+        }
+        metricsSection.appendChild(metricsRow);
         form.appendChild(metricsSection);
 
         // Teacher notes textarea
         const notesSection = this._createElement('div', 'teacher-report-notes');
-        notesSection.innerHTML = `
-            <label style="color: var(--text-secondary, #a0a0b0); font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">
-                Teacher Notes
-            </label>
-            <textarea class="report-teacher-notes" rows="4"
-                placeholder="Add notes for the student..."
-                style="width: 100%; margin-top: 5px; background: var(--bg-elevated, #1a1a28); color: var(--text-primary, #f5f5dc); border: 1px solid var(--primary, #c9a227); border-radius: 4px; padding: 8px; font-family: 'Source Sans 3', sans-serif; resize: vertical;"
-            >${this.options.teacherNotes}</textarea>
-        `;
+        const notesLabel = document.createElement('label');
+        notesLabel.style.cssText = 'color: var(--text-secondary, #a0a0b0); font-size: 12px; text-transform: uppercase; letter-spacing: 1px;';
+        notesLabel.textContent = 'Teacher Notes';
+        notesSection.appendChild(notesLabel);
+
+        const textarea = document.createElement('textarea');
+        textarea.className = 'report-teacher-notes';
+        textarea.rows = 4;
+        textarea.placeholder = 'Add notes for the student...';
+        textarea.style.cssText = "width: 100%; margin-top: 5px; background: var(--bg-elevated, #1a1a28); color: var(--text-primary, #f5f5dc); border: 1px solid var(--primary, #c9a227); border-radius: 4px; padding: 8px; font-family: 'Source Sans 3', sans-serif; resize: vertical;";
+        textarea.value = this.options.teacherNotes;
+        notesSection.appendChild(textarea);
         form.appendChild(notesSection);
 
         // Action buttons
@@ -170,7 +206,6 @@ class TeacherReport {
         if (endInput) this.options.dateRange.end = endInput.value || null;
         if (notesInput) this.options.teacherNotes = notesInput.value;
 
-        // Collect metric toggle states
         const toggles = this.container.querySelectorAll('.metric-toggle input');
         toggles.forEach(toggle => {
             this.options.metrics[toggle.dataset.metric] = toggle.checked;
@@ -198,7 +233,6 @@ class TeacherReport {
 
         this._setStatus(`PDF generated (${result.pageCount} pages)`, 'success');
 
-        // Trigger download
         if (result.download) {
             const filename = `practice-report-${options.studentName || 'student'}-${new Date().toISOString().split('T')[0]}.pdf`;
             result.download(filename);
@@ -224,10 +258,12 @@ class TeacherReport {
             heatMapData: this.sessionData?.heatMapData || []
         });
 
-        const email = prompt ? prompt('Enter recipient email:') : '';
+        // Use an inline input instead of prompt() for better compatibility
+        const emailInput = this.container?.querySelector('.share-email-input');
+        const email = emailInput ? emailInput.value : (typeof prompt !== 'undefined' ? prompt('Enter recipient email:') : '');
         if (email) {
             this.pdfExportService.shareViaEmail(email, result, options.teacherNotes);
-            this._setStatus(`Report shared to ${email}`, 'success');
+            this._setStatus(`Email client opened for ${email}`, 'success');
         }
     }
 
@@ -256,7 +292,7 @@ class TeacherReport {
     }
 
     /**
-     * Set status message
+     * Set status message (uses textContent to prevent XSS)
      * @param {string} message
      * @param {string} type - 'success', 'error', 'info'
      * @private
@@ -287,42 +323,30 @@ class TeacherReport {
     }
 
     /**
-     * Create a form field
-     * @param {string} label
+     * Create a form field using DOM API (XSS-safe)
+     * @param {string} labelText
      * @param {string} type
      * @param {string} name
      * @param {string} value
      * @returns {HTMLElement}
      * @private
      */
-    _createField(label, type, name, value = '') {
+    _createField(labelText, type, name, value = '') {
         const field = this._createElement('div', 'teacher-report-field');
-        field.innerHTML = `
-            <label style="color: var(--text-secondary, #a0a0b0); font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">
-                ${label}
-            </label>
-            <input type="${type}" class="report-${this._toKebab(name)}" value="${value || ''}"
-                style="width: 100%; margin-top: 5px; background: var(--bg-elevated, #1a1a28); color: var(--text-primary, #f5f5dc); border: 1px solid var(--primary, #c9a227); border-radius: 4px; padding: 8px;">
-        `;
-        return field;
-    }
 
-    /**
-     * Create a toggle switch HTML
-     * @param {string} label
-     * @param {string} metric
-     * @param {boolean} checked
-     * @returns {string} HTML string
-     * @private
-     */
-    _createToggle(label, metric, checked) {
-        return `
-            <label class="metric-toggle" style="display: flex; align-items: center; gap: 5px; color: var(--text-primary, #f5f5dc); cursor: pointer;">
-                <input type="checkbox" data-metric="${metric}" ${checked ? 'checked' : ''}
-                    style="accent-color: var(--primary, #c9a227);">
-                ${label}
-            </label>
-        `;
+        const label = document.createElement('label');
+        label.style.cssText = 'color: var(--text-secondary, #a0a0b0); font-size: 12px; text-transform: uppercase; letter-spacing: 1px;';
+        label.textContent = labelText;
+        field.appendChild(label);
+
+        const input = document.createElement('input');
+        input.type = type;
+        input.className = `report-${this._toKebab(name)}`;
+        input.value = value || '';
+        input.style.cssText = 'width: 100%; margin-top: 5px; background: var(--bg-elevated, #1a1a28); color: var(--text-primary, #f5f5dc); border: 1px solid var(--primary, #c9a227); border-radius: 4px; padding: 8px;';
+        field.appendChild(input);
+
+        return field;
     }
 
     /**
