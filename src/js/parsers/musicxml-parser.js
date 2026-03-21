@@ -141,9 +141,9 @@ class MusicXMLParser {
         notes.forEach(noteElement => {
             if (noteElement.tagName === 'rest') {
                 const duration = parseInt(noteElement.querySelector('duration')?.textContent) || 0;
-                const rest = new Rest(duration / 480, { measure: measureNumber, beat: currentBeat });
+                const rest = new Rest(duration / this.divisions, { measure: measureNumber, beat: currentBeat });
                 measure.rests.push(rest);
-                currentBeat += duration / 480;
+                currentBeat += duration / this.divisions;
             } else if (noteElement.tagName === 'note') {
                 const note = this.parseNote(noteElement, measureNumber, currentBeat);
                 if (note) {
@@ -165,8 +165,8 @@ class MusicXMLParser {
                     }
 
                     measure.notes.push(note);
-                    const duration = parseInt(noteElement.querySelector('duration')?.textContent) || 480;
-                    currentBeat += duration / 480;
+                    const duration = parseInt(noteElement.querySelector('duration')?.textContent) || this.divisions;
+                    currentBeat += duration / this.divisions;
                 }
             }
         });
@@ -182,11 +182,11 @@ class MusicXMLParser {
         const octave = parseInt(pitchElement.querySelector('octave')?.textContent);
         const alter = parseInt(pitchElement.querySelector('alter')?.textContent) || 0;
 
-        const duration = parseInt(noteElement.querySelector('duration')?.textContent) || 480;
+        const duration = parseInt(noteElement.querySelector('duration')?.textContent) || this.divisions;
 
         const note = new Note(
             { step, octave, alter },
-            duration / 480,
+            duration / this.divisions,
             { measure: measureNumber, beat: beatPosition }
         );
 

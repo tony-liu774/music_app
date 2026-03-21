@@ -1352,7 +1352,7 @@ class ConcertmasterApp {
         this.rhythmAnalyzer.reset();
         this.intonationAnalyzer.reset();
         this.dynamicsComparator.reset();
-        this.sessionLogger.reset();
+        this.sessionLogger.clear();
 
         // Load score dynamics/articulation data for comparison
         if (this.currentScore) {

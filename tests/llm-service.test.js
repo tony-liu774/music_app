@@ -81,14 +81,27 @@ Provide your response as JSON.`;
 
         const recent = deviations.slice(-20);
 
-        return JSON.stringify(recent.map(d => ({
-            measure: d.measure,
-            type: d.type,
-            deviation_cents: d.deviation_cents || 0,
-            deviation_ms: d.deviation_ms || 0,
-            expected_pitch: d.expected_pitch,
-            actual_pitch: d.actual_pitch
-        })), null, 2);
+        return JSON.stringify(recent.map(d => {
+            const entry = { measure: d.measure, type: d.type };
+            if (d.type === 'dynamics') {
+                entry.expected_dynamic = d.expected_dynamic;
+                entry.actual_dynamic = d.actual_dynamic;
+                entry.deviation = d.deviation;
+                entry.expected_direction = d.expected_direction;
+                entry.actual_trend = d.actual_trend;
+            } else if (d.type === 'articulation') {
+                entry.expected_articulation = d.expected_articulation;
+                entry.detected_articulation = d.detected_articulation;
+                entry.score = d.score;
+                entry.feedback = d.feedback;
+            } else {
+                entry.deviation_cents = d.deviation_cents || 0;
+                entry.deviation_ms = d.deviation_ms || 0;
+                entry.expected_pitch = d.expected_pitch;
+                entry.actual_pitch = d.actual_pitch;
+            }
+            return entry;
+        }), null, 2);
     }
 
     analyzeDeviationPatterns(deviations) {
@@ -306,5 +319,36 @@ describe('LLMService Prompt Generation', () => {
         const parsed = JSON.parse(formatted);
 
         assert.strictEqual(parsed.length, 20);
+    });
+
+    it('should preserve dynamics-specific fields in formatted output', () => {
+        const deviations = [
+            { measure: 3, type: 'dynamics', expected_dynamic: 'f', actual_dynamic: 'p', deviation: -3, expected_direction: 'crescendo', actual_trend: 'stable' }
+        ];
+
+        const formatted = llmService.formatDeviationsForPrompt(deviations);
+        const parsed = JSON.parse(formatted);
+
+        assert.strictEqual(parsed[0].type, 'dynamics');
+        assert.strictEqual(parsed[0].expected_dynamic, 'f');
+        assert.strictEqual(parsed[0].actual_dynamic, 'p');
+        assert.strictEqual(parsed[0].deviation, -3);
+        assert.strictEqual(parsed[0].expected_direction, 'crescendo');
+        assert.strictEqual(parsed[0].actual_trend, 'stable');
+    });
+
+    it('should preserve articulation-specific fields in formatted output', () => {
+        const deviations = [
+            { measure: 5, type: 'articulation', expected_articulation: 'staccato', detected_articulation: 'legato', score: 20, feedback: 'Shorten your bow strokes' }
+        ];
+
+        const formatted = llmService.formatDeviationsForPrompt(deviations);
+        const parsed = JSON.parse(formatted);
+
+        assert.strictEqual(parsed[0].type, 'articulation');
+        assert.strictEqual(parsed[0].expected_articulation, 'staccato');
+        assert.strictEqual(parsed[0].detected_articulation, 'legato');
+        assert.strictEqual(parsed[0].score, 20);
+        assert.strictEqual(parsed[0].feedback, 'Shorten your bow strokes');
     });
 });

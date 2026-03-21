@@ -146,14 +146,27 @@ Provide your response as JSON:
         // Take last 20 deviations for context
         const recent = deviations.slice(-20);
 
-        return JSON.stringify(recent.map(d => ({
-            measure: d.measure,
-            type: d.type,
-            deviation_cents: d.deviation_cents || 0,
-            deviation_ms: d.deviation_ms || 0,
-            expected_pitch: d.expected_pitch,
-            actual_pitch: d.actual_pitch
-        })), null, 2);
+        return JSON.stringify(recent.map(d => {
+            const entry = { measure: d.measure, type: d.type };
+            if (d.type === 'dynamics') {
+                entry.expected_dynamic = d.expected_dynamic;
+                entry.actual_dynamic = d.actual_dynamic;
+                entry.deviation = d.deviation;
+                entry.expected_direction = d.expected_direction;
+                entry.actual_trend = d.actual_trend;
+            } else if (d.type === 'articulation') {
+                entry.expected_articulation = d.expected_articulation;
+                entry.detected_articulation = d.detected_articulation;
+                entry.score = d.score;
+                entry.feedback = d.feedback;
+            } else {
+                entry.deviation_cents = d.deviation_cents || 0;
+                entry.deviation_ms = d.deviation_ms || 0;
+                entry.expected_pitch = d.expected_pitch;
+                entry.actual_pitch = d.actual_pitch;
+            }
+            return entry;
+        }), null, 2);
     }
 
     /**
