@@ -116,7 +116,44 @@
                 </div>
 
                 <div class="library-search">
-                    <input type="text" placeholder="Search your library..." id="library-search-input">
+                    <input type="text" placeholder="Search library and IMSLP..." id="library-search-input">
+                    <div class="search-source-toggle">
+                        <label class="toggle-label">
+                            <input type="checkbox" id="search-local-only" checked>
+                            <span class="toggle-switch"></span>
+                            <span class="toggle-text">Local Only</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="filter-chips" id="filter-chips">
+                    <div class="filter-group">
+                        <label>Instrument:</label>
+                        <div class="chips" id="instrument-chips">
+                            <button class="chip active" data-filter="instrument" data-value="all">All</button>
+                            <button class="chip" data-filter="instrument" data-value="violin">Violin</button>
+                            <button class="chip" data-filter="instrument" data-value="viola">Viola</button>
+                            <button class="chip" data-filter="instrument" data-value="cello">Cello</button>
+                            <button class="chip" data-filter="instrument" data-value="bass">Double Bass</button>
+                        </div>
+                    </div>
+                    <div class="filter-group">
+                        <label>Difficulty:</label>
+                        <div class="chips" id="difficulty-chips">
+                            <button class="chip active" data-filter="difficulty" data-value="all">All</button>
+                            <button class="chip" data-filter="difficulty" data-value="1">1★</button>
+                            <button class="chip" data-filter="difficulty" data-value="2">2★</button>
+                            <button class="chip" data-filter="difficulty" data-value="3">3★</button>
+                            <button class="chip" data-filter="difficulty" data-value="4">4★</button>
+                            <button class="chip" data-filter="difficulty" data-value="5">5★</button>
+                        </div>
+                    </div>
+                    <div class="filter-group">
+                        <label>Composer:</label>
+                        <select id="composer-filter" class="filter-select">
+                            <option value="all">All Composers</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="library-grid" id="library-grid">
@@ -678,7 +715,44 @@
                 </div>
 
                 <div class="library-search">
-                    <input type="text" placeholder="Search your library..." id="library-search-input">
+                    <input type="text" placeholder="Search library and IMSLP..." id="library-search-input">
+                    <div class="search-source-toggle">
+                        <label class="toggle-label">
+                            <input type="checkbox" id="search-local-only" checked>
+                            <span class="toggle-switch"></span>
+                            <span class="toggle-text">Local Only</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="filter-chips" id="filter-chips">
+                    <div class="filter-group">
+                        <label>Instrument:</label>
+                        <div class="chips" id="instrument-chips">
+                            <button class="chip active" data-filter="instrument" data-value="all">All</button>
+                            <button class="chip" data-filter="instrument" data-value="violin">Violin</button>
+                            <button class="chip" data-filter="instrument" data-value="viola">Viola</button>
+                            <button class="chip" data-filter="instrument" data-value="cello">Cello</button>
+                            <button class="chip" data-filter="instrument" data-value="bass">Double Bass</button>
+                        </div>
+                    </div>
+                    <div class="filter-group">
+                        <label>Difficulty:</label>
+                        <div class="chips" id="difficulty-chips">
+                            <button class="chip active" data-filter="difficulty" data-value="all">All</button>
+                            <button class="chip" data-filter="difficulty" data-value="1">1★</button>
+                            <button class="chip" data-filter="difficulty" data-value="2">2★</button>
+                            <button class="chip" data-filter="difficulty" data-value="3">3★</button>
+                            <button class="chip" data-filter="difficulty" data-value="4">4★</button>
+                            <button class="chip" data-filter="difficulty" data-value="5">5★</button>
+                        </div>
+                    </div>
+                    <div class="filter-group">
+                        <label>Composer:</label>
+                        <select id="composer-filter" class="filter-select">
+                            <option value="all">All Composers</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="library-grid" id="library-grid">
