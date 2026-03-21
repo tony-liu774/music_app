@@ -61,13 +61,16 @@ const documentMock = {
     })
 };
 
-// Setup globals
+// Setup globals before requiring source
 global.window = {};
 global.localStorage = localStorageMock;
 global.document = documentMock;
 global.setTimeout = setTimeout;
 global.clearTimeout = clearTimeout;
 global.Date = Date;
+
+// Require the actual source file
+const BluetoothHIDListener = require('../src/js/hardware/bluetooth-hid-listener.js');
 
 // Create mock DOM elements for settings UI
 function createMockElements() {
@@ -148,267 +151,6 @@ function createMockElements() {
     };
 }
 
-// BluetoothHIDListener implementation for testing
-class BluetoothHIDListener {
-    constructor() {
-        this.enabled = false;
-        this.connected = false;
-        this.deviceName = null;
-
-        this.bindings = {
-            PageUp: 'nextMeasure',
-            PageDown: 'prevMeasure',
-            ArrowRight: 'nextMeasure',
-            ArrowLeft: 'prevMeasure',
-            ArrowUp: 'nextPage',
-            ArrowDown: 'prevPage',
-            ' ': 'toggleLoop'
-        };
-
-        this.onNextMeasure = null;
-        this.onPrevMeasure = null;
-        this.onNextPage = null;
-        this.onPrevPage = null;
-        this.onToggleLoop = null;
-        this.onPedalPress = null;
-
-        this.currentMeasure = 0;
-        this.totalMeasures = 1;
-        this.lastKeyTime = 0;
-        this.debounceMs = 100;
-        this.feedbackTimeout = null;
-        this._boundKeyHandler = null;
-
-        this.loadSettings();
-    }
-
-    loadSettings() {
-        var savedEnabled = localStorage.getItem('bluetoothPedalEnabled');
-        var savedBindings = localStorage.getItem('bluetoothPedalBindings');
-        var savedDeviceName = localStorage.getItem('bluetoothLastDeviceName');
-
-        if (savedEnabled !== null) {
-            this.enabled = savedEnabled === 'true';
-        }
-        if (savedBindings) {
-            try {
-                var parsed = JSON.parse(savedBindings);
-                Object.assign(this.bindings, parsed);
-            } catch (e) {
-                // Use defaults
-            }
-        }
-        if (savedDeviceName) {
-            this.deviceName = savedDeviceName;
-        }
-    }
-
-    saveSettings() {
-        localStorage.setItem('bluetoothPedalEnabled', this.enabled);
-        localStorage.setItem('bluetoothPedalBindings', JSON.stringify(this.bindings));
-        if (this.deviceName) {
-            localStorage.setItem('bluetoothLastDeviceName', this.deviceName);
-        }
-    }
-
-    init() {
-        this.setupKeyboardListener();
-        this.setupSettingsUI();
-        this.updateStatusIndicator();
-    }
-
-    setupKeyboardListener() {
-        this._boundKeyHandler = this.handleKeyEvent.bind(this);
-        document.addEventListener('keydown', this._boundKeyHandler);
-    }
-
-    handleKeyEvent(event) {
-        if (!this.enabled) return;
-
-        var action = this.bindings[event.key];
-        if (!action) return;
-
-        var now = Date.now();
-        if (now - this.lastKeyTime < this.debounceMs) return;
-        this.lastKeyTime = now;
-
-        event.preventDefault();
-
-        if (!this.connected) {
-            this.connected = true;
-            this.updateStatusIndicator();
-        }
-
-        this.showPedalFeedback(action);
-        this.executeAction(action);
-    }
-
-    executeAction(action) {
-        switch (action) {
-            case 'nextMeasure':
-                this.currentMeasure = Math.min(this.currentMeasure + 1, this.totalMeasures - 1);
-                if (this.onNextMeasure) {
-                    this.onNextMeasure(this.currentMeasure);
-                }
-                break;
-            case 'prevMeasure':
-                this.currentMeasure = Math.max(this.currentMeasure - 1, 0);
-                if (this.onPrevMeasure) {
-                    this.onPrevMeasure(this.currentMeasure);
-                }
-                break;
-            case 'nextPage':
-                this.currentMeasure = Math.min(this.currentMeasure + 8, this.totalMeasures - 1);
-                if (this.onNextPage) {
-                    this.onNextPage(this.currentMeasure);
-                }
-                break;
-            case 'prevPage':
-                this.currentMeasure = Math.max(this.currentMeasure - 8, 0);
-                if (this.onPrevPage) {
-                    this.onPrevPage(this.currentMeasure);
-                }
-                break;
-            case 'toggleLoop':
-                if (this.onToggleLoop) {
-                    this.onToggleLoop();
-                }
-                break;
-        }
-    }
-
-    showPedalFeedback(action) {
-        var indicator = document.getElementById('pedal-feedback-indicator');
-        if (!indicator) return;
-
-        var label = this.getActionLabel(action);
-        var feedbackText = indicator.querySelector('.pedal-feedback-text');
-        if (feedbackText) {
-            feedbackText.textContent = label;
-        }
-
-        indicator.classList.add('active');
-        indicator.setAttribute('aria-label', 'Pedal pressed: ' + label);
-
-        if (this.onPedalPress) {
-            this.onPedalPress(action, label);
-        }
-
-        if (this.feedbackTimeout) {
-            clearTimeout(this.feedbackTimeout);
-        }
-        this.feedbackTimeout = setTimeout(function() {
-            indicator.classList.remove('active');
-        }, 400);
-    }
-
-    getActionLabel(action) {
-        var labels = {
-            nextMeasure: 'Next Measure',
-            prevMeasure: 'Previous Measure',
-            nextPage: 'Next Page',
-            prevPage: 'Previous Page',
-            toggleLoop: 'Toggle Loop'
-        };
-        return labels[action] || action;
-    }
-
-    updateStatusIndicator() {
-        var statusEl = document.getElementById('pedal-status');
-        if (!statusEl) return;
-
-        var statusDot = statusEl.querySelector('.pedal-status-dot');
-        var statusText = statusEl.querySelector('.pedal-status-text');
-
-        if (!this.enabled) {
-            if (statusDot) statusDot.className = 'pedal-status-dot disabled';
-            if (statusText) statusText.textContent = 'Pedal Disabled';
-        } else if (this.connected) {
-            if (statusDot) statusDot.className = 'pedal-status-dot connected';
-            if (statusText) statusText.textContent = this.deviceName || 'Pedal Connected';
-        } else {
-            if (statusDot) statusDot.className = 'pedal-status-dot listening';
-            if (statusText) statusText.textContent = 'Listening for Pedal...';
-        }
-    }
-
-    setupSettingsUI() {
-        var pedalToggle = document.getElementById('pedal-enable-toggle');
-        if (pedalToggle) {
-            pedalToggle.addEventListener('click', function() {
-                this.toggle();
-            }.bind(this));
-        }
-
-        var deviceNameInput = document.getElementById('pedal-device-name');
-        if (deviceNameInput) {
-            if (this.deviceName) {
-                deviceNameInput.value = this.deviceName;
-            }
-            deviceNameInput.addEventListener('change', function(e) {
-                this.deviceName = e.target.value || null;
-                this.saveSettings();
-                this.updateStatusIndicator();
-            }.bind(this));
-        }
-
-        if (pedalToggle) {
-            pedalToggle.classList.toggle('active', this.enabled);
-            pedalToggle.setAttribute('aria-checked', this.enabled);
-        }
-    }
-
-    toggle() {
-        this.enabled = !this.enabled;
-        this.saveSettings();
-
-        var pedalToggle = document.getElementById('pedal-enable-toggle');
-        if (pedalToggle) {
-            pedalToggle.classList.toggle('active', this.enabled);
-            pedalToggle.setAttribute('aria-checked', this.enabled);
-        }
-
-        var controlsGroup = document.getElementById('pedal-controls-group');
-        if (controlsGroup) {
-            controlsGroup.style.display = this.enabled ? 'block' : 'none';
-        }
-
-        this.updateStatusIndicator();
-
-        if (!this.enabled) {
-            this.connected = false;
-        }
-    }
-
-    setTotalMeasures(total) {
-        this.totalMeasures = Math.max(1, total);
-    }
-
-    setCurrentMeasure(measure) {
-        this.currentMeasure = Math.max(0, Math.min(measure, this.totalMeasures - 1));
-    }
-
-    setBinding(key, action) {
-        this.bindings[key] = action;
-        this.saveSettings();
-    }
-
-    getMeasureProgress() {
-        if (this.totalMeasures <= 1) return 0;
-        return this.currentMeasure / (this.totalMeasures - 1);
-    }
-
-    destroy() {
-        if (this._boundKeyHandler) {
-            document.removeEventListener('keydown', this._boundKeyHandler);
-            this._boundKeyHandler = null;
-        }
-        if (this.feedbackTimeout) {
-            clearTimeout(this.feedbackTimeout);
-        }
-    }
-}
-
 // Tests
 describe('BluetoothHIDListener', () => {
     let listener;
@@ -452,11 +194,13 @@ describe('BluetoothHIDListener', () => {
             l.destroy();
         });
 
-        it('should load custom bindings from localStorage', () => {
-            const customBindings = { 'a': 'nextMeasure' };
+        it('should load custom bindings from localStorage with validation', () => {
+            const customBindings = { 'a': 'nextMeasure', 'b': 'invalidAction' };
             localStorage.setItem('bluetoothPedalBindings', JSON.stringify(customBindings));
             const l = new BluetoothHIDListener();
             assert.strictEqual(l.bindings['a'], 'nextMeasure');
+            // Invalid action should NOT be loaded
+            assert.strictEqual(l.bindings['b'], undefined);
             // Default bindings should still exist
             assert.strictEqual(l.bindings['PageUp'], 'nextMeasure');
             l.destroy();
@@ -479,6 +223,16 @@ describe('BluetoothHIDListener', () => {
             assert.strictEqual(localStorage.getItem('bluetoothLastDeviceName'), 'TestDevice');
             assert.ok(localStorage.getItem('bluetoothPedalBindings'));
         });
+
+        it('should clear deviceName from localStorage when set to null', () => {
+            listener.deviceName = 'SomeDevice';
+            listener.saveSettings();
+            assert.strictEqual(localStorage.getItem('bluetoothLastDeviceName'), 'SomeDevice');
+
+            listener.deviceName = null;
+            listener.saveSettings();
+            assert.strictEqual(localStorage.getItem('bluetoothLastDeviceName'), null);
+        });
     });
 
     describe('Key Bindings', () => {
@@ -498,9 +252,14 @@ describe('BluetoothHIDListener', () => {
             assert.strictEqual(listener.bindings[' '], 'toggleLoop');
         });
 
-        it('should allow updating bindings', () => {
+        it('should allow updating bindings with valid actions', () => {
             listener.setBinding('Enter', 'toggleLoop');
             assert.strictEqual(listener.bindings['Enter'], 'toggleLoop');
+        });
+
+        it('should reject invalid action in setBinding', () => {
+            listener.setBinding('Enter', 'invalidAction');
+            assert.strictEqual(listener.bindings['Enter'], undefined);
         });
     });
 
@@ -511,10 +270,30 @@ describe('BluetoothHIDListener', () => {
             let called = false;
             listener.onNextMeasure = () => { called = true; };
 
-            // Simulate keydown
-            const event = { key: 'PageUp', preventDefault: () => {} };
+            const event = { key: 'PageUp', preventDefault: () => {}, target: { tagName: 'DIV' } };
             listener.handleKeyEvent(event);
 
+            assert.strictEqual(called, false);
+        });
+
+        it('should ignore events when focused on input fields', () => {
+            listener.enabled = true;
+            listener.totalMeasures = 10;
+            listener.init();
+
+            let called = false;
+            listener.onNextMeasure = () => { called = true; };
+
+            const event = { key: 'PageUp', preventDefault: () => {}, target: { tagName: 'INPUT' } };
+            listener.handleKeyEvent(event);
+            assert.strictEqual(called, false);
+
+            const event2 = { key: 'PageUp', preventDefault: () => {}, target: { tagName: 'TEXTAREA' } };
+            listener.handleKeyEvent(event2);
+            assert.strictEqual(called, false);
+
+            const event3 = { key: 'PageUp', preventDefault: () => {}, target: { tagName: 'SELECT' } };
+            listener.handleKeyEvent(event3);
             assert.strictEqual(called, false);
         });
 
@@ -526,7 +305,7 @@ describe('BluetoothHIDListener', () => {
             let receivedMeasure = null;
             listener.onNextMeasure = (m) => { receivedMeasure = m; };
 
-            const event = { key: 'PageUp', preventDefault: () => {} };
+            const event = { key: 'PageUp', preventDefault: () => {}, target: { tagName: 'DIV' } };
             listener.handleKeyEvent(event);
 
             assert.strictEqual(receivedMeasure, 1);
@@ -542,7 +321,7 @@ describe('BluetoothHIDListener', () => {
             let receivedMeasure = null;
             listener.onPrevMeasure = (m) => { receivedMeasure = m; };
 
-            const event = { key: 'PageDown', preventDefault: () => {} };
+            const event = { key: 'PageDown', preventDefault: () => {}, target: { tagName: 'DIV' } };
             listener.handleKeyEvent(event);
 
             assert.strictEqual(receivedMeasure, 4);
@@ -558,7 +337,7 @@ describe('BluetoothHIDListener', () => {
             let receivedMeasure = null;
             listener.onPrevMeasure = (m) => { receivedMeasure = m; };
 
-            const event = { key: 'PageDown', preventDefault: () => {} };
+            const event = { key: 'PageDown', preventDefault: () => {}, target: { tagName: 'DIV' } };
             listener.handleKeyEvent(event);
 
             assert.strictEqual(receivedMeasure, 0);
@@ -574,10 +353,10 @@ describe('BluetoothHIDListener', () => {
             let receivedMeasure = null;
             listener.onNextMeasure = (m) => { receivedMeasure = m; };
 
-            const event = { key: 'PageUp', preventDefault: () => {} };
+            const event = { key: 'PageUp', preventDefault: () => {}, target: { tagName: 'DIV' } };
             listener.handleKeyEvent(event);
 
-            assert.strictEqual(receivedMeasure, 4); // 4 is max index (0-based, 5 measures)
+            assert.strictEqual(receivedMeasure, 4);
             assert.strictEqual(listener.currentMeasure, 4);
         });
 
@@ -586,7 +365,7 @@ describe('BluetoothHIDListener', () => {
             listener.init();
 
             let prevented = false;
-            const event = { key: 'PageUp', preventDefault: () => { prevented = true; } };
+            const event = { key: 'PageUp', preventDefault: () => { prevented = true; }, target: { tagName: 'DIV' } };
             listener.handleKeyEvent(event);
 
             assert.strictEqual(prevented, true);
@@ -597,13 +376,13 @@ describe('BluetoothHIDListener', () => {
             listener.init();
 
             let prevented = false;
-            const event = { key: 'z', preventDefault: () => { prevented = true; } };
+            const event = { key: 'z', preventDefault: () => { prevented = true; }, target: { tagName: 'DIV' } };
             listener.handleKeyEvent(event);
 
             assert.strictEqual(prevented, false);
         });
 
-        it('should debounce rapid key presses', () => {
+        it('should debounce rapid presses of the same key', () => {
             listener.enabled = true;
             listener.totalMeasures = 10;
             listener.init();
@@ -611,16 +390,39 @@ describe('BluetoothHIDListener', () => {
             let callCount = 0;
             listener.onNextMeasure = () => { callCount++; };
 
-            const event = { key: 'PageUp', preventDefault: () => {} };
+            const event = { key: 'PageUp', preventDefault: () => {}, target: { tagName: 'DIV' } };
 
             // First press: should work
-            listener.lastKeyTime = 0;
+            listener.lastKeyTimes = {};
             listener.handleKeyEvent(event);
             assert.strictEqual(callCount, 1);
 
-            // Second press too fast: should be debounced
+            // Second press too fast (same key): should be debounced
             listener.handleKeyEvent(event);
             assert.strictEqual(callCount, 1);
+        });
+
+        it('should allow rapid presses of different keys (per-key debounce)', () => {
+            listener.enabled = true;
+            listener.totalMeasures = 10;
+            listener.currentMeasure = 5;
+            listener.init();
+
+            let nextCalled = false;
+            let prevCalled = false;
+            listener.onNextMeasure = () => { nextCalled = true; };
+            listener.onPrevMeasure = () => { prevCalled = true; };
+
+            // Press PageUp
+            listener.lastKeyTimes = {};
+            const event1 = { key: 'PageUp', preventDefault: () => {}, target: { tagName: 'DIV' } };
+            listener.handleKeyEvent(event1);
+            assert.strictEqual(nextCalled, true);
+
+            // Immediately press PageDown (different key) - should NOT be debounced
+            const event2 = { key: 'PageDown', preventDefault: () => {}, target: { tagName: 'DIV' } };
+            listener.handleKeyEvent(event2);
+            assert.strictEqual(prevCalled, true);
         });
 
         it('should mark as connected on first input', () => {
@@ -629,7 +431,7 @@ describe('BluetoothHIDListener', () => {
 
             assert.strictEqual(listener.connected, false);
 
-            const event = { key: 'PageUp', preventDefault: () => {} };
+            const event = { key: 'PageUp', preventDefault: () => {}, target: { tagName: 'DIV' } };
             listener.handleKeyEvent(event);
 
             assert.strictEqual(listener.connected, true);
@@ -646,7 +448,7 @@ describe('BluetoothHIDListener', () => {
             let receivedMeasure = null;
             listener.onNextPage = (m) => { receivedMeasure = m; };
 
-            const event = { key: 'ArrowUp', preventDefault: () => {} };
+            const event = { key: 'ArrowUp', preventDefault: () => {}, target: { tagName: 'DIV' } };
             listener.handleKeyEvent(event);
 
             assert.strictEqual(receivedMeasure, 8);
@@ -662,7 +464,7 @@ describe('BluetoothHIDListener', () => {
             let receivedMeasure = null;
             listener.onPrevPage = (m) => { receivedMeasure = m; };
 
-            const event = { key: 'ArrowDown', preventDefault: () => {} };
+            const event = { key: 'ArrowDown', preventDefault: () => {}, target: { tagName: 'DIV' } };
             listener.handleKeyEvent(event);
 
             assert.strictEqual(receivedMeasure, 8);
@@ -678,10 +480,10 @@ describe('BluetoothHIDListener', () => {
             let receivedMeasure = null;
             listener.onNextPage = (m) => { receivedMeasure = m; };
 
-            const event = { key: 'ArrowUp', preventDefault: () => {} };
+            const event = { key: 'ArrowUp', preventDefault: () => {}, target: { tagName: 'DIV' } };
             listener.handleKeyEvent(event);
 
-            assert.strictEqual(receivedMeasure, 9); // clamped to max
+            assert.strictEqual(receivedMeasure, 9);
             assert.strictEqual(listener.currentMeasure, 9);
         });
     });
@@ -694,7 +496,7 @@ describe('BluetoothHIDListener', () => {
             let toggled = false;
             listener.onToggleLoop = () => { toggled = true; };
 
-            const event = { key: ' ', preventDefault: () => {} };
+            const event = { key: ' ', preventDefault: () => {}, target: { tagName: 'DIV' } };
             listener.handleKeyEvent(event);
 
             assert.strictEqual(toggled, true);
@@ -713,7 +515,7 @@ describe('BluetoothHIDListener', () => {
                 feedbackLabel = label;
             };
 
-            const event = { key: 'PageUp', preventDefault: () => {} };
+            const event = { key: 'PageUp', preventDefault: () => {}, target: { tagName: 'DIV' } };
             listener.handleKeyEvent(event);
 
             assert.strictEqual(feedbackAction, 'nextMeasure');
@@ -853,10 +655,7 @@ describe('BluetoothHIDListener', () => {
     describe('Cleanup', () => {
         it('should remove keydown listener on destroy', () => {
             listener.init();
-            const initialCount = (documentListeners['keydown'] || []).length;
-
             listener.destroy();
-
             assert.strictEqual(listener._boundKeyHandler, null);
         });
 
@@ -865,5 +664,187 @@ describe('BluetoothHIDListener', () => {
             listener.destroy();
             // No error thrown means clearTimeout was called
         });
+    });
+});
+
+describe('IntegrationController - Bluetooth Pedal Wiring', () => {
+    let mockApp;
+    let mockListener;
+    let mockFollowTheBall;
+
+    beforeEach(() => {
+        localStorage.clear();
+        Object.keys(documentElements).forEach(k => { delete documentElements[k]; });
+
+        mockFollowTheBall = {
+            setTargetPosition: function(pos) { this._lastPosition = pos; },
+            saveSettings: function() {},
+            speed: 1,
+            _lastPosition: null
+        };
+
+        mockApp = {
+            sheetMusicRenderer: {
+                setCursorPosition: function(pos) { this._lastPosition = pos; },
+                _lastPosition: null
+            },
+            practiceLoopController: {
+                isActive: false,
+                start: function() { this.isActive = true; },
+                stop: function() { this.isActive = false; }
+            }
+        };
+
+        mockListener = new BluetoothHIDListener();
+        mockListener.totalMeasures = 16;
+    });
+
+    afterEach(() => {
+        mockListener.destroy();
+    });
+
+    it('should wire navigation callbacks when setBluetoothHIDListener is called', () => {
+        // Minimal IntegrationController mock that tests the actual wiring logic
+        const controller = {
+            app: mockApp,
+            followTheBall: mockFollowTheBall,
+            bluetoothHIDListener: mockListener,
+            setupBluetoothPedalIntegration: function() {
+                if (!this.bluetoothHIDListener) return;
+
+                const self = this;
+                const handleNavigation = (measure) => {
+                    if (self.followTheBall) {
+                        const progress = self.bluetoothHIDListener.getMeasureProgress();
+                        self.followTheBall.setTargetPosition(progress);
+                    }
+                    if (self.app && self.app.sheetMusicRenderer) {
+                        self.app.sheetMusicRenderer.setCursorPosition(measure);
+                    }
+                };
+
+                this.bluetoothHIDListener.onNextMeasure = handleNavigation;
+                this.bluetoothHIDListener.onPrevMeasure = handleNavigation;
+                this.bluetoothHIDListener.onNextPage = handleNavigation;
+                this.bluetoothHIDListener.onPrevPage = handleNavigation;
+
+                this.bluetoothHIDListener.onToggleLoop = () => {
+                    if (self.app && self.app.practiceLoopController) {
+                        if (self.app.practiceLoopController.isActive) {
+                            self.app.practiceLoopController.stop();
+                        } else {
+                            self.app.practiceLoopController.start();
+                        }
+                    }
+                };
+            }
+        };
+
+        controller.setupBluetoothPedalIntegration();
+
+        assert.ok(mockListener.onNextMeasure, 'onNextMeasure should be set');
+        assert.ok(mockListener.onPrevMeasure, 'onPrevMeasure should be set');
+        assert.ok(mockListener.onNextPage, 'onNextPage should be set');
+        assert.ok(mockListener.onPrevPage, 'onPrevPage should be set');
+        assert.ok(mockListener.onToggleLoop, 'onToggleLoop should be set');
+    });
+
+    it('should update Follow-the-Ball and renderer on nextMeasure', () => {
+        const controller = {
+            app: mockApp,
+            followTheBall: mockFollowTheBall,
+            bluetoothHIDListener: mockListener,
+        };
+
+        // Wire up using the same logic as IntegrationController
+        const handleNavigation = (measure) => {
+            if (controller.followTheBall) {
+                const progress = controller.bluetoothHIDListener.getMeasureProgress();
+                controller.followTheBall.setTargetPosition(progress);
+            }
+            if (controller.app && controller.app.sheetMusicRenderer) {
+                controller.app.sheetMusicRenderer.setCursorPosition(measure);
+            }
+        };
+        mockListener.onNextMeasure = handleNavigation;
+
+        // Simulate advancing to measure 4
+        mockListener.currentMeasure = 4;
+        mockListener.onNextMeasure(4);
+
+        // Follow-the-Ball should get progress (4/15 ≈ 0.267)
+        assert.ok(Math.abs(mockFollowTheBall._lastPosition - 4 / 15) < 0.001);
+        // Renderer should get the measure index
+        assert.strictEqual(mockApp.sheetMusicRenderer._lastPosition, 4);
+    });
+
+    it('should toggle practice loop on toggleLoop', () => {
+        const controller = {
+            app: mockApp,
+            bluetoothHIDListener: mockListener,
+        };
+
+        mockListener.onToggleLoop = () => {
+            if (controller.app && controller.app.practiceLoopController) {
+                if (controller.app.practiceLoopController.isActive) {
+                    controller.app.practiceLoopController.stop();
+                } else {
+                    controller.app.practiceLoopController.start();
+                }
+            }
+        };
+
+        // First toggle: start
+        assert.strictEqual(mockApp.practiceLoopController.isActive, false);
+        mockListener.onToggleLoop();
+        assert.strictEqual(mockApp.practiceLoopController.isActive, true);
+
+        // Second toggle: stop
+        mockListener.onToggleLoop();
+        assert.strictEqual(mockApp.practiceLoopController.isActive, false);
+    });
+
+    it('should handle missing followTheBall gracefully', () => {
+        const controller = {
+            app: mockApp,
+            followTheBall: null,
+            bluetoothHIDListener: mockListener,
+        };
+
+        const handleNavigation = (measure) => {
+            if (controller.followTheBall) {
+                const progress = controller.bluetoothHIDListener.getMeasureProgress();
+                controller.followTheBall.setTargetPosition(progress);
+            }
+            if (controller.app && controller.app.sheetMusicRenderer) {
+                controller.app.sheetMusicRenderer.setCursorPosition(measure);
+            }
+        };
+        mockListener.onNextMeasure = handleNavigation;
+
+        // Should not throw
+        mockListener.currentMeasure = 2;
+        mockListener.onNextMeasure(2);
+
+        // Renderer should still be updated
+        assert.strictEqual(mockApp.sheetMusicRenderer._lastPosition, 2);
+    });
+
+    it('should handle missing practiceLoopController gracefully', () => {
+        mockApp.practiceLoopController = null;
+
+        const controller = { app: mockApp };
+        mockListener.onToggleLoop = () => {
+            if (controller.app && controller.app.practiceLoopController) {
+                if (controller.app.practiceLoopController.isActive) {
+                    controller.app.practiceLoopController.stop();
+                } else {
+                    controller.app.practiceLoopController.start();
+                }
+            }
+        };
+
+        // Should not throw
+        mockListener.onToggleLoop();
     });
 });

@@ -11,6 +11,9 @@ class BluetoothHIDListener {
         this.connected = false;
         this.deviceName = null;
 
+        // Valid actions for binding validation
+        this.validActions = ['nextMeasure', 'prevMeasure', 'nextPage', 'prevPage', 'toggleLoop'];
+
         // Key bindings (default: AirTurn pedal mappings)
         this.bindings = {
             PageUp: 'nextMeasure',
@@ -33,7 +36,7 @@ class BluetoothHIDListener {
         // State tracking
         this.currentMeasure = 0;
         this.totalMeasures = 1;
-        this.lastKeyTime = 0;
+        this.lastKeyTimes = {}; // Per-key debounce timestamps
         this.debounceMs = 100; // Prevent double-triggers
         this.feedbackTimeout = null;
 
@@ -45,31 +48,46 @@ class BluetoothHIDListener {
     }
 
     loadSettings() {
-        var savedEnabled = localStorage.getItem('bluetoothPedalEnabled');
-        var savedBindings = localStorage.getItem('bluetoothPedalBindings');
-        var savedDeviceName = localStorage.getItem('bluetoothLastDeviceName');
+        try {
+            var savedEnabled = localStorage.getItem('bluetoothPedalEnabled');
+            var savedBindings = localStorage.getItem('bluetoothPedalBindings');
+            var savedDeviceName = localStorage.getItem('bluetoothLastDeviceName');
 
-        if (savedEnabled !== null) {
-            this.enabled = savedEnabled === 'true';
-        }
-        if (savedBindings) {
-            try {
-                var parsed = JSON.parse(savedBindings);
-                Object.assign(this.bindings, parsed);
-            } catch (e) {
-                // Use defaults
+            if (savedEnabled !== null) {
+                this.enabled = savedEnabled === 'true';
             }
-        }
-        if (savedDeviceName) {
-            this.deviceName = savedDeviceName;
+            if (savedBindings) {
+                try {
+                    var parsed = JSON.parse(savedBindings);
+                    // Validate loaded bindings: only accept known actions
+                    for (var key in parsed) {
+                        if (parsed.hasOwnProperty(key) && this.validActions.indexOf(parsed[key]) !== -1) {
+                            this.bindings[key] = parsed[key];
+                        }
+                    }
+                } catch (e) {
+                    // Use defaults on invalid JSON
+                }
+            }
+            if (savedDeviceName) {
+                this.deviceName = savedDeviceName;
+            }
+        } catch (e) {
+            // localStorage unavailable (private browsing, etc.)
         }
     }
 
     saveSettings() {
-        localStorage.setItem('bluetoothPedalEnabled', this.enabled);
-        localStorage.setItem('bluetoothPedalBindings', JSON.stringify(this.bindings));
-        if (this.deviceName) {
-            localStorage.setItem('bluetoothLastDeviceName', this.deviceName);
+        try {
+            localStorage.setItem('bluetoothPedalEnabled', this.enabled);
+            localStorage.setItem('bluetoothPedalBindings', JSON.stringify(this.bindings));
+            if (this.deviceName) {
+                localStorage.setItem('bluetoothLastDeviceName', this.deviceName);
+            } else {
+                localStorage.removeItem('bluetoothLastDeviceName');
+            }
+        } catch (e) {
+            // localStorage unavailable (private browsing, quota exceeded, etc.)
         }
     }
 
@@ -94,13 +112,18 @@ class BluetoothHIDListener {
     handleKeyEvent(event) {
         if (!this.enabled) return;
 
+        // Don't capture keys when user is typing in form fields
+        var tag = event.target && event.target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
         var action = this.bindings[event.key];
         if (!action) return;
 
-        // Debounce to prevent double-triggers from pedal bounce
+        // Per-key debounce to prevent double-triggers from pedal bounce
+        // while allowing rapid presses of different pedals
         var now = Date.now();
-        if (now - this.lastKeyTime < this.debounceMs) return;
-        this.lastKeyTime = now;
+        if (now - (this.lastKeyTimes[event.key] || 0) < this.debounceMs) return;
+        this.lastKeyTimes[event.key] = now;
 
         // Prevent default browser behavior (page scrolling)
         event.preventDefault();
@@ -136,14 +159,12 @@ class BluetoothHIDListener {
                 }
                 break;
             case 'nextPage':
-                // Jump forward 8 measures (one page)
                 this.currentMeasure = Math.min(this.currentMeasure + 8, this.totalMeasures - 1);
                 if (this.onNextPage) {
                     this.onNextPage(this.currentMeasure);
                 }
                 break;
             case 'prevPage':
-                // Jump back 8 measures (one page)
                 this.currentMeasure = Math.max(this.currentMeasure - 8, 0);
                 if (this.onPrevPage) {
                     this.onPrevPage(this.currentMeasure);
@@ -298,9 +319,10 @@ class BluetoothHIDListener {
     }
 
     /**
-     * Update a key binding
+     * Update a key binding (validates action against known set)
      */
     setBinding(key, action) {
+        if (this.validActions.indexOf(action) === -1) return;
         this.bindings[key] = action;
         this.saveSettings();
     }
@@ -327,4 +349,10 @@ class BluetoothHIDListener {
     }
 }
 
-window.BluetoothHIDListener = BluetoothHIDListener;
+if (typeof window !== 'undefined') {
+    window.BluetoothHIDListener = BluetoothHIDListener;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = BluetoothHIDListener;
+}

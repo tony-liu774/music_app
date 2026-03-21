@@ -260,56 +260,30 @@ class IntegrationController {
     setupBluetoothPedalIntegration() {
         if (!this.bluetoothHIDListener) return;
 
-        var self = this;
-
-        // Connect pedal to Follow-the-Ball cursor
-        this.bluetoothHIDListener.onNextMeasure = function(measure) {
-            if (self.followTheBall) {
-                var progress = self.bluetoothHIDListener.getMeasureProgress();
-                self.followTheBall.setTargetPosition(progress);
+        // Shared handler for all navigation actions (next/prev measure/page)
+        const handleNavigation = (measure) => {
+            if (this.followTheBall) {
+                const progress = this.bluetoothHIDListener.getMeasureProgress();
+                this.followTheBall.setTargetPosition(progress);
             }
-            if (self.app && self.app.sheetMusicRenderer) {
-                self.app.sheetMusicRenderer.setCursorPosition(measure);
+            if (this.app && this.app.sheetMusicRenderer) {
+                this.app.sheetMusicRenderer.setCursorPosition(measure);
             }
         };
 
-        this.bluetoothHIDListener.onPrevMeasure = function(measure) {
-            if (self.followTheBall) {
-                var progress = self.bluetoothHIDListener.getMeasureProgress();
-                self.followTheBall.setTargetPosition(progress);
-            }
-            if (self.app && self.app.sheetMusicRenderer) {
-                self.app.sheetMusicRenderer.setCursorPosition(measure);
-            }
-        };
-
-        this.bluetoothHIDListener.onNextPage = function(measure) {
-            if (self.followTheBall) {
-                var progress = self.bluetoothHIDListener.getMeasureProgress();
-                self.followTheBall.setTargetPosition(progress);
-            }
-            if (self.app && self.app.sheetMusicRenderer) {
-                self.app.sheetMusicRenderer.setCursorPosition(measure);
-            }
-        };
-
-        this.bluetoothHIDListener.onPrevPage = function(measure) {
-            if (self.followTheBall) {
-                var progress = self.bluetoothHIDListener.getMeasureProgress();
-                self.followTheBall.setTargetPosition(progress);
-            }
-            if (self.app && self.app.sheetMusicRenderer) {
-                self.app.sheetMusicRenderer.setCursorPosition(measure);
-            }
-        };
+        // Connect pedal navigation to Follow-the-Ball cursor and sheet music renderer
+        this.bluetoothHIDListener.onNextMeasure = handleNavigation;
+        this.bluetoothHIDListener.onPrevMeasure = handleNavigation;
+        this.bluetoothHIDListener.onNextPage = handleNavigation;
+        this.bluetoothHIDListener.onPrevPage = handleNavigation;
 
         // Connect pedal to Smart Loop toggle
-        this.bluetoothHIDListener.onToggleLoop = function() {
-            if (self.app && self.app.practiceLoop) {
-                if (self.app.practiceLoop.isActive) {
-                    self.app.practiceLoop.stop();
+        this.bluetoothHIDListener.onToggleLoop = () => {
+            if (this.app && this.app.practiceLoopController) {
+                if (this.app.practiceLoopController.isActive) {
+                    this.app.practiceLoopController.stop();
                 } else {
-                    self.app.practiceLoop.start();
+                    this.app.practiceLoopController.start();
                 }
             }
         };
