@@ -42,20 +42,40 @@ class HeatMapRenderer {
             if (!noteData.measure) continue;
 
             if (!measures[noteData.measure]) {
-                measures[noteData.measure] = { total: 0, count: 0 };
+                measures[noteData.measure] = { total: 0, count: 0, dynamicsTotal: 0, dynamicsCount: 0, articulationTotal: 0, articulationCount: 0 };
             }
 
             const accuracy = noteData.accuracy || 100;
             measures[noteData.measure].total += accuracy;
             measures[noteData.measure].count++;
+
+            // Include dynamics/articulation scores if available
+            if (noteData.dynamicsScore !== undefined) {
+                measures[noteData.measure].dynamicsTotal += noteData.dynamicsScore;
+                measures[noteData.measure].dynamicsCount++;
+            }
+            if (noteData.articulationScore !== undefined) {
+                measures[noteData.measure].articulationTotal += noteData.articulationScore;
+                measures[noteData.measure].articulationCount++;
+            }
         }
 
-        // Calculate average per measure
+        // Calculate average per measure (blended with dynamics/articulation)
         const result = [];
         for (const [measure, data] of Object.entries(measures)) {
+            let baseScore = data.count > 0 ? data.total / data.count : 100;
+
+            // Blend in dynamics/articulation scores when available
+            if (data.dynamicsCount > 0 || data.articulationCount > 0) {
+                const dynAvg = data.dynamicsCount > 0 ? data.dynamicsTotal / data.dynamicsCount : baseScore;
+                const artAvg = data.articulationCount > 0 ? data.articulationTotal / data.articulationCount : baseScore;
+                // Weighted: 60% base (pitch+rhythm), 25% dynamics, 15% articulation
+                baseScore = baseScore * 0.60 + dynAvg * 0.25 + artAvg * 0.15;
+            }
+
             result.push({
                 measure: parseInt(measure),
-                score: data.count > 0 ? data.total / data.count : 100
+                score: baseScore
             });
         }
 

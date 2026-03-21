@@ -46,6 +46,22 @@ class AISummaryGenerator {
     }
 
     /**
+     * Log a dynamics deviation from performance
+     * @param {Object} params - Deviation parameters
+     */
+    logDynamicsDeviation(params) {
+        this.sessionLogger.logDynamicsDeviation(params);
+    }
+
+    /**
+     * Log an articulation deviation from performance
+     * @param {Object} params - Deviation parameters
+     */
+    logArticulationDeviation(params) {
+        this.sessionLogger.logArticulationDeviation(params);
+    }
+
+    /**
      * Generate the complete post-session summary
      * @returns {Promise<Object>} Complete summary with AI insights
      */

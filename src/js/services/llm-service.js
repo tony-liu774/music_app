@@ -97,8 +97,8 @@ class LLMService {
 
 **Structure (3 short paragraphs):**
 1. **The Praise**: Start with what went well overall (e.g., "Great energy on this run-through!")
-2. **The Diagnosis**: Identify the 1-2 most significant patterns of error. Group them (e.g., "I noticed your intonation drifts sharp during the shifting passages in measures 14-18," or "Your rhythm tends to rush right before the crescendo in measure 42.")
-3. **The Fix**: Provide one physical or technical piece of advice (e.g., "Keep your bow arm relaxed," "Anticipate the shift with your elbow," or "Subdivide the eighth notes in your head")
+2. **The Diagnosis**: Identify the 1-2 most significant patterns of error. Group them (e.g., "I noticed your intonation drifts sharp during the shifting passages in measures 14-18," or "Your dynamics didn't follow the crescendo in measure 42," or "The staccato passages need shorter, more separated bow strokes.")
+3. **The Fix**: Provide one physical or technical piece of advice (e.g., "Keep your bow arm relaxed," "Use more bow weight for forte passages," or "Lift the bow between staccato notes")
 
 **Constraints:**
 - Never exceed 150 words
@@ -113,6 +113,8 @@ Summary Statistics:
 - Total notes played: ${summary.total_notes_played}
 - Problem measures (highest error counts): ${summary.problem_measures.slice(0, 3).map(m => `measure ${m.measure} (${m.error_count} errors)`).join(', ') || 'none'}
 - Average pitch deviation: ${summary.average_pitch_deviation_cents > 0 ? '+' : ''}${summary.average_pitch_deviation_cents} cents (positive = sharp, negative = flat)
+- Dynamics deviations: ${summary.dynamics_deviation_count || 0} (avg level deviation: ${summary.average_dynamics_deviation || 0})
+- Articulation deviations: ${summary.articulation_deviation_count || 0} (avg accuracy: ${summary.average_articulation_score || 100}%)
 
 Error Log (JSON format):
 ${formattedDeviations}
