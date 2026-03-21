@@ -13,14 +13,14 @@
     --primary-glow: rgba(201, 162, 39, 0.3);
 
     /* Secondary Accent - Emerald (correct intonation) */
-    --success: #10b981;
-    --success-light: #34d399;
-    --success-glow: rgba(16, 185, 129, 0.4);
+    --success: #2d5a4a;
+    --success-light: #3d7a6a;
+    --success-glow: rgba(45, 90, 74, 0.4);
 
     /* Error Accent - Crimson (sharp/flat) */
-    --error: #dc2626;
-    --error-light: #ef4444;
-    --error-glow: rgba(220, 38, 38, 0.4);
+    --error: #8b2942;
+    --error-light: #ab3952;
+    --error-glow: rgba(139, 41, 66, 0.4);
 
     /* Warning - Amber/Yellow */
     --warning: #c9a227;

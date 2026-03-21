@@ -28,6 +28,12 @@ class ConcertmasterApp {
         this.sheetMusicRenderer = null;
         this.heatMapRenderer = null;
         this.followTheBall = null;
+        this.zoomController = null;
+
+        // New modules for Task 4
+        this.integrationController = null;
+        this.accessibilityManager = null;
+        this.performanceOptimizer = null;
 
         // DOM Elements
         this.views = {};
@@ -75,6 +81,11 @@ class ConcertmasterApp {
         this.accuracyScorer = new AccuracyScorer();
         this.intonationAnalyzer = new IntonationAnalyzer();
 
+        // Initialize Task 4 modules
+        this.performanceOptimizer = new PerformanceOptimizer();
+        this.integrationController = new IntegrationController(this);
+        this.accessibilityManager = new AccessibilityManager(this);
+
         // Get DOM elements
         this.views = {
             library: document.getElementById('library-view'),
@@ -100,6 +111,10 @@ class ConcertmasterApp {
             this.followTheBall = new FollowTheBall(sheetContainer);
             this.followTheBall.init();
             this.followTheBall.connectToRenderer(this.sheetMusicRenderer);
+
+            // Initialize zoom controller (Task 1 feature)
+            this.zoomController = new ZoomController(sheetContainer);
+            this.zoomController.init();
         }
 
         // Initialize heat map renderer
@@ -107,6 +122,33 @@ class ConcertmasterApp {
         if (heatmapPreview) {
             this.heatMapRenderer = new HeatMapRenderer(heatmapPreview);
             this.heatMapRenderer.init();
+        }
+
+        // Setup integration between components (Task 4)
+        this.setupIntegration();
+    }
+
+    /**
+     * Setup integration between all components
+     */
+    setupIntegration() {
+        // Connect integration controller
+        if (this.integrationController) {
+            this.integrationController.setZoomController(this.zoomController);
+            this.integrationController.setFollowTheBall(this.followTheBall);
+            this.integrationController.setRhythmAnalyzer(this.rhythmAnalyzer);
+            this.integrationController.setIntonationAnalyzer(this.intonationAnalyzer);
+            this.integrationController.init();
+        }
+
+        // Initialize accessibility
+        if (this.accessibilityManager) {
+            this.accessibilityManager.init();
+        }
+
+        // Initialize lazy loading for library
+        if (this.performanceOptimizer) {
+            this.performanceOptimizer.initLazyLoading();
         }
     }
 
@@ -563,13 +605,25 @@ class ConcertmasterApp {
         }
 
         this.isPracticing = true;
-        this.sessionData = {
-            scoreId: this.currentScore.id,
-            startTime: Date.now(),
-            notes: [],
-            pitchAccuracy: [],
-            timingAccuracy: []
-        };
+
+        // Use enhanced session data from integration controller
+        if (this.integrationController) {
+            this.sessionData = this.integrationController.createEnhancedSessionData(this.currentScore.id);
+        } else {
+            this.sessionData = {
+                scoreId: this.currentScore.id,
+                startTime: Date.now(),
+                notes: [],
+                pitchAccuracy: [],
+                rhythmAccuracy: [],
+                intonationAccuracy: [],
+                threeAxis: {
+                    pitch: { score: 0, deviations: [] },
+                    rhythm: { score: 0, deviations: [] },
+                    intonation: { score: 0, deviations: [] }
+                }
+            };
+        }
 
         // Update UI
         const startBtn = document.getElementById('start-practice-btn');
@@ -589,6 +643,11 @@ class ConcertmasterApp {
         this.rhythmAnalyzer.reset();
         this.intonationAnalyzer.reset();
 
+        // Announce to screen readers
+        if (this.accessibilityManager) {
+            this.accessibilityManager.announce('Practice started. Listen for notes and play along.');
+        }
+
         this.showToast('Practice started - play your instrument', 'success');
     }
 
@@ -596,8 +655,14 @@ class ConcertmasterApp {
         this.isPracticing = false;
         this.audioEngine.stopListening();
 
+        // Finalize session with three-axis scores using integration controller
+        let finalSession = this.sessionData;
+        if (this.integrationController) {
+            finalSession = this.integrationController.finalizeSession() || this.sessionData;
+        }
+
         // Calculate final scores
-        const finalScore = this.accuracyScorer.calculateOverall(this.sessionData);
+        const finalScore = this.accuracyScorer.calculateOverall(finalSession);
 
         // Add session-ended state to sheet music container
         const sheetContainer = document.getElementById('sheet-music-container');
@@ -620,6 +685,12 @@ class ConcertmasterApp {
 
         // Show session summary
         this.showSessionSummary(finalScore);
+
+        // Announce to screen readers
+        if (this.accessibilityManager) {
+            const breakdown = this.intonationAnalyzer?.getAxisBreakdown() || finalSession.threeAxis;
+            this.accessibilityManager.announceSessionSummary(breakdown);
+        }
 
         this.showToast('Practice session ended', 'success');
     }
@@ -675,7 +746,10 @@ class ConcertmasterApp {
                         const rhythmScore = this.rhythmAnalyzer.calculateOverallTiming();
                         this.intonationAnalyzer.recordRhythmScore(rhythmScore);
 
-                        // Store in session data
+                        // Record rhythm data
+                        this.rhythmAnalyzer.recordNoteOnset(now);
+
+                        // Store in session data using integration controller
                         if (this.sessionData) {
                             this.sessionData.pitchAccuracy.push(accuracy);
                             this.sessionData.timingAccuracy.push(rhythmScore);
@@ -687,6 +761,15 @@ class ConcertmasterApp {
                                 rhythmScore: rhythmScore,
                                 matched: comparison.matched
                             });
+                        }
+
+                        // Use integration controller to record three-axis data
+                        if (this.integrationController) {
+                            this.integrationController.recordThreeAxisData(
+                                { accuracy, cents: result.centsDeviation },
+                                { score: this.rhythmAnalyzer.calculateOverallTiming(), ms: 0 },
+                                { score: this.intonationAnalyzer.getIntonationScore(), value: result.centsDeviation }
+                            );
                         }
                     }
                 }
@@ -711,6 +794,15 @@ class ConcertmasterApp {
 
             // Update UI with current note
             this.updateFeedbackDisplay(result);
+
+            // Announce note to screen readers (debounced)
+            if (this.accessibilityManager && result.name) {
+                // Only announce significant changes
+                const currentNote = document.getElementById('current-note')?.textContent;
+                if (currentNote !== result.name) {
+                    this.accessibilityManager.announceScoreChange(result, this.sessionData?.pitchAccuracy?.[this.sessionData.pitchAccuracy.length - 1] || 0);
+                }
+            }
         }
     }
 
@@ -738,6 +830,11 @@ class ConcertmasterApp {
         if (accuracyScore) {
             // Animate score transition
             this.animateScoreChange(accuracyScore, combinedScore);
+
+            // Update accessibility ARIA
+            if (this.accessibilityManager) {
+                this.accessibilityManager.updateAccuracyARIA(combinedScore);
+            }
         }
 
         // Update pitch meter (center is 0 cents)
@@ -747,13 +844,18 @@ class ConcertmasterApp {
             pitchMarker.style.left = percent + '%';
             centsDisplay.textContent = (cents > 0 ? '+' : '') + cents + '¢';
 
-            // Color based on accuracy - emerald for good, crimson for poor
+            // Color based on accuracy - use CSS variables
             if (Math.abs(cents) <= 10) {
-                pitchMarker.style.backgroundColor = '#10b981'; // emerald
+                pitchMarker.style.backgroundColor = 'var(--success)';
             } else if (Math.abs(cents) <= 25) {
-                pitchMarker.style.backgroundColor = '#f59e0b'; // amber
+                pitchMarker.style.backgroundColor = 'var(--warning)';
             } else {
-                pitchMarker.style.backgroundColor = '#ef4444'; // crimson
+                pitchMarker.style.backgroundColor = 'var(--error)';
+            }
+
+            // Update accessibility ARIA
+            if (this.accessibilityManager) {
+                this.accessibilityManager.updatePitchMeterARIA(cents);
             }
         }
 
@@ -763,13 +865,13 @@ class ConcertmasterApp {
             const sign = ms > 0 ? '+' : '';
             timingDisplay.textContent = sign + ms + 'ms';
 
-            // Color based on timing accuracy
+            // Color based on timing accuracy - use CSS variables
             if (Math.abs(ms) <= 50) {
-                timingDisplay.style.color = '#10b981'; // emerald
+                timingDisplay.style.color = 'var(--success)';
             } else if (Math.abs(ms) <= 100) {
-                timingDisplay.style.color = '#f59e0b'; // amber
+                timingDisplay.style.color = 'var(--warning)';
             } else {
-                timingDisplay.style.color = '#ef4444'; // crimson
+                timingDisplay.style.color = 'var(--error)';
             }
         }
 
