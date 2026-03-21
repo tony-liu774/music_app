@@ -75,31 +75,6 @@ class PerformanceHistory {
             .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt))
             .slice(0, limit);
     }
-
-    calculateImprovement(scoreId) {
-        const sessions = this.getSessionsForScore(scoreId)
-            .sort((a, b) => new Date(a.completedAt) - new Date(b.completedAt));
-
-        if (sessions.length < 2) return null;
-
-        const firstSession = sessions[0];
-        const lastSession = sessions[sessions.length - 1];
-
-        const firstScore = firstSession.overallScore || 0;
-        const lastScore = lastSession.overallScore || 0;
-
-        return {
-            firstScore: Math.round(firstScore),
-            lastScore: Math.round(lastScore),
-            improvement: Math.round(lastScore - firstScore),
-            sessionCount: sessions.length,
-            trend: lastScore > firstSession ? 'improving' : lastScore < firstScore ? 'declining' : 'stable'
-        };
-    }
-
-    getSessionById(id) {
-        return this.sessions.find(s => s.id === id);
-    }
 }
 
 window.PerformanceHistory = PerformanceHistory;

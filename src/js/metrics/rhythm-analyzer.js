@@ -8,6 +8,7 @@ class RhythmAnalyzer {
         this.beatTimestamps = [];
         this.noteOnsets = [];
         this.expectedIntervals = [];
+        this.timingSensitivity = 1.0;
     }
 
     setTempo(bpm) {
@@ -34,7 +35,8 @@ class RhythmAnalyzer {
 
         for (let i = 1; i < this.beatTimestamps.length; i++) {
             const actualInterval = this.beatTimestamps[i] - this.beatTimestamps[i - 1];
-            const deviation = Math.abs(actualInterval - expectedInterval);
+            // Apply timing sensitivity - higher sensitivity = more lenient scoring
+            const deviation = Math.abs(actualInterval - expectedInterval) / this.timingSensitivity;
             deviations.push(deviation);
         }
 
@@ -65,22 +67,10 @@ class RhythmAnalyzer {
         const beatScore = this.calculateBeatDeviation();
         const noteScores = [];
 
-        // Calculate default interval based on tempo
-        const defaultInterval = 60000 / this.tempo;
-
         if (this.noteOnsets.length > 1) {
             for (let i = 1; i < this.noteOnsets.length; i++) {
                 const actualInterval = this.noteOnsets[i] - this.noteOnsets[i - 1];
-                // Use expected interval if available, otherwise use default based on tempo
-                const expectedInterval = (this.expectedIntervals.length > 0 && this.expectedIntervals[i - 1] !== undefined)
-                    ? this.expectedIntervals[i - 1]
-                    : defaultInterval;
-
-                // Prevent division by zero
-                if (expectedInterval <= 0) {
-                    continue;
-                }
-
+                const expectedInterval = this.expectedIntervals[i - 1] || (60000 / this.tempo);
                 const deviation = Math.abs(actualInterval - expectedInterval);
                 const score = Math.max(0, 100 - (deviation / expectedInterval) * 100);
                 noteScores.push(score);
