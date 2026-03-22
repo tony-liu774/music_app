@@ -453,12 +453,19 @@ class ConcertmasterApp {
             // Restore session on startup (keeps user logged in across restarts)
             await this.sessionPersistence.initialize();
 
-            // Respond to SW token requests for offline queue replay
-            if (navigator.serviceWorker) {
+            // Register the service worker for offline caching and queue replay
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/sw.js').catch(err =>
+                    console.warn('SW registration failed:', err)
+                );
+
+                // Respond to SW token requests for offline queue replay
                 navigator.serviceWorker.addEventListener('message', async (event) => {
                     if (event.data && event.data.type === 'REQUEST_AUTH_TOKEN') {
-                        const token = await this.authService.getToken();
-                        event.ports[0].postMessage({ token });
+                        if (event.ports && event.ports[0]) {
+                            const token = await this.authService.getToken();
+                            event.ports[0].postMessage({ token });
+                        }
                     }
                 });
             }

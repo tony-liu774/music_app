@@ -289,6 +289,25 @@ describe('OfflineSessionManager', () => {
         assert.strictEqual(limited.length, 2);
     });
 
+    it('should filter getAllSessions by userId', async () => {
+        await manager.saveSession({ id: 's1', userId: 'user-a', timestamp: 100 });
+        await manager.saveSession({ id: 's2', userId: 'user-b', timestamp: 200 });
+        await manager.saveSession({ id: 's3', userId: 'user-a', timestamp: 300 });
+
+        const userASessions = await manager.getAllSessions(0, 'user-a');
+        assert.strictEqual(userASessions.length, 2);
+        assert.ok(userASessions.every(s => s.userId === 'user-a'));
+        assert.strictEqual(userASessions[0].id, 's3'); // newest first
+
+        const userBSessions = await manager.getAllSessions(0, 'user-b');
+        assert.strictEqual(userBSessions.length, 1);
+        assert.strictEqual(userBSessions[0].userId, 'user-b');
+
+        // Without userId returns all
+        const allSessions = await manager.getAllSessions();
+        assert.strictEqual(allSessions.length, 3);
+    });
+
     it('should get unsynced sessions', async () => {
         await manager.saveSession({ id: 's1' });
         await manager.saveSession({ id: 's2' });

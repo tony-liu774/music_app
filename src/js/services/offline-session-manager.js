@@ -185,11 +185,14 @@ class OfflineSessionManager {
     }
 
     /**
-     * Get all sessions, ordered by timestamp descending
+     * Get all sessions, ordered by timestamp descending.
+     * When userId is provided, only returns sessions belonging to that user,
+     * preventing cross-user data leakage on shared devices.
      * @param {number} limit - Max sessions to return (0 = all)
+     * @param {string} [userId] - Optional user ID to filter by
      * @returns {Promise<Array>}
      */
-    async getAllSessions(limit = 0) {
+    async getAllSessions(limit = 0, userId) {
         const db = await this.open();
         return new Promise((resolve, reject) => {
             const tx = db.transaction(this.sessionStore, 'readonly');
@@ -198,6 +201,9 @@ class OfflineSessionManager {
 
             request.onsuccess = () => {
                 let results = request.result || [];
+                if (userId) {
+                    results = results.filter(s => s.userId === userId);
+                }
                 results.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
                 if (limit > 0) results = results.slice(0, limit);
                 resolve(results);

@@ -6,9 +6,6 @@ const ASSETS = [
     '/manifest.json',
     '/src/css/themes/midnight-conservatory.css',
     '/src/css/styles.css',
-    '/src/js/services/offline-session-manager.js',
-    '/src/js/services/session-persistence-service.js',
-    '/src/js/services/auth-service.js',
     'https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@600;700&family=Source+Sans+3:wght@400;500;600&display=swap'
 ];
 
@@ -77,7 +74,7 @@ async function queueFailedRequest(request, body) {
  * Returns the token string or null if unavailable.
  */
 async function requestFreshToken() {
-    const clients = await self.clients.matchAll({ type: 'window' });
+    const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     if (clients.length === 0) return null;
 
     return new Promise((resolve) => {
@@ -160,24 +157,29 @@ async function replayQueuedRequests() {
         // Remove successful and expired items, increment retries for failures
         const removeIds = [...successIds, ...expiredIds];
         if (removeIds.length > 0 || retryIds.length > 0) {
-            const writeTx = db.transaction(OFFLINE_QUEUE_STORE, 'readwrite');
-            const writeStore = writeTx.objectStore(OFFLINE_QUEUE_STORE);
+            await new Promise((resolve, reject) => {
+                const writeTx = db.transaction(OFFLINE_QUEUE_STORE, 'readwrite');
+                const writeStore = writeTx.objectStore(OFFLINE_QUEUE_STORE);
 
-            for (const id of removeIds) {
-                writeStore.delete(id);
-            }
+                for (const id of removeIds) {
+                    writeStore.delete(id);
+                }
 
-            // Increment retry count for failed items
-            for (const id of retryIds) {
-                const getReq = writeStore.get(id);
-                getReq.onsuccess = () => {
-                    const entry = getReq.result;
-                    if (entry) {
-                        entry.retries = (entry.retries || 0) + 1;
-                        writeStore.put(entry);
-                    }
-                };
-            }
+                // Increment retry count for failed items
+                for (const id of retryIds) {
+                    const getReq = writeStore.get(id);
+                    getReq.onsuccess = () => {
+                        const entry = getReq.result;
+                        if (entry) {
+                            entry.retries = (entry.retries || 0) + 1;
+                            writeStore.put(entry);
+                        }
+                    };
+                }
+
+                writeTx.oncomplete = () => resolve();
+                writeTx.onerror = () => reject(writeTx.error);
+            });
         }
 
         // Notify clients
