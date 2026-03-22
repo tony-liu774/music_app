@@ -89,7 +89,7 @@ a:hover {
     left: 0;
     right: 0;
     height: var(--nav-height);
-    background: rgba(10, 10, 18, 0.98);
+    background: var(--bg-deep-98);
     backdrop-filter: blur(20px);
     border-bottom: 1px solid var(--border);
     z-index: 100;
@@ -195,7 +195,7 @@ a:hover {
     left: 0;
     right: 0;
     height: var(--mobile-nav-height);
-    background: rgba(10, 10, 18, 0.98);
+    background: var(--bg-deep-98);
     backdrop-filter: blur(20px);
     border-top: 1px solid var(--border);
     z-index: 100;
@@ -1140,7 +1140,7 @@ a:hover {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
+    background: var(--bg-overlay);
     backdrop-filter: blur(4px);
 }
 
@@ -1946,7 +1946,7 @@ a:hover {
     width: 100%;
     height: 100%;
     border-radius: 50%;
-    background: radial-gradient(circle at 30% 30%, #ffd700, #c9a227, #8b6914);
+    background: radial-gradient(circle at 30% 30%, var(--primary-light), var(--primary), var(--primary-dark));
     box-shadow:
         0 4px 8px rgba(0, 0, 0, 0.4),
         inset 0 2px 4px rgba(255, 255, 255, 0.4);
@@ -2093,7 +2093,7 @@ a:hover {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(10, 25, 47, 0.85);
+    background: var(--bg-deep-85);
     pointer-events: none;
     z-index: 50;
     animation: fadeIn 0.5s ease-out;
@@ -2274,7 +2274,7 @@ h1, h2, h3, h4, h5, h6 {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(10, 10, 18, 0.95);
+    background: var(--bg-deep-95);
     z-index: 1000;
     display: none;
     align-items: center;
@@ -3262,7 +3262,7 @@ h1, h2, h3, h4, h5, h6 {
     padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
     flex: 1;
     min-width: 200px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--border-alpha-10);
 }
 
 .studio-search svg {
@@ -3301,7 +3301,7 @@ h1, h2, h3, h4, h5, h6 {
 .studio-sort select {
     background: var(--bg-surface, #141420);
     color: var(--text-primary, #f5f5dc);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--border-alpha-10);
     border-radius: var(--radius-sm, 4px);
     padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
     font-size: 0.85rem;
@@ -3311,7 +3311,7 @@ h1, h2, h3, h4, h5, h6 {
 
 button.btn.btn-icon.studio-sort-dir {
     background: var(--bg-surface, #141420);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--border-alpha-10);
     color: var(--primary, #c9a227);
     font-size: 1.1rem;
     width: 36px;
@@ -3336,7 +3336,7 @@ button.btn.btn-icon.studio-sort-dir {
     grid-template-columns: 2fr 1fr 2fr 1fr 1fr 100px;
     padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
     background: var(--bg-elevated, #1a1a28);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid var(--border-alpha-10);
     font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -3348,7 +3348,7 @@ button.btn.btn-icon.studio-sort-dir {
     display: grid;
     grid-template-columns: 2fr 1fr 2fr 1fr 1fr 100px;
     padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid var(--border-alpha-05);
     align-items: center;
     transition: background var(--transition-fast, 150ms);
     cursor: pointer;
@@ -3406,8 +3406,8 @@ button.btn.btn-icon.studio-sort-dir {
 }
 
 .score-good {
-    color: #6aaa6a;
-    background: rgba(106, 170, 106, 0.15);
+    color: var(--success-light);
+    background: rgba(52, 211, 153, 0.15);
 }
 
 .score-fair {
@@ -3416,8 +3416,8 @@ button.btn.btn-icon.studio-sort-dir {
 }
 
 .score-needs-work {
-    color: #d07030;
-    background: rgba(208, 112, 48, 0.15);
+    color: var(--warning);
+    background: rgba(201, 162, 39, 0.15);
 }
 
 .score-struggling {
@@ -3505,7 +3505,7 @@ button.btn-icon.student-remove-btn:hover {
     width: 100%;
     padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
     background: var(--bg-surface, #141420);
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    border: 1px solid var(--border-alpha-15);
     border-radius: var(--radius-sm, 4px);
     color: var(--text-primary, #f5f5dc);
     font-size: 0.9rem;
@@ -3619,7 +3619,7 @@ button.btn-icon.student-remove-btn:hover {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.5);
+    background: var(--bg-overlay-light);
 }
 
 .record-button {
@@ -3659,16 +3659,16 @@ button.btn-icon.student-remove-btn:hover {
     align-items: center;
     gap: var(--space-2);
     padding: var(--space-2) var(--space-3);
-    background: rgba(0, 0, 0, 0.7);
+    background: var(--bg-overlay);
     border-radius: 20px;
-    color: white;
+    color: var(--text-primary);
     font-size: 0.875rem;
 }
 
 .recording-dot {
     width: 10px;
     height: 10px;
-    background: #ef4444;
+    background: var(--error-light);
     border-radius: 50%;
     animation: pulse 1s infinite;
 }
@@ -3820,13 +3820,13 @@ button.btn-icon.student-remove-btn:hover {
 }
 
 .inbox-item-status.pending {
-    background: rgba(251, 191, 36, 0.2);
-    color: #fbbf24;
+    background: var(--status-pending-bg);
+    color: var(--status-pending);
 }
 
 .inbox-item-status.replied {
-    background: rgba(34, 197, 94, 0.2);
-    color: #22c55e;
+    background: var(--status-replied-bg);
+    color: var(--status-replied);
 }
 
 .inbox-item-expires {
@@ -4104,13 +4104,13 @@ button.btn-icon.student-remove-btn:hover {
 }
 
 .sent-snippet-status.pending {
-    background: rgba(251, 191, 36, 0.2);
-    color: #fbbf24;
+    background: var(--status-pending-bg);
+    color: var(--status-pending);
 }
 
 .sent-snippet-status.replied {
-    background: rgba(34, 197, 94, 0.2);
-    color: #22c55e;
+    background: var(--status-replied-bg);
+    color: var(--status-replied);
 }
 
 .sent-snippet-reply {
@@ -4410,7 +4410,7 @@ button.btn-icon.student-remove-btn:hover {
 .pieces-practiced {
     margin-top: var(--space-3, 0.75rem);
     padding-top: var(--space-3, 0.75rem);
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: 1px solid var(--border-alpha-10);
 }
 
 .pieces-label {
@@ -4512,12 +4512,12 @@ button.btn-icon.student-remove-btn:hover {
 .measure-number {
     font-size: 0.625rem;
     font-weight: 600;
-    color: rgba(255, 255, 255, 0.8);
+    color: var(--text-primary);
 }
 
 .measure-accuracy {
     font-size: 0.5rem;
-    color: rgba(255, 255, 255, 0.9);
+    color: var(--text-primary);
 }
 
 /* Neglected Sections */
@@ -4698,7 +4698,7 @@ button.btn-icon.student-remove-btn:hover {
 .comparison-table td {
     padding: var(--space-3, 0.75rem);
     text-align: left;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid var(--border-alpha-05);
 }
 
 .comparison-table th {
@@ -4856,7 +4856,7 @@ button.btn-icon.student-remove-btn:hover {
     left: 50%;
     transform: translateX(-50%);
     background: linear-gradient(135deg, var(--color-amber, #c9a227), #e6b800);
-    color: #0a0a12;
+    color: var(--bg-deep);
     padding: var(--space-1, 0.25rem) var(--space-3, 0.75rem);
     border-radius: var(--radius-full, 9999px);
     font-size: 0.75rem;
@@ -5021,7 +5021,7 @@ button.btn-icon.student-remove-btn:hover {
 
 .status-badge.studio {
     background: linear-gradient(135deg, var(--color-amber, #c9a227), #a68520);
-    color: #0a0a12;
+    color: var(--bg-deep);
     border: 1px solid var(--color-amber, #c9a227);
 }
 
