@@ -57,7 +57,7 @@ describe('Tailwind CSS v4 Migration — Midnight Conservatory', () => {
             assert.ok(css.includes('--color-amber: #c9a227'), 'Should define amber');
             assert.ok(css.includes('--color-emerald: #10b981'), 'Should define emerald');
             assert.ok(css.includes('--color-crimson: #dc2626'), 'Should define crimson');
-            assert.ok(css.includes('--color-ivory: #f5f5dc'), 'Should define ivory');
+            assert.ok(css.includes('--color-ivory: #f3f4f6'), 'Should define ivory');
             assert.ok(css.includes('--color-surface: #141420'), 'Should define surface');
             assert.ok(css.includes('--color-elevated: #1a1a28'), 'Should define elevated');
         });
@@ -85,7 +85,7 @@ describe('Tailwind CSS v4 Migration — Midnight Conservatory', () => {
             assert.ok(css.includes('--primary: #c9a227'), 'Should define --primary');
             assert.ok(css.includes('--success: #10b981'), 'Should define --success');
             assert.ok(css.includes('--error: #dc2626'), 'Should define --error');
-            assert.ok(css.includes('--text-primary: #f5f5dc'), 'Should define --text-primary');
+            assert.ok(css.includes('--text-primary: #f3f4f6'), 'Should define --text-primary');
             assert.ok(css.includes('--text-secondary: #a0a0b0'), 'Should define --text-secondary');
             assert.ok(css.includes('--text-muted: #6a6a7a'), 'Should define --text-muted');
             assert.ok(css.includes('--border: #2a2a3a'), 'Should define --border');
@@ -252,7 +252,7 @@ describe('Tailwind CSS v4 Migration — Midnight Conservatory', () => {
             assert.ok(css.includes('#c9a227'), 'Should contain Polished Amber #c9a227');
             assert.ok(css.includes('#10b981'), 'Should contain Emerald #10b981');
             assert.ok(css.includes('#dc2626'), 'Should contain Crimson #dc2626');
-            assert.ok(css.includes('#f5f5dc'), 'Should contain Soft Ivory #f5f5dc');
+            assert.ok(css.includes('#f3f4f6'), 'Should contain Soft Ivory #f3f4f6');
         });
 
         it('should contain backward-compatible CSS variables', () => {
@@ -473,9 +473,9 @@ describe('Tailwind CSS v4 Migration — Midnight Conservatory', () => {
     });
 
     describe('Midnight Conservatory visual requirements', () => {
-        it('should define Soft Ivory text color (#f5f5dc), not pure white', () => {
+        it('should define Soft Ivory text color (#f3f4f6), not pure white', () => {
             const css = readAppCSS();
-            assert.ok(css.includes('--text-primary: #f5f5dc'), 'Text primary should be Soft Ivory #f5f5dc');
+            assert.ok(css.includes('--text-primary: #f3f4f6'), 'Text primary should be Soft Ivory #f3f4f6');
             assert.ok(!css.includes('--text-primary: #ffffff'), 'Text primary should NOT be pure white');
         });
 
