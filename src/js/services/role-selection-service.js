@@ -1,0 +1,166 @@
+/**
+ * Role Selection Service - Manages user role (student/teacher) persistence and invite links.
+ * Stores role in localStorage and syncs to backend when available.
+ */
+
+class RoleSelectionService {
+    constructor(authService, apiBaseUrl = '') {
+        this.authService = authService || null;
+        this.apiBaseUrl = apiBaseUrl;
+        this.roleKey = 'music_app_user_role';
+        this.inviteLinkKey = 'music_app_studio_invite';
+        this.roleSelectedKey = 'music_app_role_selected';
+    }
+
+    /**
+     * Check if the user has already selected a role.
+     * @returns {boolean}
+     */
+    hasSelectedRole() {
+        try {
+            return localStorage.getItem(this.roleSelectedKey) === 'true';
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Get the current user role.
+     * @returns {string|null} 'student' or 'teacher' or null
+     */
+    getRole() {
+        try {
+            return localStorage.getItem(this.roleKey);
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * Set the user role and persist it.
+     * @param {string} role - 'student' or 'teacher'
+     * @returns {Promise<void>}
+     */
+    async setRole(role) {
+        if (role !== 'student' && role !== 'teacher') {
+            throw new Error('Role must be "student" or "teacher"');
+        }
+
+        try {
+            localStorage.setItem(this.roleKey, role);
+            localStorage.setItem(this.roleSelectedKey, 'true');
+        } catch {
+            // localStorage quota exceeded - non-critical
+        }
+
+        // Sync to backend if authenticated
+        if (this.authService && this.authService.isAuthenticated()) {
+            await this._syncRoleToBackend(role);
+        }
+
+        // Generate invite link for teachers
+        if (role === 'teacher') {
+            this._generateInviteLink();
+        }
+    }
+
+    /**
+     * Check if the current user is a student.
+     * @returns {boolean}
+     */
+    isStudent() {
+        return this.getRole() === 'student';
+    }
+
+    /**
+     * Check if the current user is a teacher.
+     * @returns {boolean}
+     */
+    isTeacher() {
+        return this.getRole() === 'teacher';
+    }
+
+    /**
+     * Generate a unique studio invite link for teachers.
+     * @returns {string} The invite link
+     */
+    _generateInviteLink() {
+        const code = this._generateInviteCode();
+        const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://app.concertmaster.com';
+        const link = `${baseUrl}/invite/${code}`;
+
+        try {
+            localStorage.setItem(this.inviteLinkKey, link);
+        } catch {
+            // non-critical
+        }
+
+        return link;
+    }
+
+    /**
+     * Generate a random invite code.
+     * @returns {string}
+     */
+    _generateInviteCode() {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        let code = '';
+        for (let i = 0; i < 8; i++) {
+            code += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return code;
+    }
+
+    /**
+     * Get the studio invite link (for teachers).
+     * @returns {string|null}
+     */
+    getInviteLink() {
+        try {
+            return localStorage.getItem(this.inviteLinkKey);
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * Sync the role to the backend API.
+     * @param {string} role
+     * @returns {Promise<void>}
+     * @private
+     */
+    async _syncRoleToBackend(role) {
+        try {
+            const headers = await this.authService.getAuthHeaders();
+            if (!headers.Authorization) return;
+
+            await fetch(`${this.apiBaseUrl}/api/auth/role`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...headers },
+                body: JSON.stringify({ role })
+            });
+        } catch {
+            // Network error - role is persisted locally, sync will happen later
+        }
+    }
+
+    /**
+     * Clear role data (for logout or reset).
+     */
+    clearRole() {
+        try {
+            localStorage.removeItem(this.roleKey);
+            localStorage.removeItem(this.roleSelectedKey);
+            localStorage.removeItem(this.inviteLinkKey);
+        } catch {
+            // non-critical
+        }
+    }
+}
+
+if (typeof window !== 'undefined') {
+    window.RoleSelectionService = RoleSelectionService;
+}
+if (typeof module !== 'undefined') {
+    module.exports = RoleSelectionService;
+}

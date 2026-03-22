@@ -238,6 +238,91 @@ router.post('/logout', (req, res) => {
     res.json({ message: 'Logged out' });
 });
 
+/**
+ * POST /api/auth/role
+ * Set the user's role (student or teacher).
+ * Requires authentication.
+ */
+router.post('/role', authRateLimiter, (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    let decoded;
+    try {
+        decoded = jwt.verify(token, JWT_SECRET);
+        if (decoded.type === 'refresh') {
+            return res.status(401).json({ error: 'Invalid token type' });
+        }
+    } catch {
+        return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+
+    const { role } = req.body;
+    if (!role || (role !== 'student' && role !== 'teacher')) {
+        return res.status(400).json({ error: 'Role must be "student" or "teacher"' });
+    }
+
+    // Find the user and update their role
+    let foundUser = null;
+    for (const user of users.values()) {
+        if (user.id === decoded.id) {
+            foundUser = user;
+            break;
+        }
+    }
+
+    if (!foundUser) {
+        return res.status(404).json({ error: 'User not found' });
+    }
+
+    foundUser.role = role;
+
+    res.json({
+        message: 'Role updated successfully',
+        role: foundUser.role
+    });
+});
+
+/**
+ * GET /api/auth/role
+ * Get the current user's role.
+ * Requires authentication.
+ */
+router.get('/role', authRateLimiter, (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    let decoded;
+    try {
+        decoded = jwt.verify(token, JWT_SECRET);
+        if (decoded.type === 'refresh') {
+            return res.status(401).json({ error: 'Invalid token type' });
+        }
+    } catch {
+        return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+
+    let foundUser = null;
+    for (const user of users.values()) {
+        if (user.id === decoded.id) {
+            foundUser = user;
+            break;
+        }
+    }
+
+    if (!foundUser) {
+        return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ role: foundUser.role || null });
+});
+
 module.exports = router;
 module.exports.authMiddleware = authMiddleware;
 module.exports.users = users;
