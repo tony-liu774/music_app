@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="src/css/scale-engine.css">
     <link rel="stylesheet" href="src/css/annotation-toolbar.css">
     <link rel="stylesheet" href="src/css/sso-login.css">
+    <link rel="stylesheet" href="src/css/role-selection.css">
 
     <!-- Firebase Realtime Database (compat SDK - no bundler needed) -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -27,6 +28,9 @@
 <body>
     <!-- SSO Login Screen (shown on launch for unauthenticated users) -->
     <div id="sso-login-screen" class="sso-login-screen" aria-hidden="true" role="dialog" aria-label="Sign in"></div>
+
+    <!-- Role Selection Screen (shown once after first sign-in) -->
+    <div id="role-selection-screen" class="role-selection-screen" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Choose your role"></div>
 
     <div id="app">
         <!-- Navigation -->
@@ -1136,6 +1140,9 @@
     <script src="src/js/services/auth-service.js"></script>
     <script src="src/js/services/oauth-service.js"></script>
     <script src="src/js/components/sso-login-ui.js"></script>
+    <!-- Role Selection -->
+    <script src="src/js/services/role-selection-service.js"></script>
+    <script src="src/js/components/role-selection-ui.js"></script>
     <script src="src/js/app.js"></script>
 
     <!-- Onboarding Modal -->

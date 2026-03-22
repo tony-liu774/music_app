@@ -75,6 +75,10 @@ class ConcertmasterApp {
         // License service
         this.licenseService = null;
         this.licenseUI = null;
+
+        // Role Selection
+        this.roleSelectionService = null;
+        this.roleSelectionUI = null;
     }
 
     async init() {
@@ -425,15 +429,26 @@ class ConcertmasterApp {
         this.authService = new AuthService();
         this.oauthService = new OAuthService(this.authService);
 
+        // Initialize role selection service
+        if (typeof RoleSelectionService !== 'undefined') {
+            this.roleSelectionService = new RoleSelectionService(this.authService);
+        }
+
         // Fetch OAuth client IDs from the server endpoint
         await this.oauthService.fetchConfig();
 
-        // Listen for logout events to clear OAuth provider
+        // Listen for logout events to clear OAuth provider and role
         this.authService.onAuthStateChange((event) => {
             if (event === 'logout') {
                 this.oauthService.clearProvider();
+                if (this.roleSelectionService) {
+                    this.roleSelectionService.clearRole();
+                }
             }
         });
+
+        // Initialize role selection UI
+        this._initRoleSelectionUI();
 
         // Show SSO login screen if user is not authenticated
         if (typeof SSOLoginUI !== 'undefined') {
@@ -443,6 +458,12 @@ class ConcertmasterApp {
                     if (user) {
                         this.showToast(`Signed in as ${user.displayName || user.email}`, 'success');
                     }
+                    // Show role selection for new users (first sign-in)
+                    if (user && this.roleSelectionService && !this.roleSelectionService.hasSelectedRole()) {
+                        this._showRoleSelection();
+                    } else if (this.roleSelectionService) {
+                        this._applyUserRole(this.roleSelectionService.getRole());
+                    }
                 },
                 onError: (error, provider) => {
                     console.warn(`SSO error (${provider}):`, error.message);
@@ -451,6 +472,86 @@ class ConcertmasterApp {
 
             if (!this.authService.isAuthenticated()) {
                 this.ssoLoginUI.show();
+            } else if (this.roleSelectionService && !this.roleSelectionService.hasSelectedRole()) {
+                // User is authenticated but hasn't picked a role yet
+                this._showRoleSelection();
+            } else if (this.roleSelectionService) {
+                // Apply saved role on app load
+                this._applyUserRole(this.roleSelectionService.getRole());
+            }
+        }
+    }
+
+    /**
+     * Initialize the role selection UI component.
+     * @private
+     */
+    _initRoleSelectionUI() {
+        if (typeof RoleSelectionUI === 'undefined' || !this.roleSelectionService) {
+            return;
+        }
+
+        this.roleSelectionUI = new RoleSelectionUI(this.roleSelectionService);
+        this.roleSelectionUI.init({
+            onRoleSelected: (role, inviteLink) => {
+                if (role === 'skip') {
+                    // Default to student view so the user is not left in limbo.
+                    // Mark role as selected so the screen does not re-appear on reload.
+                    this.roleSelectionService.setRole('student');
+                    this._applyUserRole('student');
+                    return;
+                }
+                this._applyUserRole(role);
+                if (role === 'teacher' && inviteLink) {
+                    this.showToast('Studio invite link generated!', 'success');
+                }
+            }
+        });
+    }
+
+    /**
+     * Show the role selection screen.
+     * @private
+     */
+    _showRoleSelection() {
+        if (this.roleSelectionUI) {
+            this.roleSelectionUI.show();
+        }
+    }
+
+    /**
+     * Apply user role: route to correct dashboard and trigger appropriate flows.
+     * Student → Home Dashboard → Trigger Instrument Calibration
+     * Teacher → Studio Dashboard → Generate Studio Invite Link
+     * @param {string} role - 'student' or 'teacher'
+     * @private
+     */
+    _applyUserRole(role) {
+        if (!role) {
+            // Corrupted state: selected flag is set but role is missing.
+            // Re-show role selection or default to student view.
+            if (this.roleSelectionService) {
+                this.roleSelectionService.clearRole();
+            }
+            this._showRoleSelection();
+            return;
+        }
+
+        if (role === 'teacher') {
+            // Enable teacher mode and show studio dashboard
+            this.toggleTeacherMode(true);
+            const teacherToggle = document.getElementById('teacher-mode-toggle');
+            if (teacherToggle) {
+                teacherToggle.classList.add('active');
+                teacherToggle.setAttribute('aria-checked', 'true');
+            }
+            localStorage.setItem('teacher_mode', 'true');
+            this.showView('studio-dashboard-view');
+        } else if (role === 'student') {
+            // Show home dashboard (library) and trigger calibration if needed
+            this.showView('library-view');
+            if (this.onboardingService && !this.onboardingService.hasCompletedOnboarding) {
+                this.onboardingService.start();
             }
         }
     }
