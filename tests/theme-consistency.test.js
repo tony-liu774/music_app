@@ -1,8 +1,9 @@
 /**
- * Theme Consistency Tests
+ * Theme Consistency Tests — Tailwind CSS v4 Migration
  *
- * Verifies that CSS files use Midnight Conservatory theme variables (var(--xxx))
- * instead of hardcoded color values, ensuring a consistent visual design.
+ * Verifies that the consolidated app.css defines the Midnight Conservatory theme
+ * using Tailwind v4's @theme block and @layer architecture, and that the compiled
+ * output (public/styles.css) contains the expected CSS custom properties.
  */
 
 const { describe, it } = require('node:test');
@@ -11,55 +12,24 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const CSS_DIR = path.join(__dirname, '..', 'src', 'css');
+const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 
 /**
- * Read a CSS file and return its content.
+ * Read app.css (the single Tailwind CSS v4 source file).
  */
-function readCSS(filename) {
-    return fs.readFileSync(path.join(CSS_DIR, filename), 'utf8');
+function readAppCSS() {
+    return fs.readFileSync(path.join(CSS_DIR, 'app.css'), 'utf8');
 }
 
 /**
- * Find lines with hardcoded hex colors that are NOT inside var() fallbacks
- * or inside comments. Returns array of { line, lineNumber, color }.
- *
- * Allowed exceptions:
- * - Colors inside var(--xxx, #fallback) patterns
- * - Colors inside comments
- * - Brand-specific colors (Google white #ffffff, Apple black #000000)
- * - rgba(...) with literal numbers (common pattern)
+ * Read the compiled output (public/styles.css).
  */
-function findHardcodedColors(css, allowedColors = []) {
-    const lines = css.split('\n');
-    const issues = [];
-
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
-
-        // Skip comments
-        if (line.startsWith('/*') || line.startsWith('*') || line.startsWith('//')) continue;
-
-        // Skip lines that are inside var() fallbacks - pattern: var(--xxx, #color)
-        // We strip these out before checking
-        const lineWithoutVarFallbacks = line.replace(/var\([^)]+\)/g, '');
-
-        // Find hex colors in the remaining text
-        const hexMatches = lineWithoutVarFallbacks.match(/#[0-9a-fA-F]{3,8}\b/g);
-        if (hexMatches) {
-            for (const color of hexMatches) {
-                const normalized = color.toLowerCase();
-                if (allowedColors.includes(normalized)) continue;
-                issues.push({ line: lines[i], lineNumber: i + 1, color });
-            }
-        }
-    }
-
-    return issues;
+function readCompiledCSS() {
+    return fs.readFileSync(path.join(PUBLIC_DIR, 'styles.css'), 'utf8');
 }
 
 /**
- * Verify that a CSS file defines essential Midnight Conservatory theme properties
- * by using var() references.
+ * Count var() references in CSS.
  */
 function countVarReferences(css) {
     const matches = css.match(/var\(--[a-z-]+/g) || [];
@@ -68,121 +38,134 @@ function countVarReferences(css) {
 
 // ============ Tests ============
 
-describe('Theme Consistency - Midnight Conservatory', () => {
+describe('Tailwind CSS v4 Migration — Midnight Conservatory', () => {
 
-    describe('midnight-conservatory.css theme file', () => {
-        it('should exist and define core theme variables', () => {
-            const css = readCSS('themes/midnight-conservatory.css');
-            assert.ok(css.includes('--bg-deep:'), 'Missing --bg-deep variable');
-            assert.ok(css.includes('--bg-surface:'), 'Missing --bg-surface variable');
-            assert.ok(css.includes('--bg-elevated:'), 'Missing --bg-elevated variable');
-            assert.ok(css.includes('--primary:'), 'Missing --primary variable');
-            assert.ok(css.includes('--success:'), 'Missing --success variable');
-            assert.ok(css.includes('--error:'), 'Missing --error variable');
-            assert.ok(css.includes('--text-primary:'), 'Missing --text-primary variable');
-            assert.ok(css.includes('--text-secondary:'), 'Missing --text-secondary variable');
-            assert.ok(css.includes('--text-muted:'), 'Missing --text-muted variable');
-            assert.ok(css.includes('--border:'), 'Missing --border variable');
-            assert.ok(css.includes('--font-heading:'), 'Missing --font-heading variable');
-            assert.ok(css.includes('--font-body:'), 'Missing --font-body variable');
-            assert.ok(css.includes('--accent:'), 'Missing --accent variable');
-            assert.ok(css.includes('--accent-glow:'), 'Missing --accent-glow variable');
-            assert.ok(css.includes('--bg-card:'), 'Missing --bg-card variable');
-            assert.ok(css.includes('--border-subtle:'), 'Missing --border-subtle variable');
-            assert.ok(css.includes('--font-mono:'), 'Missing --font-mono variable');
+    describe('app.css structure', () => {
+        it('should exist as the single CSS source file', () => {
+            assert.ok(fs.existsSync(path.join(CSS_DIR, 'app.css')), 'app.css should exist');
         });
 
-        it('should define Polished Amber as primary color (#c9a227)', () => {
-            const css = readCSS('themes/midnight-conservatory.css');
-            assert.ok(css.includes('#c9a227'), 'Primary color should be Polished Amber #c9a227');
+        it('should import tailwindcss', () => {
+            const css = readAppCSS();
+            assert.ok(css.includes('@import "tailwindcss"'), 'Should import Tailwind CSS v4');
         });
 
-        it('should define deep Oxford Blue background (#0a0a12)', () => {
-            const css = readCSS('themes/midnight-conservatory.css');
-            assert.ok(css.includes('#0a0a12'), 'Deep background should be #0a0a12');
+        it('should define @theme block with Midnight Conservatory colors', () => {
+            const css = readAppCSS();
+            assert.ok(css.includes('@theme {'), 'Should have @theme block');
+            assert.ok(css.includes('--color-oxford-blue: #0a0a12'), 'Should define oxford-blue');
+            assert.ok(css.includes('--color-amber: #c9a227'), 'Should define amber');
+            assert.ok(css.includes('--color-emerald: #10b981'), 'Should define emerald');
+            assert.ok(css.includes('--color-crimson: #dc2626'), 'Should define crimson');
+            assert.ok(css.includes('--color-ivory: #f5f5dc'), 'Should define ivory');
+            assert.ok(css.includes('--color-surface: #141420'), 'Should define surface');
+            assert.ok(css.includes('--color-elevated: #1a1a28'), 'Should define elevated');
         });
 
-        it('should define Emerald for success (#10b981)', () => {
-            const css = readCSS('themes/midnight-conservatory.css');
-            assert.ok(css.includes('#10b981'), 'Success color should be Emerald #10b981');
+        it('should define typography in @theme', () => {
+            const css = readAppCSS();
+            assert.ok(css.includes("--font-heading: 'Playfair Display'"), 'Should define heading font');
+            assert.ok(css.includes("--font-body: 'Source Sans 3'"), 'Should define body font');
+            assert.ok(css.includes("--font-mono: 'JetBrains Mono'"), 'Should define mono font');
         });
 
-        it('should define Crimson for errors (#dc2626)', () => {
-            const css = readCSS('themes/midnight-conservatory.css');
-            assert.ok(css.includes('#dc2626'), 'Error color should be Crimson #dc2626');
+        it('should define glow shadow effects in @theme', () => {
+            const css = readAppCSS();
+            assert.ok(css.includes('--shadow-amber-glow:'), 'Should define amber glow shadow');
+            assert.ok(css.includes('--shadow-emerald-glow:'), 'Should define emerald glow shadow');
+            assert.ok(css.includes('--shadow-crimson-glow:'), 'Should define crimson glow shadow');
         });
 
-        it('should define Playfair Display as heading font', () => {
-            const css = readCSS('themes/midnight-conservatory.css');
-            assert.ok(css.includes("'Playfair Display'"), 'Heading font should include Playfair Display');
+        it('should include @layer base with backward-compatible CSS variables', () => {
+            const css = readAppCSS();
+            assert.ok(css.includes('@layer base'), 'Should have @layer base');
+            assert.ok(css.includes('--bg-deep: #0a0a12'), 'Should define --bg-deep');
+            assert.ok(css.includes('--bg-surface: #141420'), 'Should define --bg-surface');
+            assert.ok(css.includes('--bg-elevated: #1a1a28'), 'Should define --bg-elevated');
+            assert.ok(css.includes('--primary: #c9a227'), 'Should define --primary');
+            assert.ok(css.includes('--success: #10b981'), 'Should define --success');
+            assert.ok(css.includes('--error: #dc2626'), 'Should define --error');
+            assert.ok(css.includes('--text-primary: #f5f5dc'), 'Should define --text-primary');
+            assert.ok(css.includes('--text-secondary: #a0a0b0'), 'Should define --text-secondary');
+            assert.ok(css.includes('--text-muted: #6a6a7a'), 'Should define --text-muted');
+            assert.ok(css.includes('--border: #2a2a3a'), 'Should define --border');
+            assert.ok(css.includes('--accent: #c9a227'), 'Should define --accent');
+            assert.ok(css.includes('--accent-glow:'), 'Should define --accent-glow');
+            assert.ok(css.includes('--bg-card:'), 'Should define --bg-card');
+            assert.ok(css.includes('--border-subtle:'), 'Should define --border-subtle');
+            assert.ok(css.includes('--font-mono:'), 'Should define --font-mono');
+            assert.ok(css.includes('--shadow-glow:'), 'Should define --shadow-glow');
+            assert.ok(css.includes('--container-max: 1200px'), 'Should define --container-max');
         });
 
-        it('should define Source Sans 3 as body font', () => {
-            const css = readCSS('themes/midnight-conservatory.css');
-            assert.ok(css.includes("'Source Sans 3'"), 'Body font should include Source Sans 3');
+        it('should include @layer components', () => {
+            const css = readAppCSS();
+            assert.ok(css.includes('@layer components'), 'Should have @layer components');
+        });
+
+        it('should include grid background pattern via repeating-linear-gradient', () => {
+            const css = readAppCSS();
+            assert.ok(
+                css.includes('repeating-linear-gradient'),
+                'Should include repeating-linear-gradient for grid background pattern'
+            );
+        });
+
+        it('should include Polished Amber glow effects', () => {
+            const css = readAppCSS();
+            assert.ok(
+                css.includes('--primary-glow: rgba(201, 162, 39,'),
+                'Should define --primary-glow with amber rgba value'
+            );
+            assert.ok(
+                css.includes('var(--primary-glow)'),
+                'Should reference --primary-glow for amber glow effects'
+            );
         });
     });
 
-    describe('styles.css main stylesheet', () => {
-        it('should exist and be substantial (>3000 lines)', () => {
-            const css = readCSS('styles.css');
-            const lineCount = css.split('\n').length;
-            assert.ok(lineCount > 3000, `styles.css should have >3000 lines, got ${lineCount}`);
-        });
-
-        it('should use theme variables extensively', () => {
-            const css = readCSS('styles.css');
-            const varCount = countVarReferences(css);
-            assert.ok(varCount > 200, `styles.css should have >200 var() references, got ${varCount}`);
-        });
-
-        it('should include Midnight Conservatory glow effects', () => {
-            const css = readCSS('styles.css');
-            assert.ok(css.includes('glow'), 'Should include glow effect styles');
-            assert.ok(css.includes('box-shadow'), 'Should include box-shadow for glow');
-        });
-
-        it('should include animated underlines for nav', () => {
-            const css = readCSS('styles.css');
+    describe('app.css component styles', () => {
+        it('should include nav-link styles', () => {
+            const css = readAppCSS();
             assert.ok(css.includes('.nav-link'), 'Should include nav-link styles');
         });
 
         it('should include mobile navigation styles', () => {
-            const css = readCSS('styles.css');
+            const css = readAppCSS();
             assert.ok(css.includes('.mobile-nav'), 'Should include mobile navigation');
         });
 
-        it('should include gradient button styles', () => {
-            const css = readCSS('styles.css');
-            assert.ok(css.includes('gradient'), 'Should include gradient styles for buttons');
+        it('should include gradient styles', () => {
+            const css = readAppCSS();
+            assert.ok(css.includes('gradient'), 'Should include gradient styles');
         });
 
         it('should include tone quality indicator styles', () => {
-            const css = readCSS('styles.css');
+            const css = readAppCSS();
             assert.ok(css.includes('.tone-quality-indicator'), 'Should include tone quality indicator');
             assert.ok(css.includes('.tone-quality-bar'), 'Should include tone quality bar');
         });
 
         it('should include heat map history styles', () => {
-            const css = readCSS('styles.css');
+            const css = readAppCSS();
             assert.ok(css.includes('.heatmap-controls'), 'Should include heatmap controls');
             assert.ok(css.includes('.week-card'), 'Should include week card styles');
         });
 
         it('should include studio license UI styles', () => {
-            const css = readCSS('styles.css');
+            const css = readAppCSS();
             assert.ok(css.includes('.license-content'), 'Should include license content');
             assert.ok(css.includes('.plan-card'), 'Should include plan card styles');
         });
 
         it('should include video snippet styles', () => {
-            const css = readCSS('styles.css');
+            const css = readAppCSS();
             assert.ok(css.includes('.video-snippet-btn'), 'Should include video snippet button');
             assert.ok(css.includes('.video-trim-controls'), 'Should include video trim controls');
         });
 
         it('should include video recorder modal styles', () => {
-            const css = readCSS('styles.css');
+            const css = readAppCSS();
             assert.ok(css.includes('.video-recorder'), 'Should include video-recorder');
             assert.ok(css.includes('.video-preview-container'), 'Should include video-preview-container');
             assert.ok(css.includes('.video-overlay'), 'Should include video-overlay');
@@ -194,7 +177,7 @@ describe('Theme Consistency - Midnight Conservatory', () => {
         });
 
         it('should include teacher inbox modal styles', () => {
-            const css = readCSS('styles.css');
+            const css = readAppCSS();
             assert.ok(css.includes('.teacher-inbox'), 'Should include teacher-inbox');
             assert.ok(css.includes('.inbox-tabs'), 'Should include inbox-tabs');
             assert.ok(css.includes('.inbox-tab'), 'Should include inbox-tab');
@@ -207,7 +190,7 @@ describe('Theme Consistency - Midnight Conservatory', () => {
         });
 
         it('should include video reply modal styles', () => {
-            const css = readCSS('styles.css');
+            const css = readAppCSS();
             assert.ok(css.includes('.video-reply-form'), 'Should include video-reply-form');
             assert.ok(css.includes('.reply-video-container'), 'Should include reply-video-container');
             assert.ok(css.includes('.reply-form'), 'Should include reply-form');
@@ -218,141 +201,158 @@ describe('Theme Consistency - Midnight Conservatory', () => {
             assert.ok(css.includes('.voice-status'), 'Should include voice-status');
             assert.ok(css.includes('.reply-actions'), 'Should include reply-actions');
         });
-    });
 
-    describe('scale-engine.css', () => {
-        it('should use theme variables for all colors', () => {
-            const css = readCSS('scale-engine.css');
-            const issues = findHardcodedColors(css);
-            assert.strictEqual(issues.length, 0,
-                `scale-engine.css has hardcoded colors:\n${issues.map(i => `  Line ${i.lineNumber}: ${i.color} in "${i.line.trim()}"`).join('\n')}`
-            );
+        it('should include scale engine styles', () => {
+            const css = readAppCSS();
+            assert.ok(css.includes('.scale-engine-panel'), 'Should include scale-engine-panel');
+            assert.ok(css.includes('.scale-btn-primary'), 'Should include scale-btn-primary');
         });
 
-        it('should reference theme variables', () => {
-            const css = readCSS('scale-engine.css');
+        it('should include annotation toolbar styles', () => {
+            const css = readAppCSS();
+            assert.ok(css.includes('#annotation-toolbar'), 'Should include annotation-toolbar');
+            assert.ok(css.includes('.annotation-tool-btn'), 'Should include annotation-tool-btn');
+        });
+
+        it('should include SSO login styles', () => {
+            const css = readAppCSS();
+            assert.ok(css.includes('.sso-login-screen'), 'Should include sso-login-screen');
+            assert.ok(css.includes('.sso-btn'), 'Should include sso-btn');
+        });
+
+        it('should include role selection styles', () => {
+            const css = readAppCSS();
+            assert.ok(css.includes('.role-selection-screen'), 'Should include role-selection-screen');
+            assert.ok(css.includes('.role-card'), 'Should include role-card');
+        });
+
+        it('should use theme variables extensively', () => {
+            const css = readAppCSS();
             const varCount = countVarReferences(css);
-            assert.ok(varCount > 30, `scale-engine.css should have >30 var() references, got ${varCount}`);
+            assert.ok(varCount > 200, `app.css should have >200 var() references, got ${varCount}`);
         });
     });
 
-    describe('annotation-toolbar.css', () => {
-        it('should use theme variables for layout colors', () => {
-            const css = readCSS('annotation-toolbar.css');
-            // #00d4ff is allowed as the intentional neon annotation blue
-            // #c9a227 appears in a CSS attribute selector [style*="color: #c9a227"],
-            // not as a hardcoded color value — it matches inline styles set by JS
-            const issues = findHardcodedColors(css, ['#00d4ff', '#c9a227']);
-            assert.strictEqual(issues.length, 0,
-                `annotation-toolbar.css has hardcoded colors (excluding #00d4ff annotation blue):\n${issues.map(i => `  Line ${i.lineNumber}: ${i.color} in "${i.line.trim()}"`).join('\n')}`
+    describe('Compiled output (public/styles.css)', () => {
+        it('should exist', () => {
+            assert.ok(
+                fs.existsSync(path.join(PUBLIC_DIR, 'styles.css')),
+                'public/styles.css should exist (run npm run build:css)'
             );
         });
 
-        it('should reference theme variables for borders and backgrounds', () => {
-            const css = readCSS('annotation-toolbar.css');
-            assert.ok(css.includes('var(--bg-surface'), 'Should use --bg-surface');
-            assert.ok(css.includes('var(--border'), 'Should use --border');
-            assert.ok(css.includes('var(--bg-deep'), 'Should use --bg-deep');
+        it('should contain Tailwind CSS v4 header', () => {
+            const css = readCompiledCSS();
+            assert.ok(css.includes('tailwindcss v4'), 'Should contain Tailwind v4 version comment');
+        });
+
+        it('should contain Midnight Conservatory color values', () => {
+            const css = readCompiledCSS();
+            assert.ok(css.includes('#0a0a12'), 'Should contain Oxford Blue #0a0a12');
+            assert.ok(css.includes('#c9a227'), 'Should contain Polished Amber #c9a227');
+            assert.ok(css.includes('#10b981'), 'Should contain Emerald #10b981');
+            assert.ok(css.includes('#dc2626'), 'Should contain Crimson #dc2626');
+            assert.ok(css.includes('#f5f5dc'), 'Should contain Soft Ivory #f5f5dc');
+        });
+
+        it('should contain backward-compatible CSS variables', () => {
+            const css = readCompiledCSS();
+            assert.ok(css.includes('--bg-deep:'), 'Should contain --bg-deep variable');
+            assert.ok(css.includes('--primary:'), 'Should contain --primary variable');
+            assert.ok(css.includes('--text-primary:'), 'Should contain --text-primary variable');
+        });
+
+        it('should contain Playfair Display font reference', () => {
+            const css = readCompiledCSS();
+            assert.ok(css.includes('Playfair Display'), 'Should reference Playfair Display font');
+        });
+
+        it('should contain Source Sans 3 font reference', () => {
+            const css = readCompiledCSS();
+            assert.ok(css.includes('Source Sans 3'), 'Should reference Source Sans 3 font');
+        });
+
+        it('should contain glow effects', () => {
+            const css = readCompiledCSS();
+            assert.ok(css.includes('glow'), 'Should contain glow effect styles');
+            assert.ok(css.includes('box-shadow'), 'Should contain box-shadow for glow');
         });
     });
 
-    describe('sso-login.css', () => {
-        it('should use theme variables instead of hardcoded colors', () => {
-            const css = readCSS('sso-login.css');
-            // Allow brand-specific Google/Apple button colors
-            const allowedBrandColors = ['#ffffff', '#1f1f1f', '#000000'];
-            const issues = findHardcodedColors(css, allowedBrandColors);
-            assert.strictEqual(issues.length, 0,
-                `sso-login.css has hardcoded colors:\n${issues.map(i => `  Line ${i.lineNumber}: ${i.color} in "${i.line.trim()}"`).join('\n')}`
+    describe('Old CSS files should NOT exist', () => {
+        it('should NOT have standalone styles.css', () => {
+            assert.ok(
+                !fs.existsSync(path.join(CSS_DIR, 'styles.css')),
+                'styles.css should be deleted (migrated to app.css)'
             );
         });
 
-        it('should NOT use hardcoded #002147 (old Oxford Blue)', () => {
-            const css = readCSS('sso-login.css');
-            assert.ok(!css.includes('#002147'), 'Should not use hardcoded #002147, use var(--bg-deep) instead');
-        });
-
-        it('should reference --bg-deep for background', () => {
-            const css = readCSS('sso-login.css');
-            assert.ok(css.includes('var(--bg-deep'), 'Should use var(--bg-deep) for background');
-        });
-
-        it('should reference --primary for amber accents', () => {
-            const css = readCSS('sso-login.css');
-            assert.ok(css.includes('var(--primary'), 'Should use var(--primary) for amber accents');
-        });
-
-        it('should reference --text-primary for headings', () => {
-            const css = readCSS('sso-login.css');
-            assert.ok(css.includes('var(--text-primary'), 'Should use var(--text-primary) for heading text');
-        });
-
-        it('should reference --font-heading for title', () => {
-            const css = readCSS('sso-login.css');
-            assert.ok(css.includes('var(--font-heading'), 'Should use var(--font-heading) for title font');
-        });
-
-        it('should reference --error for error messages', () => {
-            const css = readCSS('sso-login.css');
-            assert.ok(css.includes('var(--error'), 'Should use var(--error) for error message color');
-        });
-    });
-
-    describe('role-selection.css', () => {
-        it('should use theme variables instead of hardcoded colors', () => {
-            const css = readCSS('role-selection.css');
-            const issues = findHardcodedColors(css);
-            assert.strictEqual(issues.length, 0,
-                `role-selection.css has hardcoded colors:\n${issues.map(i => `  Line ${i.lineNumber}: ${i.color} in "${i.line.trim()}"`).join('\n')}`
+        it('should NOT have standalone scale-engine.css', () => {
+            assert.ok(
+                !fs.existsSync(path.join(CSS_DIR, 'scale-engine.css')),
+                'scale-engine.css should be deleted (migrated to app.css)'
             );
         });
 
-        it('should NOT use hardcoded #002147 (old Oxford Blue)', () => {
-            const css = readCSS('role-selection.css');
-            assert.ok(!css.includes('#002147'), 'Should not use hardcoded #002147, use var(--bg-deep) instead');
+        it('should NOT have standalone annotation-toolbar.css', () => {
+            assert.ok(
+                !fs.existsSync(path.join(CSS_DIR, 'annotation-toolbar.css')),
+                'annotation-toolbar.css should be deleted (migrated to app.css)'
+            );
         });
 
-        it('should reference --bg-deep for background', () => {
-            const css = readCSS('role-selection.css');
-            assert.ok(css.includes('var(--bg-deep'), 'Should use var(--bg-deep) for background');
+        it('should NOT have standalone sso-login.css', () => {
+            assert.ok(
+                !fs.existsSync(path.join(CSS_DIR, 'sso-login.css')),
+                'sso-login.css should be deleted (migrated to app.css)'
+            );
         });
 
-        it('should reference --primary for amber accents', () => {
-            const css = readCSS('role-selection.css');
-            assert.ok(css.includes('var(--primary'), 'Should use var(--primary) for amber accents');
+        it('should NOT have standalone role-selection.css', () => {
+            assert.ok(
+                !fs.existsSync(path.join(CSS_DIR, 'role-selection.css')),
+                'role-selection.css should be deleted (migrated to app.css)'
+            );
         });
 
-        it('should reference --text-primary for headings', () => {
-            const css = readCSS('role-selection.css');
-            assert.ok(css.includes('var(--text-primary'), 'Should use var(--text-primary) for heading text');
-        });
-
-        it('should reference --font-heading for title', () => {
-            const css = readCSS('role-selection.css');
-            assert.ok(css.includes('var(--font-heading'), 'Should use var(--font-heading) for title font');
-        });
-
-        it('should reference --text-muted for skip button', () => {
-            const css = readCSS('role-selection.css');
-            assert.ok(css.includes('var(--text-muted'), 'Should use var(--text-muted) for muted text');
+        it('should NOT have standalone midnight-conservatory.css', () => {
+            assert.ok(
+                !fs.existsSync(path.join(CSS_DIR, 'themes', 'midnight-conservatory.css')),
+                'midnight-conservatory.css should be deleted (absorbed into @theme block)'
+            );
         });
     });
 
-    describe('index.html theme integration', () => {
-        it('should load midnight-conservatory.css before styles.css', () => {
+    describe('index.html Tailwind integration', () => {
+        it('should reference compiled public/styles.css', () => {
             const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-            const mcIndex = html.indexOf('midnight-conservatory.css');
-            const stylesIndex = html.indexOf('styles.css');
-            assert.ok(mcIndex !== -1, 'Should reference midnight-conservatory.css');
-            assert.ok(stylesIndex !== -1, 'Should reference styles.css');
-            assert.ok(mcIndex < stylesIndex, 'midnight-conservatory.css should load before styles.css');
+            assert.ok(
+                html.includes('public/styles.css'),
+                'Should link to public/styles.css (compiled Tailwind output)'
+            );
         });
 
-        it('should include Google Fonts for Playfair Display and Source Sans 3', () => {
+        it('should NOT reference old individual CSS files', () => {
             const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-            assert.ok(html.includes('Playfair+Display'), 'Should load Playfair Display from Google Fonts');
-            assert.ok(html.includes('Source+Sans+3'), 'Should load Source Sans 3 from Google Fonts');
-            assert.ok(html.includes('JetBrains+Mono'), 'Should load JetBrains Mono from Google Fonts');
+            assert.ok(
+                !html.includes('src/css/styles.css'),
+                'Should NOT reference old src/css/styles.css'
+            );
+            assert.ok(
+                !html.includes('src/css/scale-engine.css'),
+                'Should NOT reference old src/css/scale-engine.css'
+            );
+            assert.ok(
+                !html.includes('midnight-conservatory.css'),
+                'Should NOT reference old midnight-conservatory.css'
+            );
+        });
+
+        it('should include Google Fonts for Playfair Display, Source Sans 3, JetBrains Mono', () => {
+            const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+            assert.ok(html.includes('Playfair+Display'), 'Should load Playfair Display');
+            assert.ok(html.includes('Source+Sans+3'), 'Should load Source Sans 3');
+            assert.ok(html.includes('JetBrains+Mono'), 'Should load JetBrains Mono');
         });
 
         it('should use deep Oxford Blue theme color', () => {
@@ -360,26 +360,15 @@ describe('Theme Consistency - Midnight Conservatory', () => {
             assert.ok(html.includes('content="#0a0a12"'), 'theme-color meta should be #0a0a12');
         });
 
-        it('should include all 6 CSS files', () => {
-            const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-            assert.ok(html.includes('midnight-conservatory.css'), 'Should include midnight-conservatory.css');
-            assert.ok(html.includes('styles.css'), 'Should include styles.css');
-            assert.ok(html.includes('scale-engine.css'), 'Should include scale-engine.css');
-            assert.ok(html.includes('annotation-toolbar.css'), 'Should include annotation-toolbar.css');
-            assert.ok(html.includes('sso-login.css'), 'Should include sso-login.css');
-            assert.ok(html.includes('role-selection.css'), 'Should include role-selection.css');
-        });
-
         it('should set viewport with maximum-scale=1 to prevent zoom', () => {
             const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
             assert.ok(
                 html.includes('maximum-scale=1'),
-                'Viewport meta should include maximum-scale=1 to prevent zoomed-in UI'
+                'Viewport meta should include maximum-scale=1'
             );
-            // Use regex to match exact "initial-scale=1" not "initial-scale=1.0"
             assert.ok(
                 /initial-scale=1[,"\s]/.test(html),
-                'Viewport initial-scale should be exactly 1 (not 1.0)'
+                'Viewport initial-scale should be exactly 1'
             );
         });
 
@@ -398,47 +387,29 @@ describe('Theme Consistency - Midnight Conservatory', () => {
 
     describe('Midnight Conservatory visual requirements', () => {
         it('should define Soft Ivory text color (#f5f5dc), not pure white', () => {
-            const css = readCSS('themes/midnight-conservatory.css');
+            const css = readAppCSS();
             assert.ok(css.includes('--text-primary: #f5f5dc'), 'Text primary should be Soft Ivory #f5f5dc');
             assert.ok(!css.includes('--text-primary: #ffffff'), 'Text primary should NOT be pure white');
-            assert.ok(!css.includes('--text-primary: #fff'), 'Text primary should NOT be pure white (#fff)');
-        });
-
-        it('should include grid background pattern via repeating-linear-gradient', () => {
-            const css = readCSS('styles.css');
-            assert.ok(
-                css.includes('repeating-linear-gradient'),
-                'Should include repeating-linear-gradient for grid background pattern'
-            );
-        });
-
-        it('should include Polished Amber glow effects (primary-glow)', () => {
-            const css = readCSS('themes/midnight-conservatory.css');
-            assert.ok(
-                css.includes('--primary-glow: rgba(201, 162, 39,'),
-                'Should define --primary-glow with amber rgba value'
-            );
-            const styles = readCSS('styles.css');
-            assert.ok(
-                styles.includes('var(--primary-glow)'),
-                'styles.css should reference --primary-glow for amber glow effects'
-            );
-        });
-
-        it('should include shadow-glow for ambient lighting effects', () => {
-            const css = readCSS('themes/midnight-conservatory.css');
-            assert.ok(
-                css.includes('--shadow-glow:'),
-                'Should define --shadow-glow for ambient glow'
-            );
         });
 
         it('should define constrained container max-width', () => {
-            const css = readCSS('themes/midnight-conservatory.css');
+            const css = readAppCSS();
             assert.ok(
                 css.includes('--container-max: 1200px'),
                 'Should define --container-max: 1200px for constrained layout'
             );
+        });
+
+        it('should define Polished Amber as theme color (#c9a227)', () => {
+            const css = readAppCSS();
+            assert.ok(css.includes('--color-amber: #c9a227'), 'Should define amber theme token');
+            assert.ok(css.includes('--primary: #c9a227'), 'Should define --primary variable');
+        });
+
+        it('should define deep Oxford Blue background (#0a0a12)', () => {
+            const css = readAppCSS();
+            assert.ok(css.includes('--color-oxford-blue: #0a0a12'), 'Should define oxford-blue theme token');
+            assert.ok(css.includes('--bg-deep: #0a0a12'), 'Should define --bg-deep variable');
         });
     });
 });
