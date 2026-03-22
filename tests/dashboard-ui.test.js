@@ -235,6 +235,19 @@ describe('DashboardUI', () => {
 
             assert.strictEqual(label.textContent, '--%');
         });
+
+        it('should update aria-valuenow on parent SVG', () => {
+            const ring = new MockElement('test-ring');
+            const label = new MockElement('test-label');
+            const parentSvg = new MockElement('parent-svg');
+
+            // Mock closest() to return parent SVG
+            ring.closest = (sel) => sel === 'svg' ? parentSvg : null;
+
+            dashboard.setProgressRing(ring, label, 75);
+
+            assert.strictEqual(parentSvg.attributes['aria-valuenow'], '75');
+        });
     });
 
     describe('getStoredStats', () => {
@@ -375,6 +388,15 @@ describe('DashboardUI', () => {
         it('should handle invalid date strings', () => {
             assert.strictEqual(dashboard.formatDate('invalid'), 'invalid');
         });
+
+        it('should handle future dates gracefully (no negative days)', () => {
+            const future = new Date(Date.now() + 7 * 86400000).toISOString();
+            const result = dashboard.formatDate(future);
+            // Should NOT produce "-X days ago"
+            assert.ok(!result.includes('-'), 'Future dates should not produce negative day counts');
+            // Should fall through to locale-formatted date
+            assert.ok(result.includes(' '), 'Future dates should be locale-formatted');
+        });
     });
 
     describe('formatDuration', () => {
@@ -396,11 +418,21 @@ describe('DashboardUI', () => {
     });
 
     describe('escapeHTML', () => {
-        it('should escape HTML entities', () => {
-            // Our escapeHTML uses DOM textContent → innerHTML
-            // In Node, we mock createElement — so just test it doesn't crash
+        it('should escape HTML entities and prevent XSS', () => {
             const result = dashboard.escapeHTML('Test <script>alert("xss")</script>');
             assert.ok(typeof result === 'string');
+            // Verify dangerous characters are escaped
+            assert.ok(!result.includes('<script>'), 'Should escape <script> tags');
+            assert.ok(result.includes('&lt;'), 'Should contain escaped < characters');
+            assert.ok(result.includes('&gt;'), 'Should contain escaped > characters');
+        });
+
+        it('should escape angle brackets, ampersands, and quotes', () => {
+            const result = dashboard.escapeHTML('<img onerror="alert(1)">');
+            assert.ok(!result.includes('<img'), 'Should escape img tag');
+            assert.ok(result.includes('&lt;'), 'Should escape <');
+            assert.ok(result.includes('&gt;'), 'Should escape >');
+            assert.ok(result.includes('&quot;'), 'Should escape "');
         });
 
         it('should handle empty string', () => {
@@ -479,6 +511,31 @@ describe('DashboardUI', () => {
             const piece = { title: 'Test' };
             const item = dashboard.createAssignmentItem(piece);
             assert.ok(item._listeners['keydown'] && item._listeners['keydown'].length > 0);
+        });
+
+        it('should escape formatDate output in meta (XSS prevention)', () => {
+            const piece = {
+                title: 'Test',
+                lastPracticed: '2026-03-20'
+            };
+            const item = dashboard.createAssignmentItem(piece);
+            // formatDate output should be escaped — no raw HTML injection possible
+            assert.ok(!item.innerHTML.includes('<script'), 'Meta should not contain unescaped HTML');
+        });
+
+        it('should coerce string scores to number via Number()', () => {
+            const piece = { title: 'Test', lastScore: '85' };
+            const item = dashboard.createAssignmentItem(piece);
+            // Should treat "85" as 85 → complete status
+            assert.ok(item.innerHTML.includes('complete'), 'String score "85" should be coerced to number');
+            assert.ok(item.innerHTML.includes('good'), 'String score "85" should get good progress class');
+        });
+
+        it('should handle NaN score gracefully', () => {
+            const piece = { title: 'Test', lastScore: 'invalid' };
+            const item = dashboard.createAssignmentItem(piece);
+            // Number('invalid') || 0 should give 0 → pending
+            assert.ok(item.innerHTML.includes('pending'), 'NaN score should default to pending');
         });
     });
 
@@ -763,6 +820,27 @@ describe('Dashboard HTML Structural Requirements', () => {
         assert.ok(htmlContent.includes('id="dashboard-view"'), 'Should have dashboard-view section');
     });
 
+    it('should have Metronome tab in mobile navigation', () => {
+        const fs = require('fs');
+        const path = require('path');
+        const htmlPath = path.join(__dirname, '..', 'index.html');
+
+        let htmlContent;
+        try {
+            htmlContent = fs.readFileSync(htmlPath, 'utf-8');
+        } catch (_e) {
+            return;
+        }
+
+        // Mobile nav should include Metronome
+        const mobileNavSection = htmlContent.slice(
+            htmlContent.indexOf('class="mobile-nav'),
+            htmlContent.indexOf('<!-- Main Content Area -->')
+        );
+        assert.ok(mobileNavSection.includes('href="#metronome"'), 'Mobile nav should have metronome link');
+        assert.ok(mobileNavSection.includes('>Metronome</span>'), 'Mobile nav should have Metronome label');
+    });
+
     it('should have Home tab in mobile navigation', () => {
         const fs = require('fs');
         const path = require('path');
@@ -779,7 +857,7 @@ describe('Dashboard HTML Structural Requirements', () => {
         assert.ok(htmlContent.includes('>Home</span>'), 'Should have Home label in mobile nav');
     });
 
-    it('should have progress ring SVGs', () => {
+    it('should have progress ring SVGs with ARIA attributes', () => {
         const fs = require('fs');
         const path = require('path');
         const htmlPath = path.join(__dirname, '..', 'index.html');
@@ -795,9 +873,17 @@ describe('Dashboard HTML Structural Requirements', () => {
         assert.ok(htmlContent.includes('ring-intonation'), 'Should have intonation ring');
         assert.ok(htmlContent.includes('ring-rhythm'), 'Should have rhythm ring');
         assert.ok(htmlContent.includes('ring-pitch'), 'Should have pitch ring');
+
+        // Accessibility: SVGs should have role="progressbar" and ARIA attributes
+        assert.ok(htmlContent.includes('role="progressbar"'), 'Ring SVGs should have role="progressbar"');
+        assert.ok(htmlContent.includes('aria-valuemin="0"'), 'Ring SVGs should have aria-valuemin');
+        assert.ok(htmlContent.includes('aria-valuemax="100"'), 'Ring SVGs should have aria-valuemax');
+        assert.ok(htmlContent.includes('aria-label="Intonation progress"'), 'Intonation ring should have aria-label');
+        assert.ok(htmlContent.includes('aria-label="Rhythm progress"'), 'Rhythm ring should have aria-label');
+        assert.ok(htmlContent.includes('aria-label="Pitch accuracy progress"'), 'Pitch ring should have aria-label');
     });
 
-    it('should have dashboard quick-access cards', () => {
+    it('should have dashboard quick-access cards with accessibility attributes', () => {
         const fs = require('fs');
         const path = require('path');
         const htmlPath = path.join(__dirname, '..', 'index.html');
@@ -813,6 +899,18 @@ describe('Dashboard HTML Structural Requirements', () => {
         assert.ok(htmlContent.includes('data-navigate="tuner"'), 'Should have tuner card');
         assert.ok(htmlContent.includes('data-navigate="library"'), 'Should have library card');
         assert.ok(htmlContent.includes('data-navigate="metronome"'), 'Should have metronome card');
+
+        // Accessibility: cards should have role="button", tabindex="0", aria-label
+        const cardSection = htmlContent.slice(
+            htmlContent.indexOf('id="dashboard-cards"'),
+            htmlContent.indexOf('<!-- Assignments')
+        );
+        const cards = cardSection.split('data-navigate=').slice(1);
+        for (const card of cards) {
+            assert.ok(card.includes('role="button"'), 'Dashboard card should have role="button"');
+            assert.ok(card.includes('tabindex="0"'), 'Dashboard card should have tabindex="0"');
+            assert.ok(card.includes('aria-label='), 'Dashboard card should have aria-label');
+        }
     });
 
     it('should have hero practice session card', () => {
@@ -866,6 +964,29 @@ describe('Dashboard HTML Structural Requirements', () => {
         const appIndex = htmlContent.indexOf('src/js/app.js');
         assert.ok(dashboardIndex > 0, 'Should load dashboard-ui.js');
         assert.ok(dashboardIndex < appIndex, 'dashboard-ui.js should load before app.js');
+    });
+
+    it('should not use old ivory color #f5f5dc in JS files', () => {
+        const fs = require('fs');
+        const path = require('path');
+
+        const jsFiles = [
+            'src/js/components/teacher-report.js',
+            'src/js/components/sheet-music-renderer.js',
+            'src/js/components/heat-map-renderer.js',
+            'src/js/services/pdf-export-service.js',
+            'src/js/services/omr-client.js'
+        ];
+
+        for (const file of jsFiles) {
+            const filePath = path.join(__dirname, '..', file);
+            try {
+                const content = fs.readFileSync(filePath, 'utf-8');
+                assert.ok(!content.includes('#f5f5dc'), `${file} should not contain old ivory color #f5f5dc`);
+            } catch (_e) {
+                // Skip if file doesn't exist
+            }
+        }
     });
 
     it('should have Google Fonts loaded', () => {

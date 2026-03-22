@@ -122,6 +122,12 @@ class DashboardUI {
         const offset = this.circumference - (clamped / 100) * this.circumference;
         ringEl.style.strokeDashoffset = String(offset);
 
+        // Update ARIA on the parent SVG for screen readers
+        const svg = ringEl.closest ? ringEl.closest('svg') : null;
+        if (svg) {
+            svg.setAttribute('aria-valuenow', String(clamped));
+        }
+
         if (labelEl) {
             labelEl.textContent = pct >= 0 ? pct + '%' : '--%';
         }
@@ -193,8 +199,8 @@ class DashboardUI {
         item.setAttribute('role', 'button');
         item.setAttribute('tabindex', '0');
 
-        // Determine status
-        const score = piece.lastScore || piece.score || 0;
+        // Determine status (coerce to number to guard against bad localStorage data)
+        const score = Number(piece.lastScore || piece.score) || 0;
         let statusClass = 'pending';
         let progressClass = 'low';
         if (score >= 80) {
@@ -220,7 +226,7 @@ class DashboardUI {
             metaParts.push(this.escapeHTML(piece.instrument));
         }
         if (piece.lastPracticed) {
-            metaParts.push(this.formatDate(piece.lastPracticed));
+            metaParts.push(this.escapeHTML(this.formatDate(piece.lastPracticed)));
         }
 
         item.innerHTML = `
@@ -330,6 +336,7 @@ class DashboardUI {
             const diff = now.getTime() - date.getTime();
             const days = Math.floor(diff / (1000 * 60 * 60 * 24));
 
+            if (days < 0) return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             if (days === 0) return 'Today';
             if (days === 1) return 'Yesterday';
             if (days < 7) return days + ' days ago';

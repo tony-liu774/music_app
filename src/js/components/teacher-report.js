@@ -100,7 +100,7 @@ class TeacherReport {
         startInput.type = 'date';
         startInput.className = 'report-date-start';
         startInput.value = this.options.dateRange.start || '';
-        startInput.style.cssText = 'flex: 1; background: var(--bg-elevated, #1a1a28); color: var(--text-primary, #f5f5dc); border: 1px solid var(--primary, #c9a227); border-radius: 4px; padding: 8px;';
+        startInput.style.cssText = 'flex: 1; background: var(--bg-elevated, #1a1a28); color: var(--text-primary, #f3f4f6); border: 1px solid var(--primary, #c9a227); border-radius: 4px; padding: 8px;';
 
         const toSpan = document.createElement('span');
         toSpan.style.cssText = 'color: var(--text-secondary, #a0a0b0); align-self: center;';
@@ -110,7 +110,7 @@ class TeacherReport {
         endInput.type = 'date';
         endInput.className = 'report-date-end';
         endInput.value = this.options.dateRange.end || '';
-        endInput.style.cssText = 'flex: 1; background: var(--bg-elevated, #1a1a28); color: var(--text-primary, #f5f5dc); border: 1px solid var(--primary, #c9a227); border-radius: 4px; padding: 8px;';
+        endInput.style.cssText = 'flex: 1; background: var(--bg-elevated, #1a1a28); color: var(--text-primary, #f3f4f6); border: 1px solid var(--primary, #c9a227); border-radius: 4px; padding: 8px;';
 
         dateRow.appendChild(startInput);
         dateRow.appendChild(toSpan);
@@ -131,7 +131,7 @@ class TeacherReport {
         for (const [metric, checked] of [['Pitch', this.options.metrics.pitch], ['Rhythm', this.options.metrics.rhythm], ['Intonation', this.options.metrics.intonation]]) {
             const toggleLabel = document.createElement('label');
             toggleLabel.className = 'metric-toggle';
-            toggleLabel.style.cssText = "display: flex; align-items: center; gap: 5px; color: var(--text-primary, #f5f5dc); cursor: pointer;";
+            toggleLabel.style.cssText = "display: flex; align-items: center; gap: 5px; color: var(--text-primary, #f3f4f6); cursor: pointer;";
 
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
@@ -157,7 +157,7 @@ class TeacherReport {
         textarea.className = 'report-teacher-notes';
         textarea.rows = 4;
         textarea.placeholder = 'Add notes for the student...';
-        textarea.style.cssText = "width: 100%; margin-top: 5px; background: var(--bg-elevated, #1a1a28); color: var(--text-primary, #f5f5dc); border: 1px solid var(--primary, #c9a227); border-radius: 4px; padding: 8px; font-family: 'Source Sans 3', sans-serif; resize: vertical;";
+        textarea.style.cssText = "width: 100%; margin-top: 5px; background: var(--bg-elevated, #1a1a28); color: var(--text-primary, #f3f4f6); border: 1px solid var(--primary, #c9a227); border-radius: 4px; padding: 8px; font-family: 'Source Sans 3', sans-serif; resize: vertical;";
         textarea.value = this.options.teacherNotes;
         notesSection.appendChild(textarea);
         form.appendChild(notesSection);
@@ -343,7 +343,7 @@ class TeacherReport {
         input.type = type;
         input.className = `report-${this._toKebab(name)}`;
         input.value = value || '';
-        input.style.cssText = 'width: 100%; margin-top: 5px; background: var(--bg-elevated, #1a1a28); color: var(--text-primary, #f5f5dc); border: 1px solid var(--primary, #c9a227); border-radius: 4px; padding: 8px;';
+        input.style.cssText = 'width: 100%; margin-top: 5px; background: var(--bg-elevated, #1a1a28); color: var(--text-primary, #f3f4f6); border: 1px solid var(--primary, #c9a227); border-radius: 4px; padding: 8px;';
         field.appendChild(input);
 
         return field;

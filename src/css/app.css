@@ -455,7 +455,7 @@
       }
   }
 
-  @media (min-width: 1024px) {
+  @media (min-width: 769px) {
       .main-content {
           margin-bottom: 0;
       }
@@ -1376,21 +1376,7 @@
       transform: scale(0.96);
   }
 
-  /* Smooth page transitions */
-  .view.active {
-      animation: dashboardFadeIn 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  @keyframes dashboardFadeIn {
-      from {
-          opacity: 0;
-          transform: translateY(12px);
-      }
-      to {
-          opacity: 1;
-          transform: translateY(0);
-      }
-  }
+  /* View transition uses viewSlideIn defined in the base layer */
 
   /* Streak/Practice Pill */
   .streak-pill {
