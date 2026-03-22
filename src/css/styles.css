@@ -3576,27 +3576,6 @@ button.btn-icon.student-remove-btn:hover {
     box-shadow: 0 0 10px var(--error);
 }
 
-.score-display {
-    text-align: center;
-    padding: var(--space-4);
-    background: var(--bg-elevated);
-    border-radius: var(--radius-md);
-    min-width: 100px;
-}
-
-.score-label {
-    display: block;
-    font-size: var(--text-xs);
-    color: var(--text-muted);
-    margin-bottom: var(--space-1);
-}
-
-.score-value {
-    font-size: var(--text-2xl);
-    font-weight: 700;
-    color: var(--primary);
-}
-
 /* ============================================
    Video Snippet & Trimming (added by Video Snippet PR)
    ============================================ */
@@ -3609,6 +3588,390 @@ button.btn-icon.student-remove-btn:hover {
 
 .video-snippet-btn:hover {
     background: var(--primary-light);
+}
+
+/* ========================================
+   VIDEO RECORDER MODAL
+   ======================================== */
+
+.video-recorder {
+    text-align: center;
+    padding: var(--space-4);
+}
+
+.video-recorder h2 {
+    margin-bottom: var(--space-1);
+    color: var(--text-primary);
+}
+
+.video-recorder-subtitle {
+    color: var(--text-secondary);
+    margin-bottom: var(--space-4);
+}
+
+.video-preview-container {
+    position: relative;
+    width: 100%;
+    max-width: 640px;
+    margin: 0 auto var(--space-4);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: var(--bg-deep);
+    aspect-ratio: 16 / 9;
+}
+
+.video-preview-container video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1); /* Mirror for selfie view */
+}
+
+.video-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.record-button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-4);
+    background: var(--primary);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    color: var(--bg-deep);
+    transition: transform 0.2s, background 0.2s;
+}
+
+.record-button:hover {
+    transform: scale(1.05);
+    background: var(--accent);
+}
+
+.record-button svg {
+    width: 48px;
+    height: 48px;
+}
+
+.record-button span {
+    font-size: var(--text-sm);
+    font-weight: 600;
+}
+
+.recording-indicator {
+    position: absolute;
+    top: var(--space-3);
+    left: var(--space-3);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    background: rgba(0, 0, 0, 0.7);
+    border-radius: 20px;
+    color: white;
+    font-size: var(--text-sm);
+}
+
+.recording-dot {
+    width: 10px;
+    height: 10px;
+    background: var(--error-light);
+    border-radius: 50%;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.video-form {
+    max-width: 400px;
+    margin: 0 auto var(--space-4);
+    text-align: left;
+}
+
+.video-form .form-group {
+    margin-bottom: var(--space-3);
+}
+
+.video-form label {
+    display: block;
+    margin-bottom: var(--space-1);
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+}
+
+.video-form input,
+.video-form textarea {
+    width: 100%;
+    padding: var(--space-2) var(--space-3);
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: var(--text-base);
+}
+
+.video-form textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+.video-actions {
+    display: flex;
+    gap: var(--space-3);
+    justify-content: center;
+}
+
+/* ========================================
+   TEACHER INBOX MODAL
+   ======================================== */
+
+.teacher-inbox {
+    padding: var(--space-4);
+}
+
+.teacher-inbox h2 {
+    margin-bottom: var(--space-4);
+    color: var(--text-primary);
+}
+
+.inbox-tabs {
+    display: flex;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+    border-bottom: 1px solid var(--border-subtle);
+    padding-bottom: var(--space-2);
+}
+
+.inbox-tab {
+    padding: var(--space-2) var(--space-3);
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.inbox-tab.active {
+    background: var(--bg-card);
+    color: var(--primary);
+}
+
+.inbox-content {
+    min-height: 300px;
+}
+
+.inbox-empty {
+    text-align: center;
+    padding: var(--space-8);
+    color: var(--text-secondary);
+}
+
+.inbox-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.inbox-item {
+    display: flex;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.inbox-item:hover {
+    border-color: var(--primary);
+}
+
+.inbox-item-thumb {
+    width: 120px;
+    height: 68px;
+    border-radius: var(--radius-md);
+    object-fit: cover;
+    background: var(--bg-deep);
+}
+
+.inbox-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.inbox-item-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--space-1);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.inbox-item-meta {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+}
+
+.inbox-item-status {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: var(--radius-lg);
+    font-size: var(--text-xs);
+    margin-left: var(--space-2);
+}
+
+.inbox-item-status.pending {
+    background: rgba(201, 162, 39, 0.2);
+    color: var(--primary);
+}
+
+.inbox-item-status.replied {
+    background: rgba(16, 185, 129, 0.2);
+    color: var(--success);
+}
+
+.inbox-item-expires {
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+    margin-top: var(--space-1);
+}
+
+/* ========================================
+   VIDEO REPLY MODAL
+   ======================================== */
+
+.video-reply-form {
+    padding: var(--space-4);
+}
+
+.video-reply-form h3 {
+    margin-bottom: var(--space-4);
+    color: var(--text-primary);
+}
+
+.reply-video-container {
+    width: 100%;
+    max-width: 480px;
+    margin: 0 auto var(--space-4);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: var(--bg-deep);
+}
+
+.reply-video-container video {
+    width: 100%;
+    display: block;
+}
+
+.reply-form {
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.reply-type-selector {
+    display: flex;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+}
+
+.reply-type-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-2);
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.reply-type-btn.active {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: rgba(201, 162, 39, 0.1);
+}
+
+.reply-type-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
+.reply-form textarea {
+    width: 100%;
+    min-height: 100px;
+    padding: var(--space-3);
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: var(--text-base);
+    resize: vertical;
+    margin-bottom: var(--space-3);
+}
+
+.voice-recorder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-4);
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+}
+
+.voice-record-btn {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: var(--primary);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s;
+}
+
+.voice-record-btn:hover {
+    transform: scale(1.05);
+}
+
+.voice-record-btn svg {
+    width: 32px;
+    height: 32px;
+    color: var(--bg-deep);
+}
+
+.voice-status {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+}
+
+.reply-actions {
+    display: flex;
+    gap: var(--space-3);
+    justify-content: center;
+    margin-top: var(--space-4);
 }
 
 /* Video Trimming Controls */

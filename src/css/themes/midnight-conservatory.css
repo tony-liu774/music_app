@@ -31,6 +31,14 @@
     --text-secondary: #a0a0b0;
     --text-muted: #6a6a7a;
 
+    /* Accent (alias for primary, used in onboarding/tuner) */
+    --accent: #c9a227;
+    --accent-glow: rgba(201, 162, 39, 0.3);
+
+    /* Surface Aliases */
+    --bg-card: #1a1a28;
+    --border-subtle: #2a2a3a;
+
     /* Border Colors */
     --border: #2a2a3a;
     --border-light: #3a3a4a;

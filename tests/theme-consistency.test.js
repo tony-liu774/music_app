@@ -85,6 +85,10 @@ describe('Theme Consistency - Midnight Conservatory', () => {
             assert.ok(css.includes('--border:'), 'Missing --border variable');
             assert.ok(css.includes('--font-heading:'), 'Missing --font-heading variable');
             assert.ok(css.includes('--font-body:'), 'Missing --font-body variable');
+            assert.ok(css.includes('--accent:'), 'Missing --accent variable');
+            assert.ok(css.includes('--accent-glow:'), 'Missing --accent-glow variable');
+            assert.ok(css.includes('--bg-card:'), 'Missing --bg-card variable');
+            assert.ok(css.includes('--border-subtle:'), 'Missing --border-subtle variable');
             assert.ok(css.includes('--font-mono:'), 'Missing --font-mono variable');
         });
 
@@ -175,6 +179,44 @@ describe('Theme Consistency - Midnight Conservatory', () => {
             const css = readCSS('styles.css');
             assert.ok(css.includes('.video-snippet-btn'), 'Should include video snippet button');
             assert.ok(css.includes('.video-trim-controls'), 'Should include video trim controls');
+        });
+
+        it('should include video recorder modal styles', () => {
+            const css = readCSS('styles.css');
+            assert.ok(css.includes('.video-recorder'), 'Should include video-recorder');
+            assert.ok(css.includes('.video-preview-container'), 'Should include video-preview-container');
+            assert.ok(css.includes('.video-overlay'), 'Should include video-overlay');
+            assert.ok(css.includes('.record-button'), 'Should include record-button');
+            assert.ok(css.includes('.recording-indicator'), 'Should include recording-indicator');
+            assert.ok(css.includes('.recording-dot'), 'Should include recording-dot');
+            assert.ok(css.includes('.video-form'), 'Should include video-form');
+            assert.ok(css.includes('.video-actions'), 'Should include video-actions');
+        });
+
+        it('should include teacher inbox modal styles', () => {
+            const css = readCSS('styles.css');
+            assert.ok(css.includes('.teacher-inbox'), 'Should include teacher-inbox');
+            assert.ok(css.includes('.inbox-tabs'), 'Should include inbox-tabs');
+            assert.ok(css.includes('.inbox-tab'), 'Should include inbox-tab');
+            assert.ok(css.includes('.inbox-content'), 'Should include inbox-content');
+            assert.ok(css.includes('.inbox-list'), 'Should include inbox-list');
+            assert.ok(css.includes('.inbox-item'), 'Should include inbox-item');
+            assert.ok(css.includes('.inbox-item-thumb'), 'Should include inbox-item-thumb');
+            assert.ok(css.includes('.inbox-item-title'), 'Should include inbox-item-title');
+            assert.ok(css.includes('.inbox-item-status'), 'Should include inbox-item-status');
+        });
+
+        it('should include video reply modal styles', () => {
+            const css = readCSS('styles.css');
+            assert.ok(css.includes('.video-reply-form'), 'Should include video-reply-form');
+            assert.ok(css.includes('.reply-video-container'), 'Should include reply-video-container');
+            assert.ok(css.includes('.reply-form'), 'Should include reply-form');
+            assert.ok(css.includes('.reply-type-selector'), 'Should include reply-type-selector');
+            assert.ok(css.includes('.reply-type-btn'), 'Should include reply-type-btn');
+            assert.ok(css.includes('.voice-recorder'), 'Should include voice-recorder');
+            assert.ok(css.includes('.voice-record-btn'), 'Should include voice-record-btn');
+            assert.ok(css.includes('.voice-status'), 'Should include voice-status');
+            assert.ok(css.includes('.reply-actions'), 'Should include reply-actions');
         });
     });
 
