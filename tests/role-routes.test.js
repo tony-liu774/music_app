@@ -155,22 +155,25 @@ describe('Role Routes', () => {
             assert.strictEqual(res.status, 404);
         });
 
-        test('updates role from student to teacher', async () => {
+        test('rejects second role change (one-time enforcement)', async () => {
             const { user, token } = createTestUser();
             const app = createApp();
 
-            await request(app, 'POST', '/api/auth/role',
+            const first = await request(app, 'POST', '/api/auth/role',
                 { role: 'student' },
                 { Authorization: `Bearer ${token}` }
             );
+            assert.strictEqual(first.status, 200);
             assert.strictEqual(user.role, 'student');
 
-            const res = await request(app, 'POST', '/api/auth/role',
+            const second = await request(app, 'POST', '/api/auth/role',
                 { role: 'teacher' },
                 { Authorization: `Bearer ${token}` }
             );
-            assert.strictEqual(res.status, 200);
-            assert.strictEqual(user.role, 'teacher');
+            assert.strictEqual(second.status, 409);
+            assert.strictEqual(second.data.error, 'Role already set');
+            // Role should remain student
+            assert.strictEqual(user.role, 'student');
         });
     });
 

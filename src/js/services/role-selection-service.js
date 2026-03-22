@@ -99,13 +99,20 @@ class RoleSelectionService {
     }
 
     /**
-     * Generate a random invite code.
+     * Generate a cryptographically random invite code.
+     * Falls back to Math.random() if crypto API is unavailable (e.g., Node.js test env).
      * @returns {string}
      */
     _generateInviteCode() {
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        const len = 8;
+        if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+            const values = new Uint8Array(len);
+            crypto.getRandomValues(values);
+            return Array.from(values, v => chars[v % chars.length]).join('');
+        }
         let code = '';
-        for (let i = 0; i < 8; i++) {
+        for (let i = 0; i < len; i++) {
             code += chars.charAt(Math.floor(Math.random() * chars.length));
         }
         return code;

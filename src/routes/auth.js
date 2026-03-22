@@ -240,35 +240,19 @@ router.post('/logout', (req, res) => {
 
 /**
  * POST /api/auth/role
- * Set the user's role (student or teacher).
- * Requires authentication.
+ * Set the user's role (student or teacher). One-time only — rejects if role already set.
+ * Requires authentication via authMiddleware.
  */
-router.post('/role', authRateLimiter, (req, res) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ error: 'Authentication required' });
-    }
-
-    const token = authHeader.split(' ')[1];
-    let decoded;
-    try {
-        decoded = jwt.verify(token, JWT_SECRET);
-        if (decoded.type === 'refresh') {
-            return res.status(401).json({ error: 'Invalid token type' });
-        }
-    } catch {
-        return res.status(401).json({ error: 'Invalid or expired token' });
-    }
-
+router.post('/role', authRateLimiter, authMiddleware, (req, res) => {
     const { role } = req.body;
     if (!role || (role !== 'student' && role !== 'teacher')) {
         return res.status(400).json({ error: 'Role must be "student" or "teacher"' });
     }
 
-    // Find the user and update their role
+    // Find the user
     let foundUser = null;
     for (const user of users.values()) {
-        if (user.id === decoded.id) {
+        if (user.id === req.user.id) {
             foundUser = user;
             break;
         }
@@ -276,6 +260,11 @@ router.post('/role', authRateLimiter, (req, res) => {
 
     if (!foundUser) {
         return res.status(404).json({ error: 'User not found' });
+    }
+
+    // One-time enforcement: reject if role already set
+    if (foundUser.role) {
+        return res.status(409).json({ error: 'Role already set' });
     }
 
     foundUser.role = role;
@@ -289,28 +278,12 @@ router.post('/role', authRateLimiter, (req, res) => {
 /**
  * GET /api/auth/role
  * Get the current user's role.
- * Requires authentication.
+ * Requires authentication via authMiddleware.
  */
-router.get('/role', authRateLimiter, (req, res) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ error: 'Authentication required' });
-    }
-
-    const token = authHeader.split(' ')[1];
-    let decoded;
-    try {
-        decoded = jwt.verify(token, JWT_SECRET);
-        if (decoded.type === 'refresh') {
-            return res.status(401).json({ error: 'Invalid token type' });
-        }
-    } catch {
-        return res.status(401).json({ error: 'Invalid or expired token' });
-    }
-
+router.get('/role', authRateLimiter, authMiddleware, (req, res) => {
     let foundUser = null;
     for (const user of users.values()) {
-        if (user.id === decoded.id) {
+        if (user.id === req.user.id) {
             foundUser = user;
             break;
         }

@@ -523,6 +523,16 @@ class ConcertmasterApp {
      * @private
      */
     _applyUserRole(role) {
+        if (!role) {
+            // Corrupted state: selected flag is set but role is missing.
+            // Re-show role selection or default to student view.
+            if (this.roleSelectionService) {
+                this.roleSelectionService.clearRole();
+            }
+            this._showRoleSelection();
+            return;
+        }
+
         if (role === 'teacher') {
             // Enable teacher mode and show studio dashboard
             this.toggleTeacherMode(true);
