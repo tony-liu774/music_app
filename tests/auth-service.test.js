@@ -279,6 +279,85 @@ describe('AuthService', () => {
         assert.strictEqual(token, null);
         assert.strictEqual(auth.isAuthenticated(), false);
     });
+
+    it('should keep existing token when refresh fails due to network error (offline)', async () => {
+        const expiredToken = createMockJWT({ id: 'user1' }, -100);
+        localStorageMock.setItem('music_app_auth_token', expiredToken);
+        localStorageMock.setItem('music_app_refresh_token', 'refresh-token-123');
+
+        // Simulate network error (TypeError from fetch when offline)
+        fetchMockFn = async () => { throw new TypeError('Failed to fetch'); };
+
+        const events = [];
+        auth.onAuthStateChange((event) => events.push(event));
+
+        const token = await auth.getToken();
+        // Should return the existing token, not null
+        assert.strictEqual(token, expiredToken);
+        // Should NOT have logged out
+        assert.strictEqual(auth.isAuthenticated(), true);
+        // Should notify about offline refresh failure
+        assert.ok(events.includes('refresh_failed_offline'));
+    });
+
+    it('should keep token on Firefox-style network error', async () => {
+        const expiredToken = createMockJWT({ id: 'user1' }, -100);
+        localStorageMock.setItem('music_app_auth_token', expiredToken);
+        localStorageMock.setItem('music_app_refresh_token', 'refresh-token-123');
+
+        fetchMockFn = async () => {
+            throw new TypeError('NetworkError when attempting to fetch resource.');
+        };
+
+        const token = await auth.getToken();
+        assert.strictEqual(token, expiredToken);
+        assert.strictEqual(auth.isAuthenticated(), true);
+    });
+
+    it('should keep token when navigator.onLine is false', async () => {
+        const expiredToken = createMockJWT({ id: 'user1' }, -100);
+        localStorageMock.setItem('music_app_auth_token', expiredToken);
+        localStorageMock.setItem('music_app_refresh_token', 'refresh-token-123');
+
+        // navigator.onLine = false triggers the offline path even for generic TypeError
+        const origOnLine = navigator.onLine;
+        Object.defineProperty(navigator, 'onLine', { value: false, writable: true, configurable: true });
+
+        fetchMockFn = async () => { throw new TypeError('something unexpected'); };
+
+        const token = await auth.getToken();
+        assert.strictEqual(token, expiredToken);
+        assert.strictEqual(auth.isAuthenticated(), true);
+
+        // Restore
+        Object.defineProperty(navigator, 'onLine', { value: origOnLine, writable: true, configurable: true });
+    });
+
+    it('should still logout on non-network errors during refresh', async () => {
+        const expiredToken = createMockJWT({ id: 'user1' }, -100);
+        localStorageMock.setItem('music_app_auth_token', expiredToken);
+        localStorageMock.setItem('music_app_refresh_token', 'refresh-token-123');
+
+        // Simulate a non-network error (plain Error, not TypeError)
+        fetchMockFn = async () => { throw new Error('Some other error'); };
+
+        const token = await auth.getToken();
+        assert.strictEqual(token, null);
+        assert.strictEqual(auth.isAuthenticated(), false);
+    });
+
+    it('should logout on TypeError with non-network message when online', async () => {
+        const expiredToken = createMockJWT({ id: 'user1' }, -100);
+        localStorageMock.setItem('music_app_auth_token', expiredToken);
+        localStorageMock.setItem('music_app_refresh_token', 'refresh-token-123');
+
+        // A TypeError that is NOT a network error (e.g., programming bug)
+        fetchMockFn = async () => { throw new TypeError('Cannot read properties of undefined'); };
+
+        const token = await auth.getToken();
+        assert.strictEqual(token, null);
+        assert.strictEqual(auth.isAuthenticated(), false);
+    });
 });
 
 console.log('Running AuthService tests...');

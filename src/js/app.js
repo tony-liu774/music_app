@@ -434,15 +434,59 @@ class ConcertmasterApp {
             this.roleSelectionService = new RoleSelectionService(this.authService);
         }
 
+        // Initialize offline session manager and session persistence
+        if (typeof OfflineSessionManager !== 'undefined') {
+            this.offlineSessionManager = new OfflineSessionManager();
+        }
+
+        const syncService = typeof CloudSyncService !== 'undefined'
+            ? new CloudSyncService(this.authService)
+            : null;
+
+        if (typeof SessionPersistenceService !== 'undefined') {
+            this.sessionPersistence = new SessionPersistenceService(
+                this.authService,
+                this.offlineSessionManager || null,
+                { syncService }
+            );
+
+            // Restore session on startup (keeps user logged in across restarts)
+            await this.sessionPersistence.initialize();
+
+            // Register the service worker for offline caching and queue replay
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/sw.js').catch(err =>
+                    console.warn('SW registration failed:', err)
+                );
+
+                // Respond to SW token requests for offline queue replay
+                navigator.serviceWorker.addEventListener('message', async (event) => {
+                    if (event.data && event.data.type === 'REQUEST_AUTH_TOKEN') {
+                        if (event.ports && event.ports[0]) {
+                            const token = await this.authService.getToken();
+                            event.ports[0].postMessage({ token });
+                        }
+                    }
+                });
+            }
+        }
+
         // Fetch OAuth client IDs from the server endpoint
         await this.oauthService.fetchConfig();
 
-        // Listen for logout events to clear OAuth provider and role
+        // Listen for logout events to clear OAuth provider, role, and session
         this.authService.onAuthStateChange((event) => {
             if (event === 'logout') {
                 this.oauthService.clearProvider();
                 if (this.roleSelectionService) {
                     this.roleSelectionService.clearRole();
+                }
+                if (this.sessionPersistence) {
+                    this.sessionPersistence.onLogout();
+                }
+                // Clear API cache in SW to prevent cross-user data leakage
+                if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+                    navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_API_CACHE' });
                 }
             }
         });
@@ -457,6 +501,10 @@ class ConcertmasterApp {
                 onSuccess: (user, provider) => {
                     if (user) {
                         this.showToast(`Signed in as ${user.displayName || user.email}`, 'success');
+                        // Track session on login
+                        if (this.sessionPersistence) {
+                            this.sessionPersistence.onLogin(user);
+                        }
                     }
                     // Show role selection for new users (first sign-in)
                     if (user && this.roleSelectionService && !this.roleSelectionService.hasSelectedRole()) {
