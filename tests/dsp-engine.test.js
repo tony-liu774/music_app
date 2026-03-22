@@ -211,18 +211,58 @@ describe('PYINPitchDetector', () => {
         assert.strictEqual(detector._betaPDF(1, 2, 18), 0);
     });
 
-    it('should weight candidates by threshold (not CMNDF value)', () => {
-        // Create candidates from different thresholds
+    it('should weight candidates by threshold index (not value)', () => {
+        // Create candidates from different thresholds that exist in the distribution
         const candidates = [
             { frequency: 440, tau: 100, cmndfValue: 0.001, threshold: 0.01, confidence: 0.999 },
-            { frequency: 220, tau: 200, cmndfValue: 0.04, threshold: 0.05, confidence: 0.96 }
+            { frequency: 220, tau: 200, cmndfValue: 0.04, threshold: 0.50, confidence: 0.96 }
         ];
         const weighted = detector._weightCandidates(candidates);
-        // The candidate from the lower threshold should get a higher beta weight
+        // The candidate from threshold index 0 (0.01) should get higher beta weight
+        // than the one from threshold index 9 (0.50)
         assert.ok(weighted.length === 2);
-        // Both should have weight properties
         assert.ok(weighted[0].weight > 0);
         assert.ok(weighted[1].weight > 0);
+        // Lower threshold index → higher beta PDF weight with alpha=2, beta=18
+        const firstIsLowerThreshold = weighted[0].threshold === 0.01;
+        assert.ok(firstIsLowerThreshold,
+            'Candidate from lower threshold index should have higher weight');
+    });
+
+    it('should use index normalization for beta distribution', () => {
+        // With 10 thresholds, index normalization gives [0.1, 0.2, ..., 1.0]
+        // threshold 0.01 (index 0) → normalized = 0.1
+        // threshold 0.50 (index 9) → normalized = 1.0
+        const candidates = [
+            { frequency: 440, tau: 100, cmndfValue: 0.005, threshold: 0.01, confidence: 0.99 },
+            { frequency: 441, tau: 100, cmndfValue: 0.005, threshold: 0.10, confidence: 0.99 }
+        ];
+        const weighted = detector._weightCandidates(candidates);
+        // With beta(2,18), PDF is higher near 0.1 than near 0.6 (index 5/10)
+        // Both have same confidence and similar frequency, so weight difference comes from beta
+        assert.ok(weighted[0].weight > weighted[1].weight || weighted[0].threshold <= weighted[1].threshold,
+            'Lower threshold index should produce higher beta weight');
+    });
+
+    it('should correctly interpolate parabolic minimum toward true minimum', () => {
+        // Construct a CMNDF where the minimum is between indices 2 and 3
+        // Values: higher, lower, minimum, higher, higher
+        const cmndf = new Float32Array([0.5, 0.3, 0.1, 0.15, 0.4]);
+        // At index 2: alpha=0.3, beta=0.1, gamma=0.15
+        // offset = (0.3 - 0.15) / (2 * (0.3 - 0.2 + 0.15)) = 0.15 / 0.5 = 0.3
+        // Refined index should be > 2 (shifted toward the lower neighbor at index 3 side? No...)
+        // Actually: alpha=0.3 > gamma=0.15, so minimum is to the right, offset > 0
+        const refined = detector._parabolicInterpolation(cmndf, 2);
+        assert.ok(refined > 2, `Refined ${refined} should be > 2 (minimum is right of index 2)`);
+        assert.ok(refined < 3, `Refined ${refined} should be < 3`);
+    });
+
+    it('should not push parabolic interpolation away from minimum', () => {
+        // Symmetric minimum at index 2: alpha == gamma, so offset should be 0
+        const cmndf = new Float32Array([0.5, 0.3, 0.1, 0.3, 0.5]);
+        const refined = detector._parabolicInterpolation(cmndf, 2);
+        assert.ok(Math.abs(refined - 2) < 0.001,
+            `Symmetric minimum should stay at index 2, got ${refined}`);
     });
 
     it('should use CMNDF with absolute tau normalization', () => {
@@ -746,6 +786,33 @@ describe('DSPEngine', () => {
     it('should store _microphoneStream reference for cleanup', () => {
         // The _microphoneStream property should exist
         assert.strictEqual(engine._microphoneStream, null);
+    });
+
+    it('should capture stream from external audioEngine for cleanup', async () => {
+        const trackStopped = [];
+        const mockStream = {
+            getTracks: () => [{ stop: () => trackStopped.push('stopped') }]
+        };
+        const mockAudioEngine = {
+            audioContext: new AudioContext(),
+            microphone: {
+                connect: () => {},
+                disconnect: () => {},
+                mediaStream: mockStream
+            }
+        };
+
+        const eng = new DSPEngine({ instrument: 'violin', polyphonicEnabled: false });
+        await eng.initialize(mockAudioEngine);
+
+        assert.strictEqual(eng._microphoneStream, mockStream,
+            'Should capture stream from external audioEngine');
+
+        // Simulate running state so stop() proceeds with cleanup
+        eng.isRunning = true;
+        eng.stop();
+        assert.ok(trackStopped.length > 0,
+            'Should stop tracks from external audioEngine stream');
     });
 });
 

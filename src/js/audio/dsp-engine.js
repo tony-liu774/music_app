@@ -1,12 +1,11 @@
 /**
  * Core DSP Engine - High-Performance Pitch Detection Pipeline
  *
- * Architecture: Web Audio API → AudioWorkletNode (preferred) or
- *               ScriptProcessorNode (fallback) → DSP Pipeline
- * Latency budget: <30ms from microphone input to visual UI update
+ * Architecture: Web Audio API → ScriptProcessorNode → DSP Pipeline
+ * Latency budget: <30ms processing per frame (collection window is 23.2ms)
  *   - Buffer size 1024 samples at 44100Hz = 23.2ms collection time
- *   - AudioWorklet processes off main thread to avoid GC/rendering jitter
- *   - ScriptProcessorNode fallback for browsers without AudioWorklet support
+ *   - ScriptProcessorNode runs on main thread (bundler-free, no worklet file needed)
+ *   - Future: migrate to AudioWorkletNode for off-main-thread processing
  *
  * Pipeline stages:
  *   1. PYINPitchDetector  - Probabilistic YIN with multi-candidate thresholding
@@ -188,7 +187,8 @@ class PYINPitchDetector {
         const alpha = cmndf[index - 1];
         const beta = cmndf[index];
         const gamma = cmndf[index + 1];
-        const denominator = 2 * (2 * beta - alpha - gamma);
+        // Standard parabolic minimum: offset = (alpha - gamma) / (2 * (alpha - 2*beta + gamma))
+        const denominator = 2 * (alpha - 2 * beta + gamma);
 
         if (Math.abs(denominator) < 1e-12) return index;
 
@@ -203,14 +203,15 @@ class PYINPitchDetector {
     _weightCandidates(candidates) {
         if (candidates.length === 0) return [];
 
-        // Normalize threshold to [0, 1] range for beta distribution
-        const maxThreshold = this.thresholdDistribution[this.thresholdDistribution.length - 1];
+        const numThresholds = this.thresholdDistribution.length;
 
         return candidates.map(c => {
-            // Beta distribution weight applied to the threshold that found this candidate
-            // (not to the CMNDF value). Per pYIN paper, the prior is over thresholds.
-            const normalizedThreshold = Math.max(0.001, Math.min(0.999, c.threshold / maxThreshold));
-            const betaWeight = this._betaPDF(normalizedThreshold, this.betaAlpha, this.betaBeta);
+            // Beta distribution weight applied to the threshold INDEX that found this candidate
+            // (per pYIN paper, Mauch & Dixon 2014). Thresholds are uniformly indexed in [0,1].
+            const thresholdIndex = this.thresholdDistribution.indexOf(c.threshold);
+            const normalizedIndex = Math.max(0.001, Math.min(0.999,
+                (thresholdIndex + 1) / numThresholds));
+            const betaWeight = this._betaPDF(normalizedIndex, this.betaAlpha, this.betaBeta);
 
             // Temporal continuity bonus: penalize large pitch jumps from previous frame
             let continuityBonus = 1.0;
@@ -731,7 +732,10 @@ class DSPEngine {
         this.onLevelChange = null;
         this.onPerformanceWarning = null;
 
-        // UI update throttling for 60fps
+        // UI update throttling for 60fps (~16.67ms interval).
+        // At bufferSize=1024/44100Hz the callback fires every ~23.2ms, so the
+        // throttle is passive at default settings. It becomes active if a
+        // smaller buffer size (e.g., 512) is used.
         this._lastUIUpdate = 0;
         this._uiUpdateInterval = 1000 / 60; // ~16.67ms
     }
@@ -745,6 +749,11 @@ class DSPEngine {
             if (audioEngine) {
                 this.audioContext = audioEngine.audioContext;
                 this.microphoneSource = audioEngine.microphone;
+                // Capture stream reference for cleanup;
+                // MediaStreamAudioSourceNode exposes .mediaStream
+                if (audioEngine.microphone && audioEngine.microphone.mediaStream) {
+                    this._microphoneStream = audioEngine.microphone.mediaStream;
+                }
             }
 
             // Initialize polyphonic detector if available
