@@ -151,7 +151,9 @@ class AuthService {
     }
 
     /**
-     * Refresh the auth token using the refresh token
+     * Refresh the auth token using the refresh token.
+     * When offline (network error), keeps the existing token instead of logging out,
+     * so the user stays authenticated in basement practice rooms with bad Wi-Fi.
      * @returns {Promise<string|null>} New token or null
      * @private
      */
@@ -180,7 +182,16 @@ class AuthService {
                 localStorage.setItem(this.refreshTokenKey, data.refreshToken);
             }
             return data.token;
-        } catch {
+        } catch (error) {
+            // Network error (offline) - keep existing token, don't logout
+            // This allows the app to function in practice rooms with bad Wi-Fi
+            const isNetworkError = error instanceof TypeError ||
+                (error && error.message && error.message.includes('fetch'));
+            if (isNetworkError) {
+                const existingToken = localStorage.getItem(this.tokenKey);
+                this._notifyListeners('refresh_failed_offline', null);
+                return existingToken;
+            }
             this.logout();
             return null;
         }

@@ -279,6 +279,39 @@ describe('AuthService', () => {
         assert.strictEqual(token, null);
         assert.strictEqual(auth.isAuthenticated(), false);
     });
+
+    it('should keep existing token when refresh fails due to network error (offline)', async () => {
+        const expiredToken = createMockJWT({ id: 'user1' }, -100);
+        localStorageMock.setItem('music_app_auth_token', expiredToken);
+        localStorageMock.setItem('music_app_refresh_token', 'refresh-token-123');
+
+        // Simulate network error (TypeError from fetch when offline)
+        fetchMockFn = async () => { throw new TypeError('Failed to fetch'); };
+
+        const events = [];
+        auth.onAuthStateChange((event) => events.push(event));
+
+        const token = await auth.getToken();
+        // Should return the existing token, not null
+        assert.strictEqual(token, expiredToken);
+        // Should NOT have logged out
+        assert.strictEqual(auth.isAuthenticated(), true);
+        // Should notify about offline refresh failure
+        assert.ok(events.includes('refresh_failed_offline'));
+    });
+
+    it('should still logout on non-network errors during refresh', async () => {
+        const expiredToken = createMockJWT({ id: 'user1' }, -100);
+        localStorageMock.setItem('music_app_auth_token', expiredToken);
+        localStorageMock.setItem('music_app_refresh_token', 'refresh-token-123');
+
+        // Simulate a non-network error
+        fetchMockFn = async () => { throw new Error('Some other error'); };
+
+        const token = await auth.getToken();
+        assert.strictEqual(token, null);
+        assert.strictEqual(auth.isAuthenticated(), false);
+    });
 });
 
 console.log('Running AuthService tests...');
