@@ -183,11 +183,17 @@ class AuthService {
             }
             return data.token;
         } catch (error) {
-            // Network error (offline) - keep existing token, don't logout
-            // This allows the app to function in practice rooms with bad Wi-Fi
-            const isNetworkError = error instanceof TypeError ||
-                (error && error.message && error.message.includes('fetch'));
-            if (isNetworkError) {
+            // Network error (offline) - keep existing token, don't logout.
+            // This allows the app to function in practice rooms with bad Wi-Fi.
+            // We check navigator.onLine as the primary signal and the exact
+            // browser error messages as a secondary heuristic.
+            const navigatorOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
+            const isFailedFetch = error instanceof TypeError && (
+                error.message === 'Failed to fetch' ||               // Chrome/Edge
+                error.message === 'NetworkError when attempting to fetch resource.' || // Firefox
+                error.message === 'Load failed'                      // Safari
+            );
+            if (navigatorOffline || isFailedFetch) {
                 const existingToken = localStorage.getItem(this.tokenKey);
                 this._notifyListeners('refresh_failed_offline', null);
                 return existingToken;

@@ -298,6 +298,28 @@ describe('OfflineSessionManager', () => {
         assert.ok(unsynced.every(s => s.synced === false));
     });
 
+    it('should filter unsynced sessions by userId', async () => {
+        await manager.saveSession({ id: 's1', userId: 'user-a' });
+        await manager.saveSession({ id: 's2', userId: 'user-b' });
+        await manager.saveSession({ id: 's3', userId: 'user-a' });
+
+        const userASessions = await manager.getUnsyncedSessions('user-a');
+        assert.strictEqual(userASessions.length, 2);
+        assert.ok(userASessions.every(s => s.userId === 'user-a'));
+
+        const userBSessions = await manager.getUnsyncedSessions('user-b');
+        assert.strictEqual(userBSessions.length, 1);
+        assert.strictEqual(userBSessions[0].userId, 'user-b');
+    });
+
+    it('should return all unsynced sessions when no userId provided', async () => {
+        await manager.saveSession({ id: 's1', userId: 'user-a' });
+        await manager.saveSession({ id: 's2', userId: 'user-b' });
+
+        const all = await manager.getUnsyncedSessions();
+        assert.strictEqual(all.length, 2);
+    });
+
     it('should mark a session as synced', async () => {
         await manager.saveSession({ id: 's1' });
         await manager.markSynced('s1');

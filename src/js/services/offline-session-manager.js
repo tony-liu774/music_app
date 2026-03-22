@@ -159,10 +159,13 @@ class OfflineSessionManager {
     }
 
     /**
-     * Get all unsynced sessions
+     * Get all unsynced sessions, optionally filtered by userId.
+     * When userId is provided, only returns sessions belonging to that user,
+     * preventing cross-user data leakage on shared devices.
+     * @param {string} [userId] - Optional user ID to filter by
      * @returns {Promise<Array>}
      */
-    async getUnsyncedSessions() {
+    async getUnsyncedSessions(userId) {
         const db = await this.open();
         return new Promise((resolve, reject) => {
             const tx = db.transaction(this.sessionStore, 'readonly');
@@ -170,7 +173,13 @@ class OfflineSessionManager {
             const index = store.index('synced');
             const request = index.getAll(false);
 
-            request.onsuccess = () => resolve(request.result || []);
+            request.onsuccess = () => {
+                let results = request.result || [];
+                if (userId) {
+                    results = results.filter(s => s.userId === userId);
+                }
+                resolve(results);
+            };
             request.onerror = (event) => reject(new Error(`Failed to get unsynced sessions: ${event.target.error}`));
         });
     }
@@ -198,25 +207,29 @@ class OfflineSessionManager {
     }
 
     /**
-     * Mark a session as synced
+     * Mark a session as synced using a single atomic readwrite transaction
+     * to prevent lost updates from concurrent writes.
      * @param {string} id
      * @returns {Promise<void>}
      */
     async markSynced(id) {
         const db = await this.open();
-        const session = await this.getSession(id);
-        if (!session) return;
-
-        session.synced = true;
-        session.syncedAt = Date.now();
-
         return new Promise((resolve, reject) => {
             const tx = db.transaction(this.sessionStore, 'readwrite');
             const store = tx.objectStore(this.sessionStore);
-            const request = store.put(session);
+            const getReq = store.get(id);
 
-            request.onsuccess = () => resolve();
-            request.onerror = (event) => reject(new Error(`Failed to mark synced: ${event.target.error}`));
+            getReq.onsuccess = () => {
+                const session = getReq.result;
+                if (!session) return resolve();
+
+                session.synced = true;
+                session.syncedAt = Date.now();
+                const putReq = store.put(session);
+                putReq.onsuccess = () => resolve();
+                putReq.onerror = (event) => reject(new Error(`Failed to mark synced: ${event.target.error}`));
+            };
+            getReq.onerror = (event) => reject(new Error(`Failed to get session for sync: ${event.target.error}`));
         });
     }
 

@@ -1,4 +1,5 @@
 const CACHE_NAME = 'concertmaster-v2';
+const API_CACHE_NAME = 'concertmaster-api-v2';
 const ASSETS = [
     '/',
     '/index.html',
@@ -15,6 +16,8 @@ const ASSETS = [
 const OFFLINE_QUEUE_DB = 'ConcertmasterSWQueue';
 const OFFLINE_QUEUE_STORE = 'requests';
 const SYNC_TAG = 'concertmaster-sync';
+const MAX_QUEUE_RETRIES = 10;
+const MAX_QUEUE_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 /**
  * Open the service worker's IndexedDB queue for failed API requests
@@ -34,7 +37,8 @@ function openQueueDB() {
 }
 
 /**
- * Queue a failed POST/PUT request for later replay
+ * Queue a failed POST/PUT request for later replay.
+ * Authorization headers are stripped — fresh tokens will be requested on replay.
  */
 async function queueFailedRequest(request, body) {
     try {
@@ -42,9 +46,12 @@ async function queueFailedRequest(request, body) {
         const tx = db.transaction(OFFLINE_QUEUE_STORE, 'readwrite');
         const store = tx.objectStore(OFFLINE_QUEUE_STORE);
 
+        // Collect headers but strip Authorization to avoid storing credentials
         const headers = {};
         for (const [key, value] of request.headers.entries()) {
-            headers[key] = value;
+            if (key.toLowerCase() !== 'authorization') {
+                headers[key] = value;
+            }
         }
 
         store.add({
@@ -52,7 +59,8 @@ async function queueFailedRequest(request, body) {
             method: request.method,
             headers,
             body: body || null,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            retries: 0
         });
 
         return new Promise((resolve) => {
@@ -65,7 +73,29 @@ async function queueFailedRequest(request, body) {
 }
 
 /**
- * Replay all queued requests
+ * Request a fresh auth token from the main thread via postMessage.
+ * Returns the token string or null if unavailable.
+ */
+async function requestFreshToken() {
+    const clients = await self.clients.matchAll({ type: 'window' });
+    if (clients.length === 0) return null;
+
+    return new Promise((resolve) => {
+        const channel = new MessageChannel();
+        const timeout = setTimeout(() => resolve(null), 5000);
+
+        channel.port1.onmessage = (event) => {
+            clearTimeout(timeout);
+            resolve(event.data && event.data.token ? event.data.token : null);
+        };
+
+        clients[0].postMessage({ type: 'REQUEST_AUTH_TOKEN' }, [channel.port2]);
+    });
+}
+
+/**
+ * Replay all queued requests with fresh auth tokens.
+ * Entries exceeding MAX_QUEUE_RETRIES or MAX_QUEUE_AGE_MS are discarded.
  */
 async function replayQueuedRequests() {
     try {
@@ -79,28 +109,74 @@ async function replayQueuedRequests() {
             req.onerror = () => resolve([]);
         });
 
+        if (items.length === 0) return;
+
+        // Get a fresh token for authenticated requests
+        const freshToken = await requestFreshToken();
+
         const successIds = [];
+        const expiredIds = [];
+        const retryIds = [];
+
         for (const item of items) {
+            // Discard entries that are too old
+            if (Date.now() - item.timestamp > MAX_QUEUE_AGE_MS) {
+                expiredIds.push(item.id);
+                continue;
+            }
+
+            // Discard entries that have exceeded max retries
+            if ((item.retries || 0) >= MAX_QUEUE_RETRIES) {
+                expiredIds.push(item.id);
+                continue;
+            }
+
             try {
+                // Re-attach fresh Authorization header if we have a token
+                const headers = { ...item.headers };
+                if (freshToken) {
+                    headers['Authorization'] = `Bearer ${freshToken}`;
+                }
+
+                // Don't send body for GET/HEAD requests
+                const hasBody = item.method !== 'GET' && item.method !== 'HEAD';
+
                 const response = await fetch(item.url, {
                     method: item.method,
-                    headers: item.headers,
-                    body: item.body
+                    headers,
+                    body: hasBody ? item.body : undefined
                 });
+
                 if (response.ok) {
                     successIds.push(item.id);
+                } else {
+                    retryIds.push(item.id);
                 }
             } catch {
-                // Still offline or server error - leave in queue
+                retryIds.push(item.id);
             }
         }
 
-        // Remove successfully replayed items
-        if (successIds.length > 0) {
-            const deleteTx = db.transaction(OFFLINE_QUEUE_STORE, 'readwrite');
-            const deleteStore = deleteTx.objectStore(OFFLINE_QUEUE_STORE);
-            for (const id of successIds) {
-                deleteStore.delete(id);
+        // Remove successful and expired items, increment retries for failures
+        const removeIds = [...successIds, ...expiredIds];
+        if (removeIds.length > 0 || retryIds.length > 0) {
+            const writeTx = db.transaction(OFFLINE_QUEUE_STORE, 'readwrite');
+            const writeStore = writeTx.objectStore(OFFLINE_QUEUE_STORE);
+
+            for (const id of removeIds) {
+                writeStore.delete(id);
+            }
+
+            // Increment retry count for failed items
+            for (const id of retryIds) {
+                const getReq = writeStore.get(id);
+                getReq.onsuccess = () => {
+                    const entry = getReq.result;
+                    if (entry) {
+                        entry.retries = (entry.retries || 0) + 1;
+                        writeStore.put(entry);
+                    }
+                };
             }
         }
 
@@ -110,7 +186,8 @@ async function replayQueuedRequests() {
             client.postMessage({
                 type: 'SYNC_COMPLETE',
                 replayed: successIds.length,
-                remaining: items.length - successIds.length
+                expired: expiredIds.length,
+                remaining: retryIds.length
             });
         }
     } catch {
@@ -123,7 +200,6 @@ self.addEventListener('install', event => {
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(cache => {
-                console.log('Concertmaster: Caching app assets');
                 return cache.addAll(ASSETS);
             })
             .then(() => self.skipWaiting())
@@ -136,7 +212,7 @@ self.addEventListener('activate', event => {
         caches.keys().then(cacheNames => {
             return Promise.all(
                 cacheNames
-                    .filter(name => name !== CACHE_NAME)
+                    .filter(name => name !== CACHE_NAME && name !== API_CACHE_NAME)
                     .map(name => caches.delete(name))
             );
         }).then(() => self.clients.claim())
@@ -149,7 +225,7 @@ self.addEventListener('fetch', event => {
 
     // API calls - network first, queue POST/PUT on failure
     if (url.pathname.startsWith('/api/')) {
-        // For sync and session endpoints, intercept and queue if offline
+        // For write requests, intercept and queue if offline
         if (event.request.method === 'POST' || event.request.method === 'PUT') {
             event.respondWith(
                 event.request.clone().text().then(body => {
@@ -177,14 +253,15 @@ self.addEventListener('fetch', event => {
             return;
         }
 
-        // GET requests - network first with cache fallback
+        // GET requests - network first, cache in separate API cache (cleared on logout)
         event.respondWith(
             fetch(event.request)
                 .then(response => {
-                    // Cache successful GET API responses for offline access
-                    if (response.ok) {
+                    // Only cache successful non-authenticated GET responses
+                    // Skip caching for authenticated API responses to avoid cross-user leakage
+                    if (response.ok && !event.request.headers.has('Authorization')) {
                         const responseToCache = response.clone();
-                        caches.open(CACHE_NAME).then(cache => {
+                        caches.open(API_CACHE_NAME).then(cache => {
                             cache.put(event.request, responseToCache);
                         });
                     }
@@ -232,9 +309,29 @@ self.addEventListener('sync', event => {
     }
 });
 
-// Message handler - allows the main thread to trigger sync
+// Message handler - allows the main thread to trigger sync or clear API cache on logout
 self.addEventListener('message', event => {
-    if (event.data && event.data.type === 'TRIGGER_SYNC') {
-        replayQueuedRequests();
+    if (!event.data) return;
+
+    if (event.data.type === 'TRIGGER_SYNC') {
+        event.waitUntil(replayQueuedRequests());
+    } else if (event.data.type === 'CLEAR_API_CACHE') {
+        // Called on logout to prevent cross-user data leakage
+        event.waitUntil(caches.delete(API_CACHE_NAME));
     }
 });
+
+// Export for testing
+if (typeof module !== 'undefined') {
+    module.exports = {
+        queueFailedRequest,
+        replayQueuedRequests,
+        requestFreshToken,
+        openQueueDB,
+        CACHE_NAME,
+        API_CACHE_NAME,
+        MAX_QUEUE_RETRIES,
+        MAX_QUEUE_AGE_MS,
+        SYNC_TAG
+    };
+}

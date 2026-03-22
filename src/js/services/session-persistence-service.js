@@ -151,9 +151,11 @@ class SessionPersistenceService {
         const results = { sessions: null, queue: null, cloudSync: null };
 
         try {
-            // 1. Upload unsynced sessions from IndexedDB
+            // 1. Upload unsynced sessions from IndexedDB (user-scoped)
             if (this.offlineManager) {
-                const unsyncedSessions = await this.offlineManager.getUnsyncedSessions();
+                const session = this._getSessionMeta();
+                const currentUserId = session && session.userId;
+                const unsyncedSessions = await this.offlineManager.getUnsyncedSessions(currentUserId);
 
                 if (unsyncedSessions.length > 0) {
                     const headers = await this.authService.getAuthHeaders();
@@ -238,7 +240,9 @@ class SessionPersistenceService {
     // --- Private methods ---
 
     /**
-     * Silent token refresh - doesn't logout if offline
+     * Attempt to refresh the token silently.
+     * Does not logout if offline — the stored token may still be valid for local use.
+     * When online and an error occurs, notifies listeners so the issue is observable.
      * @private
      */
     async _silentRefresh() {
@@ -248,9 +252,10 @@ class SessionPersistenceService {
                 this._updateSessionMeta({ lastRefresh: Date.now() });
                 return true;
             }
-        } catch {
-            // If offline, don't logout - the stored token may still be valid
+        } catch (error) {
             if (!this._isOnline) return false;
+            // Online but refresh failed — notify so the issue is observable
+            this._notifyListeners('refresh_error', error && error.message);
         }
         return false;
     }
@@ -264,9 +269,9 @@ class SessionPersistenceService {
         this._heartbeatTimer = setInterval(() => {
             this._updateSessionMeta({ lastSeen: Date.now() });
 
-            // Try silent refresh if online
+            // Try silent refresh if online; catch to prevent unhandled rejection
             if (this._isOnline) {
-                this._silentRefresh();
+                this._silentRefresh().catch(() => {});
             }
         }, this.heartbeatInterval);
 
