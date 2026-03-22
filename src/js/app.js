@@ -71,6 +71,10 @@ class ConcertmasterApp {
         this.authService = null;
         this.oauthService = null;
         this.ssoLoginUI = null;
+
+        // License service
+        this.licenseService = null;
+        this.licenseUI = null;
     }
 
     async init() {
@@ -106,6 +110,9 @@ class ConcertmasterApp {
             // Initialize teacher mode if enabled
             this.initTeacherMode();
 
+            // Initialize license service (always needed for feature gating)
+            await this.initLicense();
+
             // Initialize video snippet feature
             this.initVideoSnippets();
 
@@ -133,7 +140,8 @@ class ConcertmasterApp {
             metronome: document.getElementById('metronome-view'),
             settings: document.getElementById('settings-view'),
             tuner: document.getElementById('tuner-view'),
-            studio: document.getElementById('studio-dashboard-view')
+            studio: document.getElementById('studio-dashboard-view'),
+            license: document.getElementById('license-view')
         };
 
         this.toastContainer = document.getElementById('toast-container');
@@ -1088,6 +1096,71 @@ class ConcertmasterApp {
         } else if (enabled && this.studioDashboard) {
             await this.studioDashboard.refresh();
         }
+    }
+
+    // ============================================
+    // License Service
+    // ============================================
+
+    async initLicense() {
+        // Initialize license service
+        if (!this.licenseService) {
+            this.licenseService = new LicenseService(this.apiBaseUrl);
+            this.licenseService.init();
+        }
+
+        // Initialize license UI
+        if (!this.licenseUI) {
+            this.licenseUI = new StudioLicenseUI(
+                this.licenseService,
+                this.authService,
+                () => this.applyFeatureGating() // Callback to re-apply feature gating on license change
+            );
+            await this.licenseUI.init();
+        }
+
+        // Apply feature gating
+        this.applyFeatureGating();
+    }
+
+    /**
+     * Apply feature gating based on license status
+     */
+    applyFeatureGating() {
+        if (!this.licenseService) return;
+
+        // Feature gating for navigation and UI elements
+        const featuresToGate = [
+            { id: 'studioDashboard', selector: '.studio-nav-link' },
+            { id: 'aiCoach', selector: '#ai-coach-toggle, .ai-coach-section' },
+            { id: 'heatMap', selector: '#heatmap-btn' },
+            { id: 'omrScanner', selector: '#scan-music-btn' },
+            { id: 'communityLibrary', selector: '#library-upload-btn' },
+            { id: 'scaleEngine', selector: '#scale-engine-btn' },
+            { id: 'annotations', selector: '#annotation-toolbar' },
+            { id: 'teacherReports', selector: '#generate-report-btn' },
+            { id: 'videoSnippets', selector: '#video-snippet-btn' },
+            { id: 'bluetoothPedal', selector: '#bluetooth-pedal-toggle' },
+            { id: 'advancedDSP', selector: '.advanced-dsp-toggle' }
+        ];
+
+        featuresToGate.forEach(feature => {
+            const hasFeature = this.licenseService.hasFeature(feature.id);
+            document.querySelectorAll(feature.selector).forEach(el => {
+                // Only apply gating if element wasn't explicitly hidden by other code
+                // Use data attribute to track explicit hides vs license-gated hides
+                if (el.dataset.explicitHide === 'true') return;
+                el.style.display = hasFeature ? '' : 'none';
+            });
+        });
+
+        // Show/hide studio dashboard based on license
+        const tier = this.licenseService.getTier();
+        const studioNavLinks = document.querySelectorAll('.studio-nav-link');
+        studioNavLinks.forEach(link => {
+            // Show studio dashboard if pro/studio or teacher mode enabled
+            link.style.display = (tier === 'pro' || tier === 'studio' || this.isTeacherMode) ? '' : 'none';
+        });
     }
 
     // ============================================

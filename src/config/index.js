@@ -30,4 +30,7 @@ module.exports = {
     expiresIn: process.env.JWT_EXPIRES_IN || '1h',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
   },
+  app: {
+    baseUrl: process.env.APP_BASE_URL || 'http://localhost:3000',
+  },
 };

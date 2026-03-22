@@ -14,6 +14,7 @@ const authRoutes = require('./routes/auth');
 const oauthRoutes = require('./routes/oauth');
 const syncRoutes = require('./routes/sync');
 const notificationRoutes = require('./routes/notifications');
+const licenseRoutes = require('./routes/license');
 const scheduler = require('./services/scheduler');
 
 const app = express();
@@ -93,6 +94,9 @@ app.use('/api/sync', syncRoutes);
 
 // Push notifications routes
 app.use('/api/notifications', notificationRoutes);
+
+// License and subscription routes
+app.use('/api/licenses', licenseRoutes);
 
 // API routes (placeholder for future routes)
 app.use('/api', (req, res) => {
