@@ -22,8 +22,6 @@ const ALLOWED_HARDCODED = [
     '#ffffff', // Google sign-in button (branded)
     '#000000', // Apple sign-in button (branded)
     '#1f1f1f', // Google button text (branded)
-    '#ffd700', // Follow-the-ball gradient (decorative)
-    '#8b6914', // Follow-the-ball gradient (decorative)
     '#e6b800', // Badge gradient (decorative)
     '#2d5a4a', // Pro badge gradient (decorative)
     '#1a3d30', // Pro badge gradient (decorative)
