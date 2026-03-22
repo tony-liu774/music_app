@@ -13,6 +13,7 @@ class RoleSelectionUI {
         this.container = null;
         this._onRoleSelected = null;
         this._abortController = null;
+        this._isSelecting = false;
     }
 
     /**
@@ -163,6 +164,10 @@ class RoleSelectionUI {
      * @private
      */
     async _handleRoleSelect(role) {
+        // Guard against double-clicks while an async setRole is in-flight
+        if (this._isSelecting) return;
+        this._isSelecting = true;
+
         // Add selected state visually
         const cards = this.container.querySelectorAll('.role-card');
         cards.forEach(card => card.classList.remove('selected'));

@@ -141,13 +141,16 @@ class RoleSelectionService {
             const headers = await this.authService.getAuthHeaders();
             if (!headers.Authorization) return;
 
-            await fetch(`${this.apiBaseUrl}/api/auth/role`, {
+            const response = await fetch(`${this.apiBaseUrl}/api/auth/role`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...headers },
                 body: JSON.stringify({ role })
             });
-        } catch {
-            // Network error - role is persisted locally, sync will happen later
+            if (!response.ok) {
+                console.warn(`Role sync failed with status ${response.status}`);
+            }
+        } catch (err) {
+            console.warn('Role sync network error:', err.message || err);
         }
     }
 

@@ -495,6 +495,10 @@ class ConcertmasterApp {
         this.roleSelectionUI.init({
             onRoleSelected: (role, inviteLink) => {
                 if (role === 'skip') {
+                    // Default to student view so the user is not left in limbo.
+                    // Mark role as selected so the screen does not re-appear on reload.
+                    this.roleSelectionService.setRole('student');
+                    this._applyUserRole('student');
                     return;
                 }
                 this._applyUserRole(role);

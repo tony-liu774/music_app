@@ -323,4 +323,38 @@ describe('RoleSelectionUI', () => {
         document.getElementById('role-student-card').click();
         await new Promise(r => setTimeout(r, 50));
     });
+
+    test('skip does not call setRole on the service', () => {
+        let selectedRole = null;
+
+        ui = new RoleSelectionUI(roleService);
+        ui.init({
+            onRoleSelected: (role) => { selectedRole = role; }
+        });
+        ui.show();
+
+        document.getElementById('role-skip-btn').click();
+
+        expect(selectedRole).toBe('skip');
+        // The UI should NOT have called setRole — that responsibility belongs to app.js
+        expect(roleService.getRole()).toBeNull();
+        expect(roleService.hasSelectedRole()).toBe(false);
+    });
+
+    test('double-click on role card does not trigger duplicate setRole calls', async () => {
+        let callCount = 0;
+
+        ui = new RoleSelectionUI(roleService);
+        ui.init({
+            onRoleSelected: () => { callCount++; }
+        });
+        ui.show();
+
+        const card = document.getElementById('role-student-card');
+        card.click();
+        card.click(); // second click while first is in-flight
+        await new Promise(r => setTimeout(r, 100));
+
+        expect(callCount).toBe(1);
+    });
 });

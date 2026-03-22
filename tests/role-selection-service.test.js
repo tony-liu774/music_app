@@ -148,13 +148,22 @@ describe('RoleSelectionService', () => {
         assert.strictEqual(lastFetchUrl, null);
     });
 
-    test('setRole handles fetch failure gracefully', async () => {
+    test('setRole handles fetch failure gracefully and logs warning', async () => {
         mockAuthService._authenticated = true;
         global.fetch = async () => { throw new Error('Network error'); };
+
+        const warnings = [];
+        const origWarn = console.warn;
+        console.warn = (...args) => warnings.push(args);
 
         // Should not throw
         await service.setRole('student');
         assert.strictEqual(service.getRole(), 'student');
+        assert.ok(warnings.length > 0, 'should have logged a warning');
+        assert.ok(warnings[0].some(a => typeof a === 'string' && a.includes('network error')),
+            'warning should mention network error');
+
+        console.warn = origWarn;
 
         // Restore fetch
         global.fetch = async (url, options) => {
@@ -162,6 +171,22 @@ describe('RoleSelectionService', () => {
             lastFetchOptions = options;
             return fetchResult;
         };
+    });
+
+    test('setRole logs warning on non-ok HTTP response', async () => {
+        mockAuthService._authenticated = true;
+        fetchResult = { ok: false, status: 409, json: async () => ({ error: 'Role already set' }) };
+
+        const warnings = [];
+        const origWarn = console.warn;
+        console.warn = (...args) => warnings.push(args);
+
+        await service.setRole('student');
+        assert.strictEqual(service.getRole(), 'student');
+        assert.ok(warnings.length > 0, 'should have logged a warning');
+        assert.ok(warnings[0][0].includes('409'), 'warning should mention status code');
+
+        console.warn = origWarn;
     });
 
     test('clearRole removes all role data', async () => {
