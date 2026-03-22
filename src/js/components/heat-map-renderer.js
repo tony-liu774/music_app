@@ -124,7 +124,7 @@ class HeatMapRenderer {
             ctx.fillText(data.measure, x + barWidth / 2, height - 5);
 
             // Draw score above bar
-            ctx.fillStyle = '#f5f5dc';
+            ctx.fillStyle = '#f3f4f6';
             ctx.fillText(Math.round(data.score) + '%', x + barWidth / 2, y - 5);
         });
     }

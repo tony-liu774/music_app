@@ -596,7 +596,7 @@ class OMRClient {
                     // Add camera guide overlay
                     const guide = document.createElement('div');
                     guide.style.cssText = 'border: 2px dashed rgba(201, 162, 39, 0.6); padding: 40px; margin: 20px; border-radius: 8px; max-width: 80%; text-align: center;';
-                    guide.innerHTML = '<p style="color: #f5f5dc; font-size: 14px; margin-bottom: 20px;">Position sheet music within the frame</p>';
+                    guide.innerHTML = '<p style="color: #f3f4f6; font-size: 14px; margin-bottom: 20px;">Position sheet music within the frame</p>';
 
                     overlay.appendChild(guide);
                     overlay.appendChild(video);

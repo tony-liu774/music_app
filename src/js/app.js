@@ -120,6 +120,9 @@ class ConcertmasterApp {
             // Initialize video snippet feature
             this.initVideoSnippets();
 
+            // Initialize dashboard UI
+            this.initDashboard();
+
             console.log('Concertmaster initialized successfully');
         } catch (error) {
             console.error('Initialization error:', error);
@@ -139,6 +142,7 @@ class ConcertmasterApp {
 
         // Get DOM elements
         this.views = {
+            dashboard: document.getElementById('dashboard-view'),
             library: document.getElementById('library-view'),
             practice: document.getElementById('practice-view'),
             metronome: document.getElementById('metronome-view'),
@@ -613,6 +617,16 @@ class ConcertmasterApp {
         await this.audioEngine.init();
     }
 
+    /**
+     * Initialize the Dashboard UI component
+     */
+    initDashboard() {
+        if (typeof DashboardUI !== 'undefined') {
+            this.dashboardUI = new DashboardUI(this);
+            this.dashboardUI.init();
+        }
+    }
+
     setupNavigation() {
         // Desktop navigation
         document.querySelectorAll('.nav-link').forEach(link => {
@@ -644,6 +658,44 @@ class ConcertmasterApp {
                 console.log('Toggle mobile menu');
             });
         }
+
+        // Dashboard quick-access card navigation
+        document.querySelectorAll('.dashboard-card[data-navigate]').forEach(card => {
+            const navigate = () => {
+                const target = card.dataset.navigate;
+                const viewId = target + '-view';
+                this.showView(viewId);
+
+                // Update mobile nav active state
+                document.querySelectorAll('.mobile-nav-link').forEach(l => {
+                    l.classList.remove('active');
+                    if (l.getAttribute('href') === '#' + target) {
+                        l.classList.add('active');
+                    }
+                });
+            };
+            card.addEventListener('click', navigate);
+            card.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    navigate();
+                }
+            });
+        });
+
+        // Hero resume practice button
+        const heroResumeBtn = document.getElementById('hero-resume-btn');
+        if (heroResumeBtn) {
+            heroResumeBtn.addEventListener('click', () => {
+                this.showView('practice-view');
+                document.querySelectorAll('.mobile-nav-link').forEach(l => {
+                    l.classList.remove('active');
+                    if (l.getAttribute('href') === '#practice') {
+                        l.classList.add('active');
+                    }
+                });
+            });
+        }
     }
 
     showView(viewId) {
@@ -666,6 +718,11 @@ class ConcertmasterApp {
         const targetView = document.getElementById(viewId);
         if (targetView) {
             targetView.classList.add('active');
+        }
+
+        // Refresh dashboard when navigating back to it
+        if (viewId === 'dashboard-view' && this.dashboardUI) {
+            this.dashboardUI.refresh();
         }
     }
 

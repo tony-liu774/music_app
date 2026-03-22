@@ -17,7 +17,7 @@ class PDFExportService {
             primary: [201, 162, 39],         // #c9a227 - Amber
             success: [45, 90, 74],           // #2d5a4a - Emerald
             error: [139, 41, 66],            // #8b2942 - Crimson
-            textPrimary: [245, 245, 220],    // #f5f5dc
+            textPrimary: [243, 244, 246],    // #f3f4f6
             textSecondary: [160, 160, 176],  // #a0a0b0
             white: [255, 255, 255],
             black: [0, 0, 0]

@@ -146,7 +146,7 @@ class SheetMusicRenderer {
     drawClef() {
         const ctx = this.ctx;
         // Treble clef symbol
-        ctx.fillStyle = '#f5f5dc';
+        ctx.fillStyle = '#f3f4f6';
         ctx.font = '60px serif';
         ctx.fillText('𝄞', 20, this.staffY + 35);
     }
