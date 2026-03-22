@@ -16,7 +16,10 @@ const rateLimiter = rateLimit({
   legacyHeaders: false,
   skip: skipInTest,
   handler: (req, res) => {
-    const retryAfter = Math.ceil(config.rateLimit.windowMs / 1000);
+    const resetTime = req.rateLimit?.resetTime;
+    const retryAfter = resetTime
+      ? Math.ceil((resetTime.getTime() - Date.now()) / 1000)
+      : Math.ceil(config.rateLimit.windowMs / 1000);
     res.status(429).json({
       error: 'Too many requests from this IP, please try again later.',
       retryAfter,

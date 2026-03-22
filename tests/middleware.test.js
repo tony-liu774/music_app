@@ -152,6 +152,53 @@ describe('Rate Limiter Middleware', () => {
             process.env.NODE_ENV = originalEnv;
         }
     });
+
+    it('should return 429 with error and retryAfter when rate limit exceeded', async () => {
+        const express = require('express');
+        const rateLimit = require('express-rate-limit');
+        const config = require('../src/config');
+
+        const testApp = express();
+        testApp.use(rateLimit({
+            windowMs: 60000,
+            max: 2,
+            standardHeaders: true,
+            legacyHeaders: false,
+            handler: (req, res) => {
+                const resetTime = req.rateLimit?.resetTime;
+                const retryAfter = resetTime
+                    ? Math.ceil((resetTime.getTime() - Date.now()) / 1000)
+                    : Math.ceil(60000 / 1000);
+                res.status(429).json({
+                    error: 'Too many requests from this IP, please try again later.',
+                    retryAfter,
+                });
+            },
+        }));
+        testApp.get('/test', (req, res) => res.json({ ok: true }));
+
+        const testServer = await new Promise((resolve) => {
+            const s = testApp.listen(0, () => resolve(s));
+        });
+
+        try {
+            // First 2 requests should succeed
+            const res1 = await makeRequest(testServer, 'GET', '/test');
+            assert.strictEqual(res1.status, 200);
+            const res2 = await makeRequest(testServer, 'GET', '/test');
+            assert.strictEqual(res2.status, 200);
+
+            // Third request should be rate limited
+            const res3 = await makeRequest(testServer, 'GET', '/test');
+            assert.strictEqual(res3.status, 429);
+            assert.strictEqual(res3.body.error, 'Too many requests from this IP, please try again later.');
+            assert.ok(typeof res3.body.retryAfter === 'number');
+            assert.ok(res3.body.retryAfter > 0);
+            assert.ok(res3.body.retryAfter <= 60);
+        } finally {
+            await new Promise((resolve) => testServer.close(resolve));
+        }
+    });
 });
 
 // --- Integration tests via HTTP ---
