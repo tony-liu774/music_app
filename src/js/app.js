@@ -661,7 +661,7 @@ class ConcertmasterApp {
 
         // Dashboard quick-access card navigation
         document.querySelectorAll('.dashboard-card[data-navigate]').forEach(card => {
-            card.addEventListener('click', () => {
+            const navigate = () => {
                 const target = card.dataset.navigate;
                 const viewId = target + '-view';
                 this.showView(viewId);
@@ -673,6 +673,13 @@ class ConcertmasterApp {
                         l.classList.add('active');
                     }
                 });
+            };
+            card.addEventListener('click', navigate);
+            card.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    navigate();
+                }
             });
         });
 

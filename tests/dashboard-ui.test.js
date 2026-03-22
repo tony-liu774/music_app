@@ -516,11 +516,12 @@ describe('DashboardUI', () => {
         it('should escape formatDate output in meta (XSS prevention)', () => {
             const piece = {
                 title: 'Test',
-                lastPracticed: '2026-03-20'
+                lastPracticed: '<img src=x onerror=alert(1)>'
             };
             const item = dashboard.createAssignmentItem(piece);
-            // formatDate output should be escaped — no raw HTML injection possible
-            assert.ok(!item.innerHTML.includes('<script'), 'Meta should not contain unescaped HTML');
+            // Malicious lastPracticed should be escaped in the meta
+            assert.ok(!item.innerHTML.includes('<img'), 'lastPracticed XSS should be escaped');
+            assert.ok(item.innerHTML.includes('&lt;img'), 'lastPracticed should be HTML-entity encoded');
         });
 
         it('should coerce string scores to number via Number()', () => {
