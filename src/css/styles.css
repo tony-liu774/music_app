@@ -1,4 +1,47 @@
-/* Main Styles - Midnight Conservatory */
+/* ==========================================================================
+   Main Styles - Midnight Conservatory
+   ==========================================================================
+   RULE: No hardcoded hex codes. Use var(--xxx) tokens ONLY.
+   All tokens defined in themes/midnight-conservatory.css.
+   See STYLE_GUIDE.md for full documentation.
+   ========================================================================== */
+
+/* ==========================================================================
+   UTILITY CLASSES — Midnight Conservatory Design System
+   Use these classes for consistent styling across components.
+   ========================================================================== */
+
+/* Glow Effects — "Emitted Light" Philosophy */
+.glow-amber { box-shadow: 0 0 20px var(--primary-glow); }
+.glow-emerald { box-shadow: 0 0 20px var(--success-glow); }
+.glow-crimson { box-shadow: 0 0 20px var(--error-glow); }
+
+/* Typography */
+.text-heading { font-family: var(--font-heading); }
+.text-body { font-family: var(--font-body); }
+.text-mono { font-family: var(--font-mono); }
+
+/* Backgrounds */
+.bg-deep { background: var(--bg-deep); }
+.bg-surface { background: var(--bg-surface); }
+.bg-elevated { background: var(--bg-elevated); }
+.bg-navy { background: var(--bg-navy); }
+
+/* Text Colors */
+.text-ivory { color: var(--text-primary); }
+.text-secondary-util { color: var(--text-secondary); }
+.text-muted-util { color: var(--text-muted); }
+.text-amber { color: var(--primary); }
+.text-emerald { color: var(--success); }
+.text-crimson { color: var(--error); }
+
+/* Transition Presets */
+.transition-breath { transition: var(--transition-breath); }
+.transition-fade { transition: var(--transition-fade); }
+
+/* ==========================================================================
+   BASE STYLES
+   ========================================================================== */
 
 * {
     margin: 0;
