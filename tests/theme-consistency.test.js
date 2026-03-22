@@ -239,12 +239,11 @@ describe('Theme Consistency - Midnight Conservatory', () => {
     describe('annotation-toolbar.css', () => {
         it('should use theme variables for layout colors', () => {
             const css = readCSS('annotation-toolbar.css');
-            // #00d4ff is allowed as the intentional neon annotation blue
             // #c9a227 appears in a CSS attribute selector [style*="color: #c9a227"],
             // not as a hardcoded color value — it matches inline styles set by JS
-            const issues = findHardcodedColors(css, ['#00d4ff', '#c9a227']);
+            const issues = findHardcodedColors(css, ['#c9a227']);
             assert.strictEqual(issues.length, 0,
-                `annotation-toolbar.css has hardcoded colors (excluding #00d4ff annotation blue):\n${issues.map(i => `  Line ${i.lineNumber}: ${i.color} in "${i.line.trim()}"`).join('\n')}`
+                `annotation-toolbar.css has hardcoded colors:\n${issues.map(i => `  Line ${i.lineNumber}: ${i.color} in "${i.line.trim()}"`).join('\n')}`
             );
         });
 

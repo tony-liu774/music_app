@@ -24,6 +24,14 @@
     --text-overlay: rgba(255, 255, 255, 0.8);    /* Text on dark overlays */
     --text-overlay-bright: rgba(255, 255, 255, 0.9); /* Bright text on dark overlays */
 
+    /* Decorative Background Pattern */
+    --bg-grid-line: rgba(42, 42, 58, 0.1);       /* Subtle grid line on body background */
+    --bg-ambient-amber: rgba(201, 162, 39, 0.03); /* Ambient amber radial glow */
+    --bg-ambient-emerald: rgba(45, 90, 74, 0.02); /* Ambient emerald radial glow */
+
+    /* Highlight Glow (white on dark surfaces) */
+    --highlight-inset: rgba(255, 255, 255, 0.4); /* Inset highlight (follow-the-ball shine) */
+
     /* ====== Primary Accent — Polished Amber ====== */
     --primary: #c9a227;                           /* Buttons, cursor, active elements */
     --primary-light: #ddb832;                     /* Hover states */
@@ -31,6 +39,8 @@
     --primary-gold: #ffd700;                      /* Bright gold (follow-the-ball highlight) */
     --primary-gold-deep: #8b6914;                 /* Deep gold (follow-the-ball shadow) */
     --primary-glow: rgba(201, 162, 39, 0.3);     /* Box-shadow glow for active elements */
+    --primary-glow-strong: rgba(201, 162, 39, 0.6); /* Strong glow (drop-shadow, focus rings) */
+    --primary-glow-intense: rgba(201, 162, 39, 0.8); /* Intense glow (current note highlight) */
 
     /* Primary Opacity Variants (for backgrounds and borders) */
     --primary-bg-subtle: rgba(201, 162, 39, 0.06);  /* Lightest tint (card resting) */
@@ -88,7 +98,9 @@
     --border: #2a2a3a;                            /* Standard border */
     --border-light: #3a3a4a;                      /* Light border */
     --border-subtle: #2a2a3a;                     /* Subtle border (alias) */
+    --border-white-faint: rgba(255, 255, 255, 0.05);  /* Very faint white border (table rows) */
     --border-white-subtle: rgba(255, 255, 255, 0.1); /* White hairline on dark surfaces */
+    --border-white-light: rgba(255, 255, 255, 0.15); /* Light white border (form inputs) */
 
     /* ====== Note Colors ====== */
     --note-natural: #f5f5dc;
@@ -130,10 +142,15 @@
     --radius-full: 9999px;
     --border-radius-pill: 9999px;  /* Smart Loop button shape */
 
+    /* ====== Shadow Colors ====== */
+    --shadow-color: rgba(0, 0, 0, 0.3);          /* Standard shadow opacity */
+    --shadow-color-dark: rgba(0, 0, 0, 0.4);     /* Darker shadow */
+    --shadow-color-heavy: rgba(0, 0, 0, 0.5);    /* Heavy shadow */
+
     /* ====== Shadows ====== */
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
-    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.4);
+    --shadow-sm: 0 1px 2px var(--shadow-color);
+    --shadow-md: 0 4px 6px var(--shadow-color);
+    --shadow-lg: 0 10px 15px var(--shadow-color-dark);
     --shadow-glow: 0 0 20px var(--primary-glow);       /* Amber glow — "emitted light" on active elements */
     --shadow-success: 0 0 20px var(--success-glow);     /* Emerald glow — correct pitch feedback */
     --shadow-error: 0 0 20px var(--error-glow);         /* Crimson glow — error feedback */
