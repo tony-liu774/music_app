@@ -376,9 +376,10 @@ describe('Theme Consistency - Midnight Conservatory', () => {
                 html.includes('maximum-scale=1'),
                 'Viewport meta should include maximum-scale=1 to prevent zoomed-in UI'
             );
+            // Use regex to match exact "initial-scale=1" not "initial-scale=1.0"
             assert.ok(
-                html.includes('initial-scale=1'),
-                'Viewport meta should include initial-scale=1'
+                /initial-scale=1[,"\s]/.test(html),
+                'Viewport initial-scale should be exactly 1 (not 1.0)'
             );
         });
 
