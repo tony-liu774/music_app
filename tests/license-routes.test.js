@@ -25,6 +25,42 @@ describe('License Routes', () => {
     let testLicenseKey;
 
     beforeEach(() => {
+        // Clear the in-memory Maps before each test for isolation
+        const licenseModule = require('../src/routes/license');
+        licenseModule.licenses.clear();
+        licenseModule.invitations.clear();
+
+        // Set up fresh test licenses
+        const proKey = licenseModule.generateLicenseKey('MCP');
+        licenseModule.licenses.set(proKey, {
+            id: 'pro-lic-001',
+            type: 'subscription',
+            tier: 'pro',
+            userId: null,
+            status: 'active',
+            expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000, // 30 days
+            studentLimit: 0,
+            studentCount: 0,
+            students: [],
+            createdAt: Date.now()
+        });
+
+        const studioKey = licenseModule.generateLicenseKey('MCS');
+        licenseModule.licenses.set(studioKey, {
+            id: 'studio-lic-001',
+            type: 'one-time',
+            tier: 'studio',
+            userId: null,
+            status: 'active',
+            expiresAt: null,
+            studentLimit: 30,
+            studentCount: 0,
+            students: [],
+            createdAt: Date.now()
+        });
+
+        testLicenseKey = proKey;
+
         app = express();
         app.use(express.json());
         app.use('/api/licenses', licenseRoutes);
@@ -33,16 +69,6 @@ describe('License Routes', () => {
         const testUser = { id: 'user-123', email: 'test@example.com' };
         const tokens = generateTokens(testUser);
         authToken = tokens.token;
-
-        // Get a valid license key from the module
-        const licenseModule = require('../src/routes/license');
-        const licensesMap = licenseModule.licenses;
-        for (const [key, license] of licensesMap) {
-            if (license.tier === 'pro') {
-                testLicenseKey = key;
-                break;
-            }
-        }
     });
 
     describe('POST /api/licenses/validate', () => {
@@ -82,23 +108,21 @@ describe('License Routes', () => {
         it('should activate a valid license key', async () => {
             const licenseModule = require('../src/routes/license');
             const licensesMap = licenseModule.licenses;
-            let newKey;
+            let studioKey;
             for (const [key, lic] of licensesMap) {
                 if (lic.tier === 'studio' && !lic.userId) {
-                    newKey = key;
+                    studioKey = key;
                     break;
                 }
             }
 
-            if (!newKey) {
-                // Create a new license for testing
-                newKey = licenseModule.generateLicenseKey('MCS');
-            }
+            // We have a studio license from beforeEach setup
+            assert.ok(studioKey, 'Studio license should exist from beforeEach');
 
             const response = await makeRequest(app, '/api/licenses/activate', {
                 method: 'POST',
                 headers: { Authorization: `Bearer ${authToken}` },
-                body: { licenseKey: newKey }
+                body: { licenseKey: studioKey }
             });
 
             assert.strictEqual(response.status, 200);
@@ -134,47 +158,38 @@ describe('License Routes', () => {
                 body: { licenseKey: testLicenseKey }
             });
 
-            if (activateResponse.status === 200) {
-                const statusResponse = await makeRequest(app, '/api/licenses/status', {
-                    method: 'GET',
-                    headers: { Authorization: `Bearer ${authToken}` }
-                });
+            assert.strictEqual(activateResponse.status, 200);
 
-                assert.strictEqual(statusResponse.status, 200);
-                assert.strictEqual(statusResponse.body.hasLicense, true);
-            }
+            const statusResponse = await makeRequest(app, '/api/licenses/status', {
+                method: 'GET',
+                headers: { Authorization: `Bearer ${authToken}` }
+            });
+
+            assert.strictEqual(statusResponse.status, 200);
+            assert.strictEqual(statusResponse.body.hasLicense, true);
         });
     });
 
     describe('POST /api/licenses/deactivate', () => {
         it('should deactivate license successfully', async () => {
             // First activate a license
-            await makeRequest(app, '/api/licenses/activate', {
+            const activateResponse = await makeRequest(app, '/api/licenses/activate', {
                 method: 'POST',
                 headers: { Authorization: `Bearer ${authToken}` },
                 body: { licenseKey: testLicenseKey }
             });
 
-            // Get the license ID
-            const licenseModule = require('../src/routes/license');
-            const licensesMap = licenseModule.licenses;
-            let licenseId;
-            for (const [key, lic] of licensesMap) {
-                if (lic.userId) {
-                    licenseId = lic.id;
-                    break;
-                }
-            }
+            assert.strictEqual(activateResponse.status, 200);
+            const licenseId = activateResponse.body.id;
+            assert.ok(licenseId, 'License should have an ID after activation');
 
-            if (licenseId) {
-                const response = await makeRequest(app, '/api/licenses/deactivate', {
-                    method: 'POST',
-                    headers: { Authorization: `Bearer ${authToken}` },
-                    body: { licenseId }
-                });
+            const response = await makeRequest(app, '/api/licenses/deactivate', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${authToken}` },
+                body: { licenseId }
+            });
 
-                assert.strictEqual(response.status, 200);
-            }
+            assert.strictEqual(response.status, 200);
         });
     });
 
@@ -297,7 +312,9 @@ describe('License Routes', () => {
                 headers: { Authorization: `Bearer ${authToken}` }
             });
 
+            assert.strictEqual(inviteResponse.status, 200);
             const inviteLink = inviteResponse.body.inviteLink;
+            assert.ok(inviteLink, 'inviteLink should exist');
             const token = inviteLink.split('?invite=')[1];
 
             // Accept invitation as a different user
@@ -407,81 +424,65 @@ describe('License Routes', () => {
                 body: { studentEmail: 'student@test.com' }
             });
 
+            assert.strictEqual(genResponse.status, 200);
             const studentId = genResponse.body.studentId;
+            assert.ok(studentId, 'Should have a student ID');
 
-            // Get students to find the ID
-            const studentsResponse = await makeRequest(app, '/api/licenses/students', {
-                method: 'GET',
+            // Delete the student
+            const deleteResponse = await makeRequest(app, `/api/licenses/students/${studentId}`, {
+                method: 'DELETE',
                 headers: { Authorization: `Bearer ${authToken}` }
             });
 
-            const student = studentsResponse.body.find(s => s.email === 'student@test.com');
-
-            if (student) {
-                const deleteResponse = await makeRequest(app, `/api/licenses/students/${student.id}`, {
-                    method: 'DELETE',
-                    headers: { Authorization: `Bearer ${authToken}` }
-                });
-
-                assert.strictEqual(deleteResponse.status, 200);
-            }
+            assert.strictEqual(deleteResponse.status, 200);
         });
     });
 
     describe('GET /api/licenses/:licenseId/renewal', () => {
         it('should return renewal info for subscription license', async () => {
             // Activate pro license first
-            await makeRequest(app, '/api/licenses/activate', {
+            const activateResponse = await makeRequest(app, '/api/licenses/activate', {
                 method: 'POST',
                 headers: { Authorization: `Bearer ${authToken}` },
                 body: { licenseKey: testLicenseKey }
             });
 
-            // Get license ID
-            const licenseModule = require('../src/routes/license');
-            const licensesMap = licenseModule.licenses;
-            let licenseId;
-            for (const [key, lic] of licensesMap) {
-                if (lic.userId && lic.tier === 'pro') {
-                    licenseId = lic.id;
-                    break;
-                }
-            }
+            assert.strictEqual(activateResponse.status, 200);
+            const licenseId = activateResponse.body.id;
+            assert.ok(licenseId, 'License should have an ID after activation');
 
-            if (licenseId) {
-                const response = await makeRequest(app, `/api/licenses/${licenseId}/renewal`, {
-                    method: 'GET',
-                    headers: { Authorization: `Bearer ${authToken}` }
-                });
+            const response = await makeRequest(app, `/api/licenses/${licenseId}/renewal`, {
+                method: 'GET',
+                headers: { Authorization: `Bearer ${authToken}` }
+            });
 
-                assert.strictEqual(response.status, 200);
-                assert.strictEqual(response.body.currentTier, 'pro');
-            }
+            assert.strictEqual(response.status, 200);
+            assert.strictEqual(response.body.currentTier, 'pro');
         });
 
         it('should return no renewal needed for one-time license', async () => {
             const studioKey = await setupStudioLicense();
 
-            // Get license ID
+            // Get license ID using the Map key (not lic.key)
             const licenseModule = require('../src/routes/license');
             const licensesMap = licenseModule.licenses;
             let licenseId;
             for (const [key, lic] of licensesMap) {
-                if (lic.key === studioKey) {
+                if (key === studioKey) {
                     licenseId = lic.id;
                     break;
                 }
             }
 
-            if (licenseId) {
-                const response = await makeRequest(app, `/api/licenses/${licenseId}/renewal`, {
-                    method: 'GET',
-                    headers: { Authorization: `Bearer ${authToken}` }
-                });
+            assert.ok(licenseId, 'Should find the studio license');
 
-                assert.strictEqual(response.status, 200);
-                assert.strictEqual(response.body.renewalRequired, false);
-            }
+            const response = await makeRequest(app, `/api/licenses/${licenseId}/renewal`, {
+                method: 'GET',
+                headers: { Authorization: `Bearer ${authToken}` }
+            });
+
+            assert.strictEqual(response.status, 200);
+            assert.strictEqual(response.body.renewalRequired, false);
         });
 
         it('should return 404 for non-existent license', async () => {
@@ -491,6 +492,185 @@ describe('License Routes', () => {
             });
 
             assert.strictEqual(response.status, 404);
+        });
+    });
+
+    describe('POST /api/licenses/redeem-student-key', () => {
+        it('should redeem a valid student key', async () => {
+            // First set up a studio license with a student
+            await setupStudioLicense();
+
+            // Generate a student key
+            const genResponse = await makeRequest(app, '/api/licenses/generate-student-key', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${authToken}` },
+                body: { studentEmail: 'newstudent@test.com' }
+            });
+
+            assert.strictEqual(genResponse.status, 200);
+            const studentKey = genResponse.body.studentKey;
+            assert.ok(studentKey, 'Should have a student key');
+
+            // Now redeem as a different user (the student)
+            const studentToken = generateTokens({ id: 'student-user', email: 'newstudent@test.com' }).token;
+
+            const response = await makeRequest(app, '/api/licenses/redeem-student-key', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${studentToken}` },
+                body: { studentKey }
+            });
+
+            assert.strictEqual(response.status, 200);
+            assert.strictEqual(response.body.tier, 'studio');
+        });
+
+        it('should reject invalid student key format', async () => {
+            const studentToken = generateTokens({ id: 'student-user', email: 'student@test.com' }).token;
+
+            const response = await makeRequest(app, '/api/licenses/redeem-student-key', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${studentToken}` },
+                body: { studentKey: 'invalid-key' }
+            });
+
+            assert.strictEqual(response.status, 400);
+            assert.strictEqual(response.body.error, 'Invalid student key format');
+        });
+
+        it('should reject non-existent student key', async () => {
+            const studentToken = generateTokens({ id: 'student-user', email: 'student@test.com' }).token;
+
+            const response = await makeRequest(app, '/api/licenses/redeem-student-key', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${studentToken}` },
+                body: { studentKey: 'STU-ABCD0000-EFGH-IJKL' }
+            });
+
+            assert.strictEqual(response.status, 404);
+            assert.strictEqual(response.body.error, 'Student key not found');
+        });
+
+        it('should reject key already redeemed by another user', async () => {
+            // First set up a studio license with a student
+            await setupStudioLicense();
+
+            // Generate a student key
+            const genResponse = await makeRequest(app, '/api/licenses/generate-student-key', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${authToken}` },
+                body: { studentEmail: 'student@test.com' }
+            });
+
+            const studentKey = genResponse.body.studentKey;
+
+            // First user redeems
+            const firstStudentToken = generateTokens({ id: 'first-student', email: 'student@test.com' }).token;
+            await makeRequest(app, '/api/licenses/redeem-student-key', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${firstStudentToken}` },
+                body: { studentKey }
+            });
+
+            // Second user tries to redeem the same key
+            const secondStudentToken = generateTokens({ id: 'second-student', email: 'other@test.com' }).token;
+            const response = await makeRequest(app, '/api/licenses/redeem-student-key', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${secondStudentToken}` },
+                body: { studentKey }
+            });
+
+            assert.strictEqual(response.status, 409);
+            assert.strictEqual(response.body.error, 'Key already redeemed by another user');
+        });
+
+        it('should reject without auth', async () => {
+            const response = await makeRequest(app, '/api/licenses/redeem-student-key', {
+                method: 'POST',
+                body: { studentKey: 'STU-ABCD0000-EFGH-IJKL' }
+            });
+
+            assert.strictEqual(response.status, 401);
+        });
+    });
+
+    describe('GET /api/licenses/check-invitation', () => {
+        it('should return no invitation when none exists', async () => {
+            const response = await makeRequest(app, '/api/licenses/check-invitation', {
+                method: 'GET',
+                headers: { Authorization: `Bearer ${authToken}` }
+            });
+
+            assert.strictEqual(response.status, 200);
+            assert.strictEqual(response.body.hasInvitation, false);
+        });
+
+        it('should detect valid invitation with token', async () => {
+            // First set up a studio license and generate invite link
+            await setupStudioLicense();
+
+            const inviteResponse = await makeRequest(app, '/api/licenses/invite-link', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${authToken}` }
+            });
+
+            const inviteLink = inviteResponse.body.inviteLink;
+            const token = inviteLink.split('?invite=')[1];
+
+            // Check invitation as the student
+            const studentToken = generateTokens({ id: 'student-user', email: 'newstudent@test.com' }).token;
+
+            const response = await makeRequest(app, `/api/licenses/check-invitation?token=${token}`, {
+                method: 'GET',
+                headers: { Authorization: `Bearer ${studentToken}` }
+            });
+
+            assert.strictEqual(response.status, 200);
+            assert.strictEqual(response.body.hasInvitation, true);
+            assert.strictEqual(response.body.teacherTier, 'studio');
+        });
+
+        it('should return no invitation for invalid token', async () => {
+            const studentToken = generateTokens({ id: 'student-user', email: 'student@test.com' }).token;
+
+            const response = await makeRequest(app, '/api/licenses/check-invitation?token=invalid-token', {
+                method: 'GET',
+                headers: { Authorization: `Bearer ${studentToken}` }
+            });
+
+            assert.strictEqual(response.status, 200);
+            assert.strictEqual(response.body.hasInvitation, false);
+        });
+
+        it('should return no invitation for expired token', async () => {
+            // Create an expired invitation
+            const licenseModule = require('../src/routes/license');
+            const expiredToken = licenseModule.generateInviteToken();
+            licenseModule.invitations.set(expiredToken, {
+                licenseId: 'studio-lic-001',
+                teacherId: 'user-123',
+                expiresAt: Date.now() - 1000, // Expired 1 second ago
+                maxUses: 1,
+                usedCount: 0
+            });
+
+            const studentToken = generateTokens({ id: 'student-user', email: 'student@test.com' }).token;
+
+            const response = await makeRequest(app, `/api/licenses/check-invitation?token=${expiredToken}`, {
+                method: 'GET',
+                headers: { Authorization: `Bearer ${studentToken}` }
+            });
+
+            assert.strictEqual(response.status, 200);
+            assert.strictEqual(response.body.hasInvitation, false);
+            assert.ok(response.body.error.includes('expired'));
+        });
+
+        it('should reject without auth', async () => {
+            const response = await makeRequest(app, '/api/licenses/check-invitation', {
+                method: 'GET'
+            });
+
+            assert.strictEqual(response.status, 401);
         });
     });
 });

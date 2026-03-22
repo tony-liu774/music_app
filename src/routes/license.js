@@ -26,8 +26,9 @@ function generateInviteToken() {
     return crypto.randomBytes(32).toString('hex');
 }
 
-// License rate limiter: 10 attempts per minute
-const licenseRateLimiter = rateLimit({
+// License rate limiter: 10 attempts per minute (disabled in test mode)
+const isTest = process.env.NODE_ENV === 'test';
+const licenseRateLimiter = isTest ? (req, res, next) => next() : rateLimit({
     windowMs: 60 * 1000,
     max: 10,
     message: { error: 'Too many license requests, please try again later.' },
