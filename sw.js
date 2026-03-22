@@ -1,11 +1,10 @@
-const CACHE_NAME = 'concertmaster-v2';
+const CACHE_NAME = 'concertmaster-v3';
 const API_CACHE_NAME = 'concertmaster-api-v2';
 const ASSETS = [
     '/',
     '/index.html',
     '/manifest.json',
-    '/src/css/themes/midnight-conservatory.css',
-    '/src/css/styles.css',
+    '/public/styles.css',
     'https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@600;700&family=Source+Sans+3:wght@400;500;600&display=swap'
 ];
 
