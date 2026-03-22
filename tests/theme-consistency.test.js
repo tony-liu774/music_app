@@ -369,5 +369,75 @@ describe('Theme Consistency - Midnight Conservatory', () => {
             assert.ok(html.includes('sso-login.css'), 'Should include sso-login.css');
             assert.ok(html.includes('role-selection.css'), 'Should include role-selection.css');
         });
+
+        it('should set viewport with maximum-scale=1 to prevent zoom', () => {
+            const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+            assert.ok(
+                html.includes('maximum-scale=1'),
+                'Viewport meta should include maximum-scale=1 to prevent zoomed-in UI'
+            );
+            assert.ok(
+                html.includes('initial-scale=1'),
+                'Viewport meta should include initial-scale=1'
+            );
+        });
+
+        it('should include font preconnect hints for Google Fonts', () => {
+            const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+            assert.ok(
+                html.includes('preconnect" href="https://fonts.googleapis.com"'),
+                'Should preconnect to fonts.googleapis.com'
+            );
+            assert.ok(
+                html.includes('preconnect" href="https://fonts.gstatic.com"'),
+                'Should preconnect to fonts.gstatic.com'
+            );
+        });
+    });
+
+    describe('Midnight Conservatory visual requirements', () => {
+        it('should define Soft Ivory text color (#f5f5dc), not pure white', () => {
+            const css = readCSS('themes/midnight-conservatory.css');
+            assert.ok(css.includes('--text-primary: #f5f5dc'), 'Text primary should be Soft Ivory #f5f5dc');
+            assert.ok(!css.includes('--text-primary: #ffffff'), 'Text primary should NOT be pure white');
+            assert.ok(!css.includes('--text-primary: #fff'), 'Text primary should NOT be pure white (#fff)');
+        });
+
+        it('should include grid background pattern via repeating-linear-gradient', () => {
+            const css = readCSS('styles.css');
+            assert.ok(
+                css.includes('repeating-linear-gradient'),
+                'Should include repeating-linear-gradient for grid background pattern'
+            );
+        });
+
+        it('should include Polished Amber glow effects (primary-glow)', () => {
+            const css = readCSS('themes/midnight-conservatory.css');
+            assert.ok(
+                css.includes('--primary-glow: rgba(201, 162, 39,'),
+                'Should define --primary-glow with amber rgba value'
+            );
+            const styles = readCSS('styles.css');
+            assert.ok(
+                styles.includes('var(--primary-glow)'),
+                'styles.css should reference --primary-glow for amber glow effects'
+            );
+        });
+
+        it('should include shadow-glow for ambient lighting effects', () => {
+            const css = readCSS('themes/midnight-conservatory.css');
+            assert.ok(
+                css.includes('--shadow-glow:'),
+                'Should define --shadow-glow for ambient glow'
+            );
+        });
+
+        it('should define constrained container max-width', () => {
+            const css = readCSS('themes/midnight-conservatory.css');
+            assert.ok(
+                css.includes('--container-max: 1200px'),
+                'Should define --container-max: 1200px for constrained layout'
+            );
+        });
     });
 });
