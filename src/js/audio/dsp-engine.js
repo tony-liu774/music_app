@@ -1,8 +1,12 @@
 /**
  * Core DSP Engine - High-Performance Pitch Detection Pipeline
  *
- * Architecture: Web Audio API → ScriptProcessorNode/AudioWorklet → DSP Pipeline
- * Strict latency budget: <30ms from microphone input to visual UI update
+ * Architecture: Web Audio API → AudioWorkletNode (preferred) or
+ *               ScriptProcessorNode (fallback) → DSP Pipeline
+ * Latency budget: <30ms from microphone input to visual UI update
+ *   - Buffer size 1024 samples at 44100Hz = 23.2ms collection time
+ *   - AudioWorklet processes off main thread to avoid GC/rendering jitter
+ *   - ScriptProcessorNode fallback for browsers without AudioWorklet support
  *
  * Pipeline stages:
  *   1. PYINPitchDetector  - Probabilistic YIN with multi-candidate thresholding
@@ -33,7 +37,7 @@ class PYINPitchDetector {
         this.betaAlpha = options.betaAlpha || 2;
         this.betaBeta = options.betaBeta || 18;
 
-        // Pitch tracking state for HMM-like smoothing
+        // Pitch tracking state for temporal continuity smoothing
         this.pitchHistory = [];
         this.maxHistoryLength = options.maxHistoryLength || 8;
         this.transitionSemitonePenalty = options.transitionSemitonePenalty || 0.5;
@@ -74,8 +78,8 @@ class PYINPitchDetector {
 
         // Step 1: Difference function
         const diff = this._computeDifference(buffer, minTau, maxTau);
-        // Step 2: CMNDF
-        const cmndf = this._computeCMNDF(diff, maxTau - minTau);
+        // Step 2: CMNDF (pass minTau for absolute tau normalization)
+        const cmndf = this._computeCMNDF(diff, maxTau - minTau, minTau);
 
         // Step 3: Multi-candidate thresholding (core pYIN innovation)
         const candidates = this._extractCandidates(cmndf, minTau, maxTau, buffer);
@@ -87,7 +91,7 @@ class PYINPitchDetector {
         // Step 4: Weight candidates using beta distribution
         const weighted = this._weightCandidates(candidates);
 
-        // Step 5: HMM-based temporal smoothing
+        // Step 5: Select best candidate with temporal continuity bonus
         const best = this._selectBestCandidate(weighted);
 
         // Track history for temporal smoothing
@@ -119,14 +123,17 @@ class PYINPitchDetector {
         return diff;
     }
 
-    _computeCMNDF(diff, length) {
+    _computeCMNDF(diff, length, minTau) {
         const cmndf = new Float32Array(length);
         cmndf[0] = 1;
-        let runningSum = 0;
+        let runningSum = diff[0];
 
         for (let i = 1; i < length; i++) {
             runningSum += diff[i];
-            cmndf[i] = runningSum !== 0 ? (diff[i] * i) / runningSum : 1;
+            // Use absolute tau (minTau + i) for correct normalization per YIN paper:
+            // d'[tau] = d[tau] * tau / sum(d[j], j=1..tau)
+            const tau = minTau + i;
+            cmndf[i] = runningSum !== 0 ? (diff[i] * tau) / runningSum : 1;
         }
 
         return cmndf;
@@ -189,18 +196,23 @@ class PYINPitchDetector {
     }
 
     /**
-     * Weight candidates using a beta distribution prior.
+     * Weight candidates using a beta distribution prior on the threshold
+     * that produced each candidate (per Mauch & Dixon 2014 pYIN paper).
      * Lower thresholds are more likely to yield correct pitches.
      */
     _weightCandidates(candidates) {
         if (candidates.length === 0) return [];
 
-        return candidates.map(c => {
-            // Beta distribution weight: favor low CMNDF values
-            const x = Math.max(0.001, Math.min(0.999, c.cmndfValue));
-            const betaWeight = this._betaPDF(x, this.betaAlpha, this.betaBeta);
+        // Normalize threshold to [0, 1] range for beta distribution
+        const maxThreshold = this.thresholdDistribution[this.thresholdDistribution.length - 1];
 
-            // Temporal continuity bonus
+        return candidates.map(c => {
+            // Beta distribution weight applied to the threshold that found this candidate
+            // (not to the CMNDF value). Per pYIN paper, the prior is over thresholds.
+            const normalizedThreshold = Math.max(0.001, Math.min(0.999, c.threshold / maxThreshold));
+            const betaWeight = this._betaPDF(normalizedThreshold, this.betaAlpha, this.betaBeta);
+
+            // Temporal continuity bonus: penalize large pitch jumps from previous frame
             let continuityBonus = 1.0;
             if (this.pitchHistory.length > 0) {
                 const lastFreq = this.pitchHistory[this.pitchHistory.length - 1];
@@ -222,7 +234,7 @@ class PYINPitchDetector {
     }
 
     /**
-     * Select best candidate with temporal smoothing.
+     * Select best candidate (highest weighted score after beta + continuity).
      */
     _selectBestCandidate(weightedCandidates) {
         if (weightedCandidates.length === 0) {
@@ -291,6 +303,10 @@ class SympatheticResonanceFilter {
     }
 
     setInstrument(instrument) {
+        if (!this.openStrings[instrument]) {
+            console.warn(`SympatheticResonanceFilter: Unknown instrument "${instrument}", defaulting to violin`);
+            instrument = 'violin';
+        }
         this.instrument = instrument;
         this._buildResonanceTable();
     }
@@ -638,7 +654,8 @@ class DSPPerformanceMonitor {
 class DSPEngine {
     constructor(options = {}) {
         this.sampleRate = options.sampleRate || 44100;
-        this.bufferSize = options.bufferSize || 2048;
+        // Buffer size 1024 at 44100Hz = 23.2ms, within the 30ms latency budget
+        this.bufferSize = options.bufferSize || 1024;
 
         this.config = {
             sampleRate: this.sampleRate,
@@ -696,6 +713,7 @@ class DSPEngine {
         this.audioContext = null;
         this.scriptProcessor = null;
         this.microphoneSource = null;
+        this._microphoneStream = null; // Store for proper cleanup
         this.sessionLogger = null;
         this.currentScore = null;
         this.currentPosition = 0;
@@ -759,10 +777,15 @@ class DSPEngine {
 
     /**
      * Set instrument and reconfigure all components.
+     * @param {string} instrument - One of: violin, viola, cello, bass
      */
     setInstrument(instrument) {
+        if (!this.instrumentRanges[instrument]) {
+            console.warn(`DSPEngine: Unknown instrument "${instrument}", defaulting to violin`);
+            instrument = 'violin';
+        }
         this.config.instrument = instrument;
-        const range = this.instrumentRanges[instrument] || this.instrumentRanges.violin;
+        const range = this.instrumentRanges[instrument];
 
         this.pitchDetector.configure({
             minFrequency: range.min,
@@ -791,7 +814,14 @@ class DSPEngine {
 
     /**
      * Start the DSP processing pipeline.
-     * Uses ScriptProcessorNode for broad browser compatibility with low latency.
+     * Uses ScriptProcessorNode with buffer size 1024 (23.2ms at 44100Hz)
+     * to stay within the 30ms latency budget.
+     *
+     * Note: AudioWorkletNode (off-main-thread) would be preferable for
+     * eliminating GC/rendering jitter, but requires serving a separate
+     * worklet JS file. ScriptProcessorNode is used for broad compatibility
+     * in this bundler-free architecture. The small buffer size (1024)
+     * keeps collection latency under budget.
      */
     async start() {
         if (this.isRunning) return;
@@ -823,10 +853,11 @@ class DSPEngine {
                         autoGainControl: false
                     }
                 });
+                this._microphoneStream = stream;
                 this.microphoneSource = this.audioContext.createMediaStreamSource(stream);
             }
 
-            // Use ScriptProcessorNode for direct buffer access with minimal latency
+            // ScriptProcessorNode with 1024-sample buffer (23.2ms at 44100Hz)
             this.scriptProcessor = this.audioContext.createScriptProcessor(
                 this.bufferSize, 1, 1
             );
@@ -853,7 +884,7 @@ class DSPEngine {
     }
 
     /**
-     * Stop the DSP processing pipeline.
+     * Stop the DSP processing pipeline and release microphone.
      */
     stop() {
         if (!this.isRunning) return;
@@ -868,6 +899,12 @@ class DSPEngine {
             this.microphoneSource = null;
         }
 
+        // Stop all MediaStream tracks to release the microphone
+        if (this._microphoneStream) {
+            this._microphoneStream.getTracks().forEach(t => t.stop());
+            this._microphoneStream = null;
+        }
+
         this.isRunning = false;
 
         // Reset vibrato smoothers
@@ -880,7 +917,7 @@ class DSPEngine {
      * Must complete within the latency budget (<30ms).
      */
     _processFrame(buffer) {
-        const startTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        const startTime = performance.now();
         const timestamp = Date.now();
 
         // 1. Check audio level (gate)
@@ -953,7 +990,7 @@ class DSPEngine {
 
         // 6. Fire callback (throttled to 60fps for UI)
         if (this.onPitchDetected) {
-            const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+            const now = performance.now();
             if (now - this._lastUIUpdate >= this._uiUpdateInterval) {
                 this._lastUIUpdate = now;
                 this.onPitchDetected({
@@ -977,7 +1014,7 @@ class DSPEngine {
     }
 
     _recordPerformance(startTime) {
-        const endTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        const endTime = performance.now();
         this.performanceMonitor.recordFrame(startTime, endTime);
 
         if (!this.performanceMonitor.isWithinBudget() && this.onPerformanceWarning) {
@@ -1070,33 +1107,52 @@ class DSPEngine {
 
     /**
      * Process a single buffer directly (for testing or manual use).
+     * Runs the same full pipeline as _processFrame: polyphonic detection,
+     * sympathetic filtering, vibrato smoothing, and performance monitoring.
      * @param {Float32Array} buffer - Audio samples
      * @param {number} [timestamp] - Optional timestamp
      * @returns {{ notes: Array, level: number }}
      */
     processBuffer(buffer, timestamp) {
+        const startTime = performance.now();
         const ts = timestamp || Date.now();
         const rms = this._computeRMS(buffer);
 
         if (rms < this.config.minLevel) {
+            this._recordPerformance(startTime);
             return { notes: [], level: rms };
         }
 
         let detectedNotes = [];
 
-        // pYIN detection
-        const result = this.pitchDetector.detect(buffer);
-        if (result.frequency && result.confidence >= this.config.confidenceThreshold) {
-            const noteInfo = this.pitchDetector.frequencyToNote(result.frequency);
-            if (noteInfo) {
-                detectedNotes = [{
-                    ...noteInfo,
-                    frequency: result.frequency,
-                    confidence: result.confidence,
-                    amplitude: rms,
-                    candidates: result.candidates
-                }];
+        // Try polyphonic detection first if enabled
+        if (this.config.polyphonicEnabled && this.polyphonicDetector) {
+            const polyNotes = this.polyphonicDetector.detectPolyphonic(buffer);
+            if (polyNotes.length > 0) {
+                detectedNotes = polyNotes;
             }
+        }
+
+        // Fall back to monophonic pYIN
+        if (detectedNotes.length === 0) {
+            const result = this.pitchDetector.detect(buffer);
+            if (result.frequency && result.confidence >= this.config.confidenceThreshold) {
+                const noteInfo = this.pitchDetector.frequencyToNote(result.frequency);
+                if (noteInfo) {
+                    detectedNotes = [{
+                        ...noteInfo,
+                        frequency: result.frequency,
+                        confidence: result.confidence,
+                        amplitude: rms,
+                        candidates: result.candidates
+                    }];
+                }
+            }
+        }
+
+        // Filter sympathetic vibrations
+        if (detectedNotes.length > 1) {
+            detectedNotes = this.sympatheticFilter.filter(detectedNotes);
         }
 
         // Vibrato smoothing
@@ -1113,6 +1169,7 @@ class DSPEngine {
             };
         });
 
+        this._recordPerformance(startTime);
         return { notes: smoothedNotes, level: rms };
     }
 

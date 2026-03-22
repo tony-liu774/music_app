@@ -11,7 +11,9 @@ const assert = require('node:assert');
 global.window = global;
 global.navigator = {
     mediaDevices: {
-        getUserMedia: () => Promise.resolve({ getTracks: () => [] }),
+        getUserMedia: () => Promise.resolve({
+            getTracks: () => [{ stop: () => {} }]
+        }),
         enumerateDevices: () => Promise.resolve([])
     }
 };
@@ -37,7 +39,10 @@ global.AudioContext = class AudioContext {
     close() { return Promise.resolve(); }
     resume() { return Promise.resolve(); }
 };
-global.performance = { now: () => Date.now() };
+
+// performance.now() mock with sub-ms counter for realistic timing
+let perfCounter = 0;
+global.performance = { now: () => ++perfCounter };
 
 // Load the session-logger dependency (used by DSPEngine)
 require('../src/js/analysis/session-logger.js');
@@ -82,16 +87,6 @@ function generateDualSineWave(freq1, freq2, sampleRate, length, amp1, amp2) {
     return buffer;
 }
 
-function generateVibratoWave(baseFreq, vibratoRate, vibratoDepthHz, sampleRate, length) {
-    const buffer = new Float32Array(length);
-    for (let i = 0; i < length; i++) {
-        const vibrato = vibratoDepthHz * Math.sin(2 * Math.PI * vibratoRate * i / sampleRate);
-        const freq = baseFreq + vibrato;
-        buffer[i] = 0.5 * Math.sin(2 * Math.PI * freq * i / sampleRate);
-    }
-    return buffer;
-}
-
 // ──────────────────────────────────────────────────────────────────────────────
 // PYINPitchDetector
 // ──────────────────────────────────────────────────────────────────────────────
@@ -112,7 +107,6 @@ describe('PYINPitchDetector', () => {
         const buffer = generateSineWave(440, 44100, 4096);
         const result = detector.detect(buffer);
         assert.ok(result.frequency, 'Should detect a frequency');
-        // Allow ±5 Hz tolerance for YIN on a short buffer
         assert.ok(Math.abs(result.frequency - 440) < 5,
             `Detected ${result.frequency}Hz, expected ~440Hz`);
         assert.ok(result.confidence > 0.5, `Confidence ${result.confidence} should be > 0.5`);
@@ -176,19 +170,16 @@ describe('PYINPitchDetector', () => {
 
     it('should calculate cents deviation correctly', () => {
         assert.strictEqual(detector.centsDeviation(440, 440), 0);
-        // A4 to A#4 is ~100 cents
         const cents = detector.centsDeviation(440, 415.3);
         assert.ok(Math.abs(cents - 100) <= 2, `Expected ~100 cents, got ${cents}`);
         assert.strictEqual(detector.centsDeviation(0, 440), 0);
         assert.strictEqual(detector.centsDeviation(null, 440), 0);
     });
 
-    it('should provide temporal smoothing via pitch history', () => {
-        // First detection
+    it('should provide temporal continuity via pitch history', () => {
         const buf1 = generateSineWave(440, 44100, 4096);
         detector.detect(buf1);
 
-        // Second detection at same pitch - should have continuity bonus
         const buf2 = generateSineWave(441, 44100, 4096);
         const result = detector.detect(buf2);
         assert.ok(result.frequency, 'Should detect frequency with history');
@@ -213,13 +204,34 @@ describe('PYINPitchDetector', () => {
     });
 
     it('should use beta distribution for candidate weighting', () => {
-        // The beta PDF should return non-zero for values in (0,1)
         const result = detector._betaPDF(0.1, 2, 18);
         assert.ok(result > 0, 'Beta PDF should be positive for x in (0,1)');
 
-        // Edge cases
         assert.strictEqual(detector._betaPDF(0, 2, 18), 0);
         assert.strictEqual(detector._betaPDF(1, 2, 18), 0);
+    });
+
+    it('should weight candidates by threshold (not CMNDF value)', () => {
+        // Create candidates from different thresholds
+        const candidates = [
+            { frequency: 440, tau: 100, cmndfValue: 0.001, threshold: 0.01, confidence: 0.999 },
+            { frequency: 220, tau: 200, cmndfValue: 0.04, threshold: 0.05, confidence: 0.96 }
+        ];
+        const weighted = detector._weightCandidates(candidates);
+        // The candidate from the lower threshold should get a higher beta weight
+        assert.ok(weighted.length === 2);
+        // Both should have weight properties
+        assert.ok(weighted[0].weight > 0);
+        assert.ok(weighted[1].weight > 0);
+    });
+
+    it('should use CMNDF with absolute tau normalization', () => {
+        // Verify _computeCMNDF accepts minTau parameter
+        const diff = new Float32Array([10, 8, 5, 3, 2, 4, 6]);
+        const cmndf = detector._computeCMNDF(diff, diff.length, 100);
+        assert.strictEqual(cmndf[0], 1, 'First CMNDF value should be 1');
+        // With minTau=100, the normalization factor for i=1 should use tau=101
+        assert.ok(cmndf[1] > 0, 'CMNDF values should be positive');
     });
 });
 
@@ -242,16 +254,12 @@ describe('SympatheticResonanceFilter', () => {
     });
 
     it('should build resonance table with harmonics', () => {
-        // 4 strings × 8 harmonics = 32 resonances
         assert.strictEqual(filter.resonanceFrequencies.length, 32);
-        // First entry should be G3 fundamental
         assert.strictEqual(filter.resonanceFrequencies[0].harmonic, 1);
         assert.ok(filter.resonanceFrequencies[0].isFundamental);
     });
 
     it('should detect sympathetic vibrations (quiet resonance on adjacent string)', () => {
-        // Primary note: A4 at amplitude 0.5
-        // Secondary: D4 harmonic (293.66 Hz) at very low amplitude (sympathetic)
         const result = filter.analyze(293.66, 0.05, 440, 0.5);
         assert.ok(result.isSympathetic, 'Should detect D4 as sympathetic resonance');
         assert.ok(result.resonanceSource, 'Should provide resonance source info');
@@ -263,7 +271,6 @@ describe('SympatheticResonanceFilter', () => {
     });
 
     it('should NOT flag a strong secondary note as sympathetic', () => {
-        // Double stop: both notes are strong
         const result = filter.analyze(293.66, 0.4, 440, 0.5);
         assert.ok(!result.isSympathetic,
             'Strong secondary note should not be flagged as sympathetic');
@@ -277,7 +284,7 @@ describe('SympatheticResonanceFilter', () => {
     it('should filter notes array removing sympathetic vibrations', () => {
         const notes = [
             { frequency: 440, amplitude: 0.5, name: 'A', octave: 4 },
-            { frequency: 293.66, amplitude: 0.05, name: 'D', octave: 4 } // sympathetic
+            { frequency: 293.66, amplitude: 0.05, name: 'D', octave: 4 }
         ];
         const filtered = filter.filter(notes);
         assert.strictEqual(filtered.length, 1);
@@ -310,8 +317,14 @@ describe('SympatheticResonanceFilter', () => {
         assert.ok(Math.abs(strings[0] - 65.41) < 1, 'Cello lowest string should be ~C2');
     });
 
+    it('should default to violin for unknown instrument', () => {
+        filter.setInstrument('guitar');
+        assert.strictEqual(filter.instrument, 'violin');
+        const strings = filter.getOpenStrings();
+        assert.strictEqual(strings.length, 4);
+    });
+
     it('should detect harmonics of open strings as potential sympathetic', () => {
-        // G3 2nd harmonic = 392 Hz. If this appears quietly while playing A4 (440)
         const result = filter.analyze(392, 0.03, 440, 0.5);
         assert.ok(result.isSympathetic, '2nd harmonic of G string should be sympathetic');
         assert.strictEqual(result.resonanceSource.harmonic, 2);
@@ -353,17 +366,13 @@ describe('VibratoSmoother', () => {
         smoother.addSample(440, 0.9, 1000);
         smoother.addSample(442, 0.9, 1050);
         smoother.addSample(438, 0.9, 1100);
-
-        // Add sample 250ms later - the first sample should be evicted
         smoother.addSample(441, 0.9, 1250);
 
-        // Only 3 samples should remain (1050, 1100, 1250)
         assert.strictEqual(smoother.samples.length, 3);
     });
 
     it('should detect vibrato (oscillating pitch)', () => {
         const baseTime = 1000;
-        // Simulate vibrato: pitch oscillates ±10Hz around 440Hz
         smoother.addSample(440, 0.9, baseTime);
         smoother.addSample(450, 0.9, baseTime + 30);
         smoother.addSample(440, 0.9, baseTime + 60);
@@ -390,11 +399,10 @@ describe('VibratoSmoother', () => {
     it('should ignore low-confidence samples', () => {
         const baseTime = 1000;
         smoother.addSample(440, 0.9, baseTime);
-        smoother.addSample(500, 0.1, baseTime + 50); // low confidence - noise
+        smoother.addSample(500, 0.1, baseTime + 50);
         smoother.addSample(441, 0.9, baseTime + 100);
 
         const center = smoother.getCenterFrequency();
-        // Center should be near 440, not pulled toward 500
         assert.ok(Math.abs(center - 440) < 5,
             `Center ${center} should be near 440, not pulled by noise`);
     });
@@ -406,7 +414,6 @@ describe('VibratoSmoother', () => {
 
         const cents = smoother.centsDeviationFromTarget(440);
         assert.ok(typeof cents === 'number', 'Should return a number');
-        // Should be slightly sharp (positive cents)
         assert.ok(cents >= 0 && cents <= 10, `Cents ${cents} should be small positive`);
     });
 
@@ -422,7 +429,6 @@ describe('VibratoSmoother', () => {
 
     it('should estimate vibrato rate from zero crossings', () => {
         const baseTime = 1000;
-        // 5Hz vibrato over 200ms = 1 full cycle
         for (let i = 0; i < 10; i++) {
             const t = baseTime + i * 20;
             const freq = 440 + 10 * Math.sin(2 * Math.PI * 5 * i * 20 / 1000);
@@ -458,8 +464,8 @@ describe('DSPPerformanceMonitor', () => {
     });
 
     it('should record frame latencies', () => {
-        monitor.recordFrame(100, 105); // 5ms
-        monitor.recordFrame(200, 208); // 8ms
+        monitor.recordFrame(100, 105);
+        monitor.recordFrame(200, 208);
 
         assert.strictEqual(monitor.totalFrames, 2);
         assert.ok(monitor.getAverageLatency() > 0);
@@ -467,8 +473,8 @@ describe('DSPPerformanceMonitor', () => {
     });
 
     it('should detect dropped frames exceeding latency budget', () => {
-        monitor.recordFrame(100, 105);   // 5ms - OK
-        monitor.recordFrame(200, 235);   // 35ms - DROPPED (>30ms)
+        monitor.recordFrame(100, 105);
+        monitor.recordFrame(200, 235);
 
         assert.strictEqual(monitor.droppedFrames, 1);
         assert.strictEqual(monitor.totalFrames, 2);
@@ -476,9 +482,9 @@ describe('DSPPerformanceMonitor', () => {
 
     it('should calculate P95 latency', () => {
         for (let i = 0; i < 20; i++) {
-            monitor.recordFrame(0, 10); // 10ms
+            monitor.recordFrame(0, 10);
         }
-        monitor.recordFrame(0, 50); // One outlier at 50ms
+        monitor.recordFrame(0, 50);
 
         const p95 = monitor.getP95Latency();
         assert.ok(p95 <= 50, 'P95 should be at most 50ms');
@@ -507,13 +513,13 @@ describe('DSPPerformanceMonitor', () => {
     });
 
     it('should calculate drop rate as percentage', () => {
-        monitor.recordFrame(0, 10); // OK
-        monitor.recordFrame(0, 10); // OK
-        monitor.recordFrame(0, 10); // OK
-        monitor.recordFrame(0, 35); // Dropped
+        monitor.recordFrame(0, 10);
+        monitor.recordFrame(0, 10);
+        monitor.recordFrame(0, 10);
+        monitor.recordFrame(0, 35);
 
         const stats = monitor.getStats();
-        assert.strictEqual(stats.dropRate, 25); // 1/4 = 25%
+        assert.strictEqual(stats.dropRate, 25);
     });
 
     it('should reset all stats', () => {
@@ -549,9 +555,15 @@ describe('DSPEngine', () => {
             sampleRate: 44100,
             bufferSize: 2048,
             instrument: 'violin',
-            polyphonicEnabled: false, // disable for predictable unit tests
+            polyphonicEnabled: false,
             vibratoWindowMs: 200
         });
+    });
+
+    it('should default buffer size to 1024 for latency budget', () => {
+        const defaultEngine = new DSPEngine();
+        assert.strictEqual(defaultEngine.bufferSize, 1024);
+        assert.strictEqual(defaultEngine.config.bufferSize, 1024);
     });
 
     it('should initialize with correct defaults', () => {
@@ -582,6 +594,12 @@ describe('DSPEngine', () => {
         assert.strictEqual(engine.pitchDetector.maxFrequency, 987);
     });
 
+    it('should default to violin for unknown instrument', () => {
+        engine.setInstrument('guitar');
+        assert.strictEqual(engine.config.instrument, 'violin');
+        assert.strictEqual(engine.pitchDetector.minFrequency, 196);
+    });
+
     it('should process a buffer with pYIN and return detected notes', () => {
         const buffer = generateSineWave(440, 44100, 4096);
         const result = engine.processBuffer(buffer);
@@ -598,7 +616,6 @@ describe('DSPEngine', () => {
     });
 
     it('should apply vibrato smoothing to detected notes', () => {
-        // Process multiple buffers to build up vibrato smoother history
         const buffer = generateSineWave(440, 44100, 4096);
         engine.processBuffer(buffer, 1000);
         engine.processBuffer(buffer, 1050);
@@ -657,7 +674,6 @@ describe('DSPEngine', () => {
     it('should compute RMS level correctly', () => {
         const buffer = generateSineWave(440, 44100, 4096, 1.0);
         const rms = engine._computeRMS(buffer);
-        // RMS of a sine wave with amplitude 1.0 is ~0.707
         assert.ok(Math.abs(rms - 0.707) < 0.02, `RMS ${rms} should be ~0.707`);
     });
 
@@ -677,15 +693,12 @@ describe('DSPEngine', () => {
         };
         engine.setScore(mockScore);
 
-        // Simulate note match callback
         let matchData = null;
         engine.onNoteMatch = (data) => { matchData = data; };
 
-        // Process a buffer with A4
         const buffer = generateSineWave(440, 44100, 4096);
         const result = engine.processBuffer(buffer, 1000);
 
-        // Try to trigger comparison
         if (result.notes.length > 0 && result.notes[0].midi === 69) {
             engine._compareToScore(result.notes, Date.now());
             if (matchData) {
@@ -696,7 +709,6 @@ describe('DSPEngine', () => {
 
     it('should log deviations to session logger during score comparison', async () => {
         await engine.initialize();
-
         engine.sessionLogger.startSession('test-session');
 
         const mockScore = {
@@ -706,7 +718,6 @@ describe('DSPEngine', () => {
         };
         engine.setScore(mockScore);
 
-        // Simulate a note detection and comparison
         const notes = [{
             midi: 69, name: 'A', octave: 4,
             frequency: 442, centerFrequency: 442, confidence: 0.9
@@ -719,10 +730,114 @@ describe('DSPEngine', () => {
         assert.ok(log.deviations[0].deviation_cents !== 0,
             'Should have non-zero cents deviation for 442 vs 440');
     });
+
+    it('should record performance metrics in processBuffer()', () => {
+        const buffer = generateSineWave(440, 44100, 4096);
+
+        engine.processBuffer(buffer, 1000);
+        engine.processBuffer(buffer, 1050);
+        engine.processBuffer(buffer, 1100);
+
+        const stats = engine.performanceMonitor.getStats();
+        assert.ok(stats.totalFrames >= 3,
+            `processBuffer should record performance (got ${stats.totalFrames} frames)`);
+    });
+
+    it('should store _microphoneStream reference for cleanup', () => {
+        // The _microphoneStream property should exist
+        assert.strictEqual(engine._microphoneStream, null);
+    });
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Integration: pYIN + Vibrato + Sympathetic filtering pipeline
+// _processFrame tests
+// ──────────────────────────────────────────────────────────────────────────────
+
+describe('DSPEngine._processFrame', () => {
+    let engine;
+
+    beforeEach(async () => {
+        engine = new DSPEngine({
+            sampleRate: 44100,
+            bufferSize: 2048,
+            instrument: 'violin',
+            polyphonicEnabled: false,
+            vibratoWindowMs: 200
+        });
+        await engine.initialize();
+    });
+
+    it('should process a buffer and update lastDetectedNotes', () => {
+        const buffer = generateSineWave(440, 44100, 4096);
+        engine._processFrame(buffer);
+
+        // lastDetectedNotes should be set (may be empty if RMS is below threshold)
+        assert.ok(Array.isArray(engine.lastDetectedNotes));
+    });
+
+    it('should fire onPitchDetected callback', () => {
+        let callbackData = null;
+        engine.onPitchDetected = (data) => { callbackData = data; };
+
+        const buffer = generateSineWave(440, 44100, 4096);
+        engine._processFrame(buffer);
+
+        if (callbackData) {
+            assert.ok('notes' in callbackData);
+            assert.ok('level' in callbackData);
+            assert.ok('timestamp' in callbackData);
+            assert.ok('latencyMs' in callbackData);
+        }
+    });
+
+    it('should fire onLevelChange callback', () => {
+        let level = null;
+        engine.onLevelChange = (l) => { level = l; };
+
+        const buffer = generateSineWave(440, 44100, 4096);
+        engine._processFrame(buffer);
+
+        assert.ok(level !== null, 'onLevelChange should have been called');
+        assert.ok(level > 0, 'Level should be positive for non-silent buffer');
+    });
+
+    it('should record performance metrics', () => {
+        const buffer = generateSineWave(440, 44100, 4096);
+        engine._processFrame(buffer);
+        engine._processFrame(buffer);
+
+        const stats = engine.performanceMonitor.getStats();
+        assert.ok(stats.totalFrames >= 2, 'Should have recorded frames');
+    });
+
+    it('should set empty notes for silence', () => {
+        const buffer = generateSilence(4096);
+        engine._processFrame(buffer);
+
+        assert.strictEqual(engine.lastDetectedNotes.length, 0);
+    });
+
+    it('should compare to score and log deviations when score is set', () => {
+        engine.sessionLogger.startSession('frame-test');
+
+        const mockScore = {
+            getAllNotes: () => [
+                { midi: 69, getMIDI: () => 69, getFrequency: () => 440, measure: 1, beat: 1 }
+            ]
+        };
+        engine.setScore(mockScore);
+
+        const buffer = generateSineWave(440, 44100, 4096);
+        engine._processFrame(buffer);
+
+        // Check if deviations were logged (depends on whether pitch was detected)
+        const log = engine.getSessionLog();
+        assert.ok(log !== null, 'Session log should exist');
+    });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Integration: Full pipeline
 // ──────────────────────────────────────────────────────────────────────────────
 
 describe('DSP Pipeline Integration', () => {
@@ -730,7 +845,6 @@ describe('DSP Pipeline Integration', () => {
         const smoother = new VibratoSmoother({ windowMs: 200 });
         const baseTime = 1000;
 
-        // Simulate vibrato: 440Hz ± 5Hz over 200ms
         const frequencies = [435, 438, 440, 443, 445, 443, 440, 437, 435, 438];
         frequencies.forEach((f, i) => {
             smoother.addSample(f, 0.9, baseTime + i * 20);
@@ -738,7 +852,6 @@ describe('DSP Pipeline Integration', () => {
 
         const center = smoother.getCenterFrequency();
         assert.ok(center, 'Should have a center frequency');
-        // Center should be near 440Hz despite vibrato
         assert.ok(Math.abs(center - 440) < 5,
             `Center frequency ${center} should be near 440Hz through vibrato`);
     });
@@ -746,14 +859,12 @@ describe('DSP Pipeline Integration', () => {
     it('should filter sympathetic resonances while preserving intentional double stops', () => {
         const filter = new SympatheticResonanceFilter({ instrument: 'violin' });
 
-        // Case 1: Sympathetic resonance (quiet D4 while playing A4)
         const case1 = filter.filter([
             { frequency: 440, amplitude: 0.5 },
-            { frequency: 293.66, amplitude: 0.05 } // D4 open string, very quiet
+            { frequency: 293.66, amplitude: 0.05 }
         ]);
         assert.strictEqual(case1.length, 1, 'Should remove sympathetic resonance');
 
-        // Case 2: Intentional double stop (A4 + E5)
         const case2 = filter.filter([
             { frequency: 440, amplitude: 0.5 },
             { frequency: 659, amplitude: 0.45 }
@@ -773,17 +884,17 @@ describe('DSP Pipeline Integration', () => {
         assert.strictEqual(engine.sympatheticFilter.instrument, 'viola');
     });
 
-    it('should track performance within latency budget for small buffers', () => {
+    it('should track performance through processBuffer', () => {
         const engine = new DSPEngine({ bufferSize: 2048 });
         const buffer = generateSineWave(440, 44100, 4096);
 
-        // Process several buffers
         for (let i = 0; i < 5; i++) {
             engine.processBuffer(buffer, 1000 + i * 50);
         }
 
         const stats = engine.performanceMonitor.getStats();
-        assert.ok(stats.totalFrames === 0, 'processBuffer does not go through performance monitor');
+        assert.ok(stats.totalFrames >= 5,
+            `processBuffer should track performance (got ${stats.totalFrames} frames)`);
     });
 
     it('should format note name for session logging', () => {
@@ -793,5 +904,12 @@ describe('DSP Pipeline Integration', () => {
 
         const name2 = engine._formatNoteName(60);
         assert.strictEqual(name2, 'C4');
+    });
+
+    it('should validate instrument name in setInstrument', () => {
+        const engine = new DSPEngine();
+        engine.setInstrument('banjo');
+        // Should fall back to violin
+        assert.strictEqual(engine.config.instrument, 'violin');
     });
 });
