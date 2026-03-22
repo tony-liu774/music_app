@@ -40,6 +40,16 @@
   --shadow-amber-glow: 0 0 20px rgba(201, 162, 39, 0.3);
   --shadow-emerald-glow: 0 0 20px rgba(16, 185, 129, 0.3);
   --shadow-crimson-glow: 0 0 20px rgba(220, 38, 38, 0.3);
+
+  /* Override Tailwind defaults for consistent var() + utility usage */
+  --text-3xl: 2rem;
+  --text-4xl: 3rem;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.4);
 }
 
 /* ============================================================================
@@ -95,20 +105,13 @@
     --note-sharp: #ddb832;
     --note-flat: #ab3a54;
 
-    /* Typography */
-    --font-heading: 'Playfair Display', Georgia, serif;
-    --font-body: 'Source Sans 3', -apple-system, BlinkMacSystemFont, sans-serif;
-    --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
-
-    /* Font Sizes */
+    /* Font Sizes (non-conflicting with Tailwind defaults) */
     --text-xs: 0.75rem;
     --text-sm: 0.875rem;
     --text-base: 1rem;
     --text-lg: 1.125rem;
     --text-xl: 1.25rem;
     --text-2xl: 1.5rem;
-    --text-3xl: 2rem;
-    --text-4xl: 3rem;
 
     /* Spacing */
     --space-1: 0.25rem;
@@ -122,17 +125,9 @@
     --space-12: 3rem;
     --space-16: 4rem;
 
-    /* Border Radius */
-    --radius-sm: 4px;
-    --radius-md: 8px;
-    --radius-lg: 12px;
-    --radius-xl: 16px;
-    --radius-full: 9999px;
-
-    /* Shadows */
+    /* Shadows (non-conflicting with Tailwind defaults) */
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
-    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.4);
     --shadow-glow: 0 0 20px var(--primary-glow);
 
     /* Transitions */
@@ -280,33 +275,6 @@
       min-height: 100vh;
       display: flex;
       flex-direction: column;
-  }
-
-  /* Typography */
-  h1, h2, h3, h4, h5, h6 {
-      font-family: var(--font-heading);
-      font-weight: 600;
-      line-height: 1.2;
-      color: var(--text-primary);
-  }
-
-  h1 { font-size: var(--text-4xl); }
-  h2 { font-size: var(--text-3xl); }
-  h3 { font-size: var(--text-2xl); }
-  h4 { font-size: var(--text-xl); }
-
-  p {
-      color: var(--text-secondary);
-  }
-
-  a {
-      color: var(--primary);
-      text-decoration: none;
-      transition: color var(--transition-fast);
-  }
-
-  a:hover {
-      color: var(--primary-light);
   }
 
   /* Navigation */
@@ -2383,15 +2351,6 @@
 
   .sheet-music-canvas .passed-note {
       opacity: 0.6;
-  }
-
-  /* Ensure typography uses theme fonts */
-  body {
-      font-family: var(--font-body);
-  }
-
-  h1, h2, h3, h4, h5, h6 {
-      font-family: var(--font-heading);
   }
 
   /* Consistent soft glow on active/focused elements */

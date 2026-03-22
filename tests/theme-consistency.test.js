@@ -385,6 +385,93 @@ describe('Tailwind CSS v4 Migration — Midnight Conservatory', () => {
         });
     });
 
+    describe('Service worker asset references', () => {
+        it('should reference public/styles.css in sw.js', () => {
+            const sw = fs.readFileSync(path.join(__dirname, '..', 'sw.js'), 'utf8');
+            assert.ok(
+                sw.includes('/public/styles.css'),
+                'sw.js should cache /public/styles.css'
+            );
+        });
+
+        it('should NOT reference deleted CSS files in sw.js', () => {
+            const sw = fs.readFileSync(path.join(__dirname, '..', 'sw.js'), 'utf8');
+            assert.ok(
+                !sw.includes('/src/css/themes/midnight-conservatory.css'),
+                'sw.js should NOT reference deleted midnight-conservatory.css'
+            );
+            assert.ok(
+                !sw.includes('/src/css/styles.css'),
+                'sw.js should NOT reference deleted styles.css'
+            );
+        });
+
+        it('should have bumped cache version', () => {
+            const sw = fs.readFileSync(path.join(__dirname, '..', 'sw.js'), 'utf8');
+            assert.ok(
+                !sw.includes('concertmaster-v2'),
+                'sw.js should not still use concertmaster-v2 cache version'
+            );
+        });
+    });
+
+    describe('Build tool dependencies', () => {
+        it('should have tailwindcss in devDependencies, not dependencies', () => {
+            const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+            assert.ok(!pkg.dependencies['tailwindcss'], 'tailwindcss should NOT be in dependencies');
+            assert.ok(!pkg.dependencies['@tailwindcss/cli'], '@tailwindcss/cli should NOT be in dependencies');
+            assert.ok(pkg.devDependencies['tailwindcss'], 'tailwindcss should be in devDependencies');
+            assert.ok(pkg.devDependencies['@tailwindcss/cli'], '@tailwindcss/cli should be in devDependencies');
+        });
+    });
+
+    describe('@theme block overrides Tailwind defaults', () => {
+        it('should override --text-3xl and --text-4xl in @theme', () => {
+            const css = readAppCSS();
+            // Extract the @theme block
+            const themeMatch = css.match(/@theme\s*\{[\s\S]*?\n\}/);
+            assert.ok(themeMatch, 'Should have @theme block');
+            const themeBlock = themeMatch[0];
+            assert.ok(themeBlock.includes('--text-3xl: 2rem'), '--text-3xl should be overridden in @theme');
+            assert.ok(themeBlock.includes('--text-4xl: 3rem'), '--text-4xl should be overridden in @theme');
+        });
+
+        it('should override border radius tokens in @theme', () => {
+            const css = readAppCSS();
+            const themeMatch = css.match(/@theme\s*\{[\s\S]*?\n\}/);
+            const themeBlock = themeMatch[0];
+            assert.ok(themeBlock.includes('--radius-sm: 4px'), '--radius-sm should be in @theme');
+            assert.ok(themeBlock.includes('--radius-md: 8px'), '--radius-md should be in @theme');
+            assert.ok(themeBlock.includes('--radius-lg: 12px'), '--radius-lg should be in @theme');
+            assert.ok(themeBlock.includes('--radius-xl: 16px'), '--radius-xl should be in @theme');
+            assert.ok(themeBlock.includes('--radius-full: 9999px'), '--radius-full should be in @theme');
+        });
+
+        it('should override --shadow-lg in @theme', () => {
+            const css = readAppCSS();
+            const themeMatch = css.match(/@theme\s*\{[\s\S]*?\n\}/);
+            const themeBlock = themeMatch[0];
+            assert.ok(themeBlock.includes('--shadow-lg:'), '--shadow-lg should be in @theme');
+        });
+    });
+
+    describe('No duplicate typography between layers', () => {
+        it('should NOT have h1-h6 styles in @layer components', () => {
+            const css = readAppCSS();
+            // Find the components layer
+            const compMatch = css.match(/@layer components\s*\{([\s\S]*)\}/);
+            assert.ok(compMatch, 'Should have @layer components');
+            const compBlock = compMatch[1];
+            // Check no duplicate heading rules in components layer
+            // The base layer defines headings; components should not re-declare them
+            const headingPattern = /^\s*h1,\s*h2,\s*h3,\s*h4,\s*h5,\s*h6\s*\{/m;
+            assert.ok(
+                !headingPattern.test(compBlock),
+                'h1-h6 typography should only be in @layer base, not duplicated in @layer components'
+            );
+        });
+    });
+
     describe('Midnight Conservatory visual requirements', () => {
         it('should define Soft Ivory text color (#f5f5dc), not pure white', () => {
             const css = readAppCSS();
