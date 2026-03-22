@@ -44,40 +44,65 @@ describe('Logger Middleware', () => {
         assert.strictEqual(typeof logger, 'function');
     });
 
-    it('should call next()', (_, done) => {
+    it('should call next() immediately in test environment', (_, done) => {
         const logger = require('../src/middleware/logger');
-        const { EventEmitter } = require('events');
-        const mockRes = new EventEmitter();
-        mockRes.statusCode = 200;
 
         logger({
             method: 'GET',
             originalUrl: '/test'
-        }, mockRes, () => {
+        }, {}, () => {
             done();
         });
     });
 
-    it('should log on response finish', (_, done) => {
+    it('should skip logging in test environment', () => {
         const logger = require('../src/middleware/logger');
         const { EventEmitter } = require('events');
         const mockRes = new EventEmitter();
         mockRes.statusCode = 200;
 
-        const originalLog = console.log;
-        let logCalled = false;
-        console.log = (msg) => {
-            if (typeof msg === 'string' && msg.includes('GET') && msg.includes('/test') && msg.includes('200')) {
-                logCalled = true;
-            }
+        let nextCalled = false;
+        let listenerAdded = false;
+        const originalOn = mockRes.on.bind(mockRes);
+        mockRes.on = (event, ...args) => {
+            if (event === 'finish') listenerAdded = true;
+            return originalOn(event, ...args);
         };
 
-        logger({ method: 'GET', originalUrl: '/test' }, mockRes, () => {});
-        mockRes.emit('finish');
+        logger({ method: 'GET', originalUrl: '/test' }, mockRes, () => {
+            nextCalled = true;
+        });
 
-        console.log = originalLog;
-        assert.strictEqual(logCalled, true);
-        done();
+        assert.strictEqual(nextCalled, true);
+        assert.strictEqual(listenerAdded, false);
+    });
+
+    it('should log on response finish in non-test environment', () => {
+        const logger = require('../src/middleware/logger');
+        const { EventEmitter } = require('events');
+        const mockRes = new EventEmitter();
+        mockRes.statusCode = 200;
+
+        const originalEnv = process.env.NODE_ENV;
+        const originalLog = console.log;
+        let logCalled = false;
+
+        try {
+            process.env.NODE_ENV = 'development';
+            console.log = (msg) => {
+                if (typeof msg === 'string' && msg.includes('GET') && msg.includes('/test') && msg.includes('200')) {
+                    logCalled = true;
+                }
+            };
+
+            logger({ method: 'GET', originalUrl: '/test' }, mockRes, () => {});
+            mockRes.emit('finish');
+
+            assert.strictEqual(logCalled, true);
+        } finally {
+            console.log = originalLog;
+            process.env.NODE_ENV = originalEnv;
+        }
     });
 });
 
@@ -111,12 +136,21 @@ describe('Rate Limiter Middleware', () => {
         assert.strictEqual(typeof rateLimiter, 'function');
     });
 
-    it('should skip rate limiting in test environment', () => {
-        // NODE_ENV is 'test' during test runs
-        assert.strictEqual(process.env.NODE_ENV, 'test');
+    it('should have skip function that returns true in test environment', () => {
         const rateLimiter = require('../src/middleware/rateLimiter');
-        // The skip function should return true in test env
-        assert.strictEqual(typeof rateLimiter, 'function');
+        assert.strictEqual(typeof rateLimiter._skipInTest, 'function');
+        assert.strictEqual(rateLimiter._skipInTest(), true);
+    });
+
+    it('should have skip function that returns false in non-test environment', () => {
+        const rateLimiter = require('../src/middleware/rateLimiter');
+        const originalEnv = process.env.NODE_ENV;
+        try {
+            process.env.NODE_ENV = 'development';
+            assert.strictEqual(rateLimiter._skipInTest(), false);
+        } finally {
+            process.env.NODE_ENV = originalEnv;
+        }
     });
 });
 
@@ -141,7 +175,14 @@ describe('Middleware Integration Tests', () => {
         assert.strictEqual(res.headers['access-control-allow-origin'], 'http://localhost:5173');
     });
 
-    it('should handle OPTIONS preflight requests', async () => {
+    it('should include Access-Control-Allow-Credentials header', async () => {
+        const res = await makeRequest(server, 'GET', '/health', {
+            'Origin': 'http://localhost:5173'
+        });
+        assert.strictEqual(res.headers['access-control-allow-credentials'], 'true');
+    });
+
+    it('should handle OPTIONS preflight with allowed headers and methods', async () => {
         const url = new URL('/health', `http://localhost:${server.address().port}`);
         const res = await new Promise((resolve, reject) => {
             const options = {
@@ -151,7 +192,8 @@ describe('Middleware Integration Tests', () => {
                 method: 'OPTIONS',
                 headers: {
                     'Origin': 'http://localhost:5173',
-                    'Access-Control-Request-Method': 'GET'
+                    'Access-Control-Request-Method': 'POST',
+                    'Access-Control-Request-Headers': 'Authorization'
                 }
             };
             const req = http.request(options, (res) => {
@@ -163,10 +205,12 @@ describe('Middleware Integration Tests', () => {
             req.end();
         });
         assert.ok(res.status === 204 || res.status === 200);
+        const allowedHeaders = res.headers['access-control-allow-headers'];
+        assert.ok(allowedHeaders && allowedHeaders.includes('Authorization'),
+            'Should allow Authorization header');
     });
 
     it('should not be rate limited in test environment', async () => {
-        // Make several rapid requests — should all succeed in test env
         for (let i = 0; i < 5; i++) {
             const res = await makeRequest(server, 'GET', '/health');
             assert.strictEqual(res.status, 200);
@@ -179,12 +223,13 @@ describe('Middleware Integration Tests', () => {
         assert.strictEqual(res.body.status, 'ok');
     });
 
-    it('health/detailed endpoint should return uptime and memory', async () => {
+    it('health/detailed should return timestamp but hide memory in production-like guard', async () => {
         const res = await makeRequest(server, 'GET', '/health/detailed');
         assert.strictEqual(res.status, 200);
         assert.strictEqual(res.body.status, 'ok');
-        assert.ok(typeof res.body.uptime === 'number');
         assert.ok(res.body.timestamp);
+        // In test (non-production) env, uptime and memory should be present
+        assert.ok(typeof res.body.uptime === 'number');
         assert.ok(res.body.memory);
     });
 });

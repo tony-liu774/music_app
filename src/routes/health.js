@@ -3,6 +3,7 @@
  */
 
 const express = require('express');
+const config = require('../config');
 const router = express.Router();
 
 router.get('/', (req, res) => {
@@ -10,12 +11,15 @@ router.get('/', (req, res) => {
 });
 
 router.get('/detailed', (req, res) => {
-  res.status(200).json({
+  const response = {
     status: 'ok',
-    uptime: process.uptime(),
     timestamp: new Date().toISOString(),
-    memory: process.memoryUsage(),
-  });
+  };
+  if (config.nodeEnv !== 'production') {
+    response.uptime = process.uptime();
+    response.memory = process.memoryUsage();
+  }
+  res.status(200).json(response);
 });
 
 module.exports = router;
