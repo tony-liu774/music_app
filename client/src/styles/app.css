@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 /* ============================================================================
    Tailwind CSS v4 Theme Configuration — Midnight Conservatory
@@ -118,7 +118,7 @@
   }
 
   /* Light Theme Override */
-  [data-theme="light"] {
+  [data-theme='light'] {
     --bg-deep: #f5f5f0;
     --bg-surface: #ffffff;
     --bg-elevated: #fafafa;
