@@ -11,6 +11,7 @@ const omrRoutes = require('./routes/omr');
 const teacherRoutes = require('./routes/teacher');
 const authRoutes = require('./routes/auth');
 const syncRoutes = require('./routes/sync');
+const assignmentRoutes = require('./routes/assignments');
 
 const app = express();
 
@@ -74,6 +75,9 @@ app.use('/api/auth', authRoutes);
 // Cloud sync routes
 app.use('/api/sync', syncRoutes);
 
+// Assignments routes (Smart Assignments & Routine Builder)
+app.use('/api/assignments', assignmentRoutes);
+
 // API routes (placeholder for future routes)
 app.use('/api', (req, res) => {
   res.status(200).json({
@@ -90,6 +94,8 @@ app.use('/api', (req, res) => {
       authLogin: '/api/auth/login',
       sync: '/api/sync',
       syncStatus: '/api/sync/status',
+      assignments: '/api/assignments',
+      assignmentProgress: '/api/assignments/:id/progress',
     },
   });
 });
