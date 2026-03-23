@@ -1252,6 +1252,18 @@
     <!-- Toast Notifications -->
     <div class="toast-container" id="toast-container"></div>
 
+    <!-- Onboarding Modal -->
+    <div id="onboarding-modal" class="modal onboarding-modal">
+        <div class="onboarding-container">
+            <div class="onboarding-progress-bar">
+                <div class="onboarding-progress"></div>
+            </div>
+            <div class="onboarding-content">
+                <!-- Dynamic content rendered by OnboardingUI -->
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script src="src/js/models/sheet-music.js"></script>
     <script src="src/js/parsers/musicxml-parser.js"></script>
@@ -1321,17 +1333,5 @@
     <script src="src/js/components/role-selection-ui.js"></script>
     <!-- Dashboard UI -->
     <script src="src/js/components/dashboard-ui.js"></script>
-    <!-- Onboarding Modal (before scripts so DOM is available synchronously) -->
-    <div id="onboarding-modal" class="modal onboarding-modal">
-        <div class="onboarding-container">
-            <div class="onboarding-progress-bar">
-                <div class="onboarding-progress"></div>
-            </div>
-            <div class="onboarding-content">
-                <!-- Dynamic content rendered by OnboardingUI -->
-            </div>
-        </div>
-    </div>
-
     <script src="src/js/app.js"></script>
 </body>

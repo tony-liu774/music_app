@@ -276,6 +276,13 @@ class OnboardingUI {
         });
 
         nextBtn?.addEventListener('click', () => {
+            // Warn if mic was denied — Tuner/Practice will be blocked
+            if (this.service.microphoneDenied && !this.service.microphoneGranted) {
+                const proceed = confirm(
+                    'Microphone access was denied. Tuner and Practice features will be unavailable until you grant microphone permission.\n\nContinue anyway?'
+                );
+                if (!proceed) return;
+            }
             this.service.nextStep();
         });
 
@@ -302,6 +309,11 @@ class OnboardingUI {
      * Show settings guidance overlay
      */
     _showSettingsGuidance(message) {
+        // Cancel any in-flight timer before starting a new one
+        if (this._toastTimer) {
+            clearTimeout(this._toastTimer);
+            this._toastTimer = null;
+        }
         let toast = this.container.querySelector('.settings-guidance-toast');
         if (!toast) {
             toast = document.createElement('div');

@@ -223,14 +223,15 @@ class OnboardingService {
      * Finish onboarding and sync state to store
      */
     finishOnboarding() {
-        try {
-            localStorage.setItem('onboarding_complete', 'true');
-        } catch (e) {
-            console.warn('Could not save onboarding status');
-        }
-
+        // Delegate persistence to store (single source of truth)
         if (this.store) {
             this.store.setOnboardingComplete(true);
+        } else {
+            try {
+                localStorage.setItem('onboarding_complete', 'true');
+            } catch (e) {
+                console.warn('Could not save onboarding status');
+            }
         }
 
         if (this.onComplete) {
