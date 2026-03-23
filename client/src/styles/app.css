@@ -1,0 +1,146 @@
+@import "tailwindcss";
+
+/* ============================================================================
+   Tailwind CSS v4 Theme Configuration — Midnight Conservatory
+   All styling uses Tailwind utility classes or @layer components.
+   No standalone CSS files. No hardcoded colors — use theme tokens.
+   ============================================================================ */
+
+@theme {
+  /* Midnight Conservatory Color Palette */
+  --color-oxford-blue: #0a0a12;
+  --color-surface: #141420;
+  --color-elevated: #1a1a28;
+  --color-hover: #222233;
+  --color-navy: #06060e;
+  --color-amber: #c9a227;
+  --color-amber-light: #ddb832;
+  --color-amber-dark: #a68520;
+  --color-amber-glow: rgba(201, 162, 39, 0.3);
+  --color-emerald: #10b981;
+  --color-emerald-light: #34d399;
+  --color-emerald-glow: rgba(16, 185, 129, 0.4);
+  --color-crimson: #dc2626;
+  --color-crimson-light: #ef4444;
+  --color-crimson-glow: rgba(220, 38, 38, 0.4);
+  --color-ivory: #f3f4f6;
+  --color-ivory-muted: #a0a0b0;
+  --color-ivory-dim: #6a6a7a;
+  --color-border: #2a2a3a;
+  --color-border-light: #3a3a4a;
+  --color-card: #1a1a28;
+  --color-border-subtle: #2a2a3a;
+
+  /* Typography */
+  --font-heading: 'Playfair Display', Georgia, serif;
+  --font-body: 'Source Sans 3', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  /* Effects */
+  --shadow-amber-glow: 0 0 20px rgba(201, 162, 39, 0.3);
+  --shadow-emerald-glow: 0 0 20px rgba(16, 185, 129, 0.3);
+  --shadow-crimson-glow: 0 0 20px rgba(220, 38, 38, 0.3);
+
+  /* Override Tailwind defaults for consistent var() + utility usage */
+  --text-3xl: 2rem;
+  --text-4xl: 3rem;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.4);
+}
+
+/* ============================================================================
+   Base Layer — CSS Custom Properties (backward-compatible aliases) & Resets
+   ============================================================================ */
+@layer base {
+  :root {
+    /* Background Colors */
+    --bg-deep: #0a0a12;
+    --bg-surface: #141420;
+    --bg-elevated: #1a1a28;
+    --bg-hover: #222233;
+
+    /* Primary Accent - Polished Amber */
+    --primary: #c9a227;
+    --primary-light: #ddb832;
+    --primary-dark: #a68520;
+    --primary-glow: rgba(201, 162, 39, 0.3);
+
+    /* Secondary Accent - Emerald (correct intonation) */
+    --success: #10b981;
+    --success-light: #34d399;
+    --success-glow: rgba(16, 185, 129, 0.4);
+
+    /* Error Accent - Crimson (sharp/flat) */
+    --error: #dc2626;
+    --error-light: #ef4444;
+    --error-glow: rgba(220, 38, 38, 0.4);
+
+    /* Warning - Amber/Yellow */
+    --warning: #c9a227;
+    --warning-light: #ddb832;
+
+    /* Text Colors */
+    --text-primary: #f3f4f6;
+    --text-secondary: #a0a0b0;
+    --text-muted: #6a6a7a;
+
+    /* Accent (alias for primary) */
+    --accent: #c9a227;
+    --accent-glow: rgba(201, 162, 39, 0.3);
+
+    /* Surface Aliases */
+    --bg-card: #1a1a28;
+    --border-subtle: #2a2a3a;
+
+    /* Border Colors */
+    --border: #2a2a3a;
+    --border-light: #3a3a4a;
+
+    /* Note Colors */
+    --note-natural: #f3f4f6;
+    --note-sharp: #ddb832;
+    --note-flat: #ab3a54;
+
+    /* Transitions */
+    --transition-fast: 150ms ease;
+    --transition-normal: 300ms ease;
+    --transition-slow: 500ms ease;
+
+    /* Layout */
+    --nav-height: 64px;
+    --mobile-nav-height: 72px;
+    --container-max: 1200px;
+    --sidebar-width: 280px;
+  }
+
+  /* Light Theme Override */
+  [data-theme="light"] {
+    --bg-deep: #f5f5f0;
+    --bg-surface: #ffffff;
+    --bg-elevated: #fafafa;
+    --bg-hover: #f0f0f0;
+    --text-primary: #1a1a1a;
+    --text-secondary: #555555;
+    --text-muted: #888888;
+    --border: #e0e0e0;
+    --border-light: #eeeeee;
+  }
+
+  html {
+    font-size: 16px;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    line-height: 1.6;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+}
