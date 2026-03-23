@@ -126,7 +126,36 @@
                 </div>
 
                 <div class="library-search">
-                    <input type="text" placeholder="Search your library..." id="library-search-input">
+                    <input type="text" placeholder="Search your library or IMSLP..." id="library-search-input">
+                    <div class="search-source-toggle">
+                        <label class="source-toggle">
+                            <input type="checkbox" id="search-local-toggle" checked>
+                            <span class="toggle-label">Local</span>
+                        </label>
+                        <label class="source-toggle">
+                            <input type="checkbox" id="search-imslp-toggle" checked>
+                            <span class="toggle-label">IMSLP</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="library-filters">
+                    <div class="filter-chips" id="filter-chips">
+                        <span class="filter-label">Filter:</span>
+                        <button class="filter-chip active" data-filter="all">All</button>
+                        <button class="filter-chip" data-filter="violin">Violin</button>
+                        <button class="filter-chip" data-filter="viola">Viola</button>
+                        <button class="filter-chip" data-filter="cello">Cello</button>
+                        <button class="filter-chip" data-filter="bass">Bass</button>
+                    </div>
+                    <div class="sort-controls">
+                        <label class="sort-label">Sort:</label>
+                        <select id="library-sort-select" class="sort-select">
+                            <option value="recent">Recently Added</option>
+                            <option value="popular">Most Popular</option>
+                            <option value="alpha">Alphabetical</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="library-grid" id="library-grid">
@@ -546,6 +575,89 @@
                 <div class="search-results" id="imslp-results">
                     <div class="empty-state">
                         <p>Search for public domain sheet music</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Score Detail Modal -->
+        <div class="modal" id="score-detail-modal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-large score-detail-modal">
+                <button class="modal-close" aria-label="Close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+                <div class="score-detail-header">
+                    <div>
+                        <h2 class="score-detail-title" id="score-detail-title">Score Title</h2>
+                        <p class="score-detail-composer" id="score-detail-composer">Composer</p>
+                    </div>
+                    <div class="score-detail-actions">
+                        <button class="btn btn-secondary" id="score-detail-practice-btn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="5 3 19 12 5 21 5 3"/>
+                            </svg>
+                            Practice
+                        </button>
+                        <button class="btn btn-primary" id="score-detail-download-btn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="7 10 12 15 17 10"/>
+                                <line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                            Download
+                        </button>
+                    </div>
+                </div>
+                <div class="score-zoom-container" id="score-zoom-container">
+                    <div class="score-zoom-content" id="score-zoom-content">
+                        <div class="score-detail-thumbnail" id="score-detail-thumbnail">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="score-zoom-controls">
+                        <button class="zoom-btn" id="score-zoom-out" title="Zoom Out">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="5" y1="12" x2="19" y2="12"/>
+                            </svg>
+                        </button>
+                        <span class="zoom-level-display" id="score-zoom-level">100%</span>
+                        <button class="zoom-btn" id="score-zoom-in" title="Zoom In">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"/>
+                                <line x1="5" y1="12" x2="19" y2="12"/>
+                            </svg>
+                        </button>
+                        <button class="zoom-btn" id="score-zoom-reset" title="Reset">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                <path d="M3 3v5h5"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="score-detail-meta">
+                    <div class="score-detail-meta-item">
+                        <span class="score-detail-meta-label">Instrument</span>
+                        <span class="score-detail-meta-value" id="score-detail-instrument">Violin</span>
+                    </div>
+                    <div class="score-detail-meta-item">
+                        <span class="score-detail-meta-label">Difficulty</span>
+                        <span class="score-detail-meta-value" id="score-detail-difficulty">Intermediate</span>
+                    </div>
+                    <div class="score-detail-meta-item">
+                        <span class="score-detail-meta-label">Added</span>
+                        <span class="score-detail-meta-value" id="score-detail-added">Jan 1, 2024</span>
+                    </div>
+                    <div class="score-detail-meta-item">
+                        <span class="score-detail-meta-label">Last Practiced</span>
+                        <span class="score-detail-meta-value" id="score-detail-last-practiced">Never</span>
                     </div>
                 </div>
             </div>

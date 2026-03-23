@@ -55,6 +55,10 @@ class ConcertmasterApp {
         this.isTeacherMode = false;
         this.teacherService = null;
         this.studioDashboard = null;
+
+        // Score detail modal
+        this.currentDetailScoreId = null;
+        this.scoreZoomLevel = 1;
     }
 
     async init() {
@@ -71,6 +75,7 @@ class ConcertmasterApp {
             this.setupPracticeControls();
             this.setupMetronome();
             this.setupSettings();
+            this.setupScoreDetailModal();
 
             // Initialize accessibility features
             this.initAccessibility();
@@ -265,9 +270,32 @@ class ConcertmasterApp {
             });
         });
 
-        // Library search
-        document.getElementById('library-search-input')?.addEventListener('input', (e) => {
-            this.filterLibrary(e.target.value);
+        // Library search with concurrent IMSLP search
+        const searchInput = document.getElementById('library-search-input');
+        let searchTimeout = null;
+        searchInput?.addEventListener('input', (e) => {
+            // Debounce search
+            if (searchTimeout) clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                this.filterLibrary(e.target.value);
+            }, 300);
+        });
+
+        // Filter chips
+        document.querySelectorAll('.filter-chip').forEach(chip => {
+            chip.addEventListener('click', () => {
+                document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+                chip.classList.add('active');
+                const query = searchInput?.value || '';
+                this.filterLibrary(query, chip.dataset.filter);
+            });
+        });
+
+        // Sort dropdown
+        document.getElementById('library-sort-select')?.addEventListener('change', (e) => {
+            const query = searchInput?.value || '';
+            const activeFilter = document.querySelector('.filter-chip.active')?.dataset.filter || 'all';
+            this.filterLibrary(query, activeFilter, e.target.value);
         });
     }
 
@@ -692,14 +720,18 @@ class ConcertmasterApp {
 
     async loadLibrary() {
         await this.scoreLibrary.init();
-        this.renderLibrary();
+        this.showSkeletonLoading();
+        // Small delay to show skeleton effect
+        setTimeout(() => {
+            this.renderLibrary();
+        }, 300);
     }
 
     renderLibrary() {
         const grid = document.getElementById('library-grid');
         if (!grid) return;
 
-        const scores = this.scoreLibrary.scores;
+        const scores = this.scoreLibrary.scores.map(s => ({ ...s, _source: 'local' }));
 
         if (scores.length === 0) {
             grid.innerHTML = `
@@ -716,17 +748,12 @@ class ConcertmasterApp {
             return;
         }
 
-        grid.innerHTML = scores.map((score, index) => `
-            <div class="library-card" data-id="${score.id}" data-index="${index}" tabindex="0" role="option">
-                <div class="library-card-thumbnail">
-                    ${score.thumbnail ? `<img data-src="${score.thumbnail}" alt="" class="lazy-thumbnail" loading="lazy">` : `
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                        <polyline points="14 2 14 8 20 8"/>
-                    </svg>
-                    `}
-                </div>
-                <h3 class="library-card-title">${score.title}</h3>
+        // Apply current sort preference
+        const sortBy = document.getElementById('library-sort-select')?.value || 'recent';
+        const sortedScores = this.sortScores(scores, sortBy);
+
+        this.renderLibraryFiltered(sortedScores);
+    }
                 <p class="library-card-composer">${score.composer}</p>
                 <div class="library-card-meta">
                     <span class="instrument-badge">${score.instrument || 'Violin'}</span>
@@ -775,53 +802,395 @@ class ConcertmasterApp {
         return date.toLocaleDateString();
     }
 
-    filterLibrary(query) {
-        const results = this.scoreLibrary.search(query);
-        const grid = document.getElementById('library-grid');
+    filterLibrary(query, instrumentFilter = 'all', sortBy = null) {
+        // Get sort preference if not passed
+        if (!sortBy) {
+            sortBy = document.getElementById('library-sort-select')?.value || 'recent';
+        }
 
-        if (results.length === 0) {
+        // Show skeleton loading
+        this.showSkeletonLoading();
+
+        // Get source toggle states
+        const searchLocal = document.getElementById('search-local-toggle')?.checked ?? true;
+        const searchImslp = document.getElementById('search-imslp-toggle')?.checked ?? true;
+
+        // Concurrent search
+        Promise.all([
+            searchLocal ? this.searchLocalLibrary(query, instrumentFilter, sortBy) : Promise.resolve([]),
+            searchImslp ? this.searchIMSLPConcurrently(query, instrumentFilter) : Promise.resolve([])
+        ]).then(([localResults, imslpResults]) => {
+            // Merge and deduplicate results
+            const mergedResults = this.mergeSearchResults(localResults, imslpResults);
+
+            // Apply sorting
+            const sortedResults = this.sortScores(mergedResults, sortBy);
+
+            // Render results
+            this.renderLibraryFiltered(sortedResults);
+        }).catch(error => {
+            console.error('Search error:', error);
+            // Fallback to local search only
+            const localResults = this.searchLocalLibrary(query, instrumentFilter, sortBy);
+            this.renderLibraryFiltered(localResults);
+        });
+    }
+
+    async searchLocalLibrary(query, instrumentFilter, sortBy) {
+        let scores = this.scoreLibrary.scores;
+
+        // Apply text search
+        if (query && query.trim()) {
+            const lowerQuery = query.toLowerCase();
+            scores = scores.filter(score =>
+                score.title?.toLowerCase().includes(lowerQuery) ||
+                score.composer?.toLowerCase().includes(lowerQuery) ||
+                score.instrument?.toLowerCase().includes(lowerQuery)
+            );
+        }
+
+        // Apply instrument filter
+        if (instrumentFilter && instrumentFilter !== 'all') {
+            scores = scores.filter(score =>
+                score.instrument?.toLowerCase() === instrumentFilter.toLowerCase()
+            );
+        }
+
+        // Mark as local source
+        scores = scores.map(score => ({ ...score, _source: 'local' }));
+
+        return scores;
+    }
+
+    async searchIMSLPConcurrently(query, instrumentFilter) {
+        if (!query || !query.trim()) return [];
+
+        try {
+            const imslpClient = new IMSLPClient();
+            const results = await imslpClient.search(query, instrumentFilter);
+
+            // Transform IMSLP results to match local format
+            return results.map(result => ({
+                id: `imslp-${result.id}`,
+                title: result.title,
+                composer: result.composer,
+                instrument: result.instrument || instrumentFilter,
+                difficulty: result.difficulty || 3,
+                thumbnail: result.thumbnail || null,
+                addedAt: result.uploadedAt || new Date().toISOString(),
+                practiceCount: 0,
+                lastPracticed: null,
+                _source: 'imslp',
+                _imslpId: result.id,
+                _downloadUrl: result.downloadUrl
+            }));
+        } catch (error) {
+            console.error('IMSLP search error:', error);
+            return [];
+        }
+    }
+
+    mergeSearchResults(localResults, imslpResults) {
+        const merged = [...localResults];
+
+        // Add IMSLP results that aren't duplicates
+        imslpResults.forEach(imslpResult => {
+            const isDuplicate = localResults.some(local =>
+                local.title?.toLowerCase() === imslpResult.title?.toLowerCase() &&
+                local.composer?.toLowerCase() === imslpResult.composer?.toLowerCase()
+            );
+            if (!isDuplicate) {
+                merged.push(imslpResult);
+            }
+        });
+
+        return merged;
+    }
+
+    sortScores(scores, sortBy) {
+        const sorted = [...scores];
+
+        switch (sortBy) {
+            case 'recent':
+                sorted.sort((a, b) => new Date(b.addedAt || 0) - new Date(a.addedAt || 0));
+                break;
+            case 'popular':
+                sorted.sort((a, b) => (b.practiceCount || 0) - (a.practiceCount || 0));
+                break;
+            case 'alpha':
+                sorted.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+                break;
+        }
+
+        return sorted;
+    }
+
+    showSkeletonLoading() {
+        const grid = document.getElementById('library-grid');
+        if (!grid) return;
+
+        const skeletonCount = 6;
+        grid.innerHTML = Array(skeletonCount).fill(0).map(() => `
+            <div class="skeleton-card">
+                <div class="skeleton-thumbnail"></div>
+                <div class="skeleton-title"></div>
+                <div class="skeleton-composer"></div>
+                <div class="skeleton-meta"></div>
+            </div>
+        `).join('');
+    }
+
+    renderLibraryFiltered(scores) {
+        const grid = document.getElementById('library-grid');
+        if (!grid) return;
+
+        if (scores.length === 0) {
             grid.innerHTML = `
                 <div class="empty-state">
-                    <p>No scores match your search</p>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M9 18V5l12-2v13"/>
+                        <circle cx="6" cy="18" r="3"/>
+                        <circle cx="18" cy="16" r="3"/>
+                    </svg>
+                    <h3>No scores found</h3>
+                    <p>Try adjusting your search or filters</p>
                 </div>
             `;
             return;
         }
 
-        // Re-render with filtered results
-        this.renderLibraryFiltered(results);
-    }
-
-    renderLibraryFiltered(scores) {
-        const grid = document.getElementById('library-grid');
-
         grid.innerHTML = scores.map(score => `
-            <div class="library-card" data-id="${score.id}">
+            <div class="library-card" data-id="${score.id}" data-source="${score._source || 'local'}" tabindex="0" role="option">
+                ${score._source === 'imslp' ? '<span class="source-badge imslp">IMSLP</span>' : ''}
+                <div class="library-card-actions">
+                    <button class="card-action-btn favorite-btn ${score.isFavorited ? 'favorited' : ''}" data-id="${score.id}" title="Favorite" aria-label="Favorite">
+                        <svg viewBox="0 0 24 24" fill="${score.isFavorited ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
+                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                        </svg>
+                    </button>
+                    <button class="card-action-btn download-btn" data-id="${score.id}" title="Download" aria-label="Download">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                    </button>
+                </div>
                 <div class="library-card-thumbnail">
+                    ${score.thumbnail ? `<img src="${score.thumbnail}" alt="${score.title}" loading="lazy">` : `
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                         <polyline points="14 2 14 8 20 8"/>
                     </svg>
+                    `}
                 </div>
                 <h3 class="library-card-title">${score.title}</h3>
                 <p class="library-card-composer">${score.composer}</p>
                 <div class="library-card-meta">
-                    <span class="instrument-badge">${score.instrument || 'Violin'}</span>
+                    <span class="instrument-badge">${score.instrument || 'Unknown'}</span>
                     <span>${this.formatDate(score.addedAt)}</span>
                 </div>
+                ${score.difficulty ? this.renderDifficultyStars(score.difficulty) : ''}
             </div>
         `).join('');
 
-        // Add click handlers
+        // Setup lazy loading
+        this.setupLazyLoading();
+
+        // Add click handlers for cards
         grid.querySelectorAll('.library-card').forEach(card => {
-            card.addEventListener('click', () => {
+            card.addEventListener('click', (e) => {
+                // Ignore clicks on action buttons
+                if (e.target.closest('.library-card-actions')) return;
                 const id = card.dataset.id;
-                this.selectScore(id);
+                const source = card.dataset.source;
+                if (source === 'imslp') {
+                    this.handleIMSLPResultClick(id);
+                } else {
+                    this.selectScore(id);
+                }
+            });
+
+            // Keyboard support
+            card.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    const id = card.dataset.id;
+                    const source = card.dataset.source;
+                    if (source === 'imslp') {
+                        this.handleIMSLPResultClick(id);
+                    } else {
+                        this.selectScore(id);
+                    }
+                }
+            });
+        });
+
+        // Add click handlers for favorite buttons
+        grid.querySelectorAll('.favorite-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const id = btn.dataset.id;
+                this.toggleFavorite(id);
+            });
+        });
+
+        // Add click handlers for download buttons
+        grid.querySelectorAll('.download-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const id = btn.dataset.id;
+                const card = btn.closest('.library-card');
+                const source = card.dataset.source;
+                if (source === 'imslp') {
+                    this.downloadFromIMSLP(id);
+                } else {
+                    this.downloadScore(id);
+                }
             });
         });
     }
 
+    renderDifficultyStars(difficulty) {
+        const stars = Math.round(difficulty);
+        let html = '<div class="difficulty-stars">';
+        for (let i = 1; i <= 5; i++) {
+            html += `<svg class="difficulty-star ${i <= stars ? 'filled' : ''}" viewBox="0 0 24 24" fill="${i <= stars ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>`;
+        }
+        html += '</div>';
+        return html;
+    }
+
+    toggleFavorite(id) {
+        const score = this.scoreLibrary.scores.find(s => s.id === id);
+        if (score) {
+            score.isFavorited = !score.isFavorited;
+            // Update button state
+            const btn = document.querySelector(`.favorite-btn[data-id="${id}"]`);
+            if (btn) {
+                btn.classList.toggle('favorited', score.isFavorited);
+                btn.querySelector('svg').setAttribute('fill', score.isFavorited ? 'currentColor' : 'none');
+            }
+            this.showToast(score.isFavorited ? 'Added to favorites' : 'Removed from favorites', 'success');
+        }
+    }
+
+    downloadScore(id) {
+        const score = this.scoreLibrary.scores.find(s => s.id === id);
+        if (score) {
+            this.showToast('Downloading score...', 'info');
+            // Implementation for downloading local score
+            console.log('Downloading score:', score.title);
+        }
+    }
+
+    downloadFromIMSLP(id) {
+        const imslpId = id.replace('imslp-', '');
+        this.showToast('Downloading from IMSLP...', 'info');
+        // Call IMSLP client to download
+        const imslpClient = new IMSLPClient();
+        imslpClient.download(imslpId).then(blob => {
+            // Save blob or process it
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `imslp-${imslpId}.pdf`;
+            a.click();
+            URL.revokeObjectURL(url);
+            this.showToast('Download complete', 'success');
+        }).catch(error => {
+            this.showToast('Download failed: ' + error.message, 'error');
+        });
+    }
+
+    handleIMSLPResultClick(id) {
+        const imslpId = id.replace('imslp-', '');
+        // Show a modal or navigate to practice view with the IMSLP score
+        this.showToast('IMSLP scores open in external viewer', 'info');
+    }
+
+    showScoreDetail(id) {
+        const score = this.scoreLibrary.scores.find(s => s.id === id);
+        if (!score) return;
+
+        // Populate detail modal
+        document.getElementById('score-detail-title').textContent = score.title;
+        document.getElementById('score-detail-composer').textContent = score.composer;
+        document.getElementById('score-detail-instrument').textContent = score.instrument || 'Unknown';
+
+        // Set difficulty
+        const difficultyLabels = ['Beginner', 'Easy', 'Intermediate', 'Advanced', 'Expert'];
+        const difficultyText = score.difficulty ? difficultyLabels[Math.min(score.difficulty - 1, 4)] : 'Unknown';
+        document.getElementById('score-detail-difficulty').textContent = difficultyText;
+
+        document.getElementById('score-detail-added').textContent = this.formatDate(score.addedAt);
+        document.getElementById('score-detail-last-practiced').textContent = score.lastPracticed ? this.formatDate(score.lastPracticed) : 'Never';
+
+        // Set thumbnail
+        const thumbnailEl = document.getElementById('score-detail-thumbnail');
+        if (score.thumbnail) {
+            thumbnailEl.innerHTML = `<img src="${score.thumbnail}" alt="${score.title}">`;
+        }
+
+        // Store current score id for actions
+        this.currentDetailScoreId = id;
+
+        // Reset zoom
+        this.scoreZoomLevel = 1;
+        this.updateScoreZoom();
+
+        // Show modal
+        document.getElementById('score-detail-modal')?.classList.add('active');
+    }
+
     selectScore(id) {
+        const score = this.scoreLibrary.scores.find(s => s.id === id);
+        if (!score) return;
+
+        this.currentScore = score;
+
+        // Show detail modal instead of going directly to practice
+        this.showScoreDetail(id);
+    }
+
+    setupScoreDetailModal() {
+        // Practice button
+        document.getElementById('score-detail-practice-btn')?.addEventListener('click', () => {
+            const id = this.currentDetailScoreId;
+            if (id) {
+                document.getElementById('score-detail-modal')?.classList.remove('active');
+                this.startPracticeFromDetail(id);
+            }
+        });
+
+        // Download button
+        document.getElementById('score-detail-download-btn')?.addEventListener('click', () => {
+            const id = this.currentDetailScoreId;
+            if (id) {
+                this.downloadScore(id);
+            }
+        });
+
+        // Zoom controls
+        document.getElementById('score-zoom-in')?.addEventListener('click', () => {
+            this.scoreZoomLevel = Math.min(2, this.scoreZoomLevel + 0.25);
+            this.updateScoreZoom();
+        });
+
+        document.getElementById('score-zoom-out')?.addEventListener('click', () => {
+            this.scoreZoomLevel = Math.max(0.5, this.scoreZoomLevel - 0.25);
+            this.updateScoreZoom();
+        });
+
+        document.getElementById('score-zoom-reset')?.addEventListener('click', () => {
+            this.scoreZoomLevel = 1;
+            this.updateScoreZoom();
+        });
+    }
+
+    startPracticeFromDetail(id) {
         const score = this.scoreLibrary.scores.find(s => s.id === id);
         if (!score) return;
 
@@ -860,6 +1229,17 @@ class ConcertmasterApp {
 
         // Announce score change to screen readers
         this.announceScoreChange();
+    }
+
+    updateScoreZoom() {
+        const zoomContent = document.getElementById('score-zoom-content');
+        const zoomLevelDisplay = document.getElementById('score-zoom-level');
+        if (zoomContent) {
+            zoomContent.style.transform = `scale(${this.scoreZoomLevel})`;
+        }
+        if (zoomLevelDisplay) {
+            zoomLevelDisplay.textContent = Math.round(this.scoreZoomLevel * 100) + '%';
+        }
     }
 
     async handleFileUpload(input) {
@@ -1402,7 +1782,7 @@ class ConcertmasterApp {
         });
     }
 
-    searchIMSLP() {
+    async searchIMSLP() {
         const input = document.getElementById('imslp-search-input');
         const query = input?.value?.trim();
 
@@ -1414,30 +1794,86 @@ class ConcertmasterApp {
         // Show loading state
         const resultsEl = document.getElementById('imslp-results');
         if (resultsEl) {
-            resultsEl.innerHTML = '<div class="empty-state"><p>Searching...</p></div>';
+            resultsEl.innerHTML = `
+                <div class="search-loading">
+                    <div class="search-loading-spinner"></div>
+                    <p>Searching IMSLP...</p>
+                </div>
+            `;
         }
 
-        // Simulate search results (in real implementation, this would call backend)
-        setTimeout(() => {
+        try {
+            const imslpClient = new IMSLPClient();
+            const results = await imslpClient.search(query);
+
+            if (results.length === 0) {
+                if (resultsEl) {
+                    resultsEl.innerHTML = `
+                        <div class="empty-state">
+                            <p>No results found on IMSLP</p>
+                        </div>
+                    `;
+                }
+                return;
+            }
+
+            if (resultsEl) {
+                resultsEl.innerHTML = results.map(result => `
+                    <div class="imslp-result-item">
+                        <div class="imslp-result-info">
+                            <h4>${result.title}</h4>
+                            <p>${result.composer} ${result.instrument ? '• ' + result.instrument : ''}</p>
+                        </div>
+                        <div class="imslp-result-actions">
+                            <button class="btn btn-secondary imslp-download-btn" data-id="${result.id}">Add to Library</button>
+                        </div>
+                    </div>
+                `).join('');
+
+                // Add click handlers for download buttons
+                resultsEl.querySelectorAll('.imslp-download-btn').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const id = btn.dataset.id;
+                        const result = results.find(r => r.id === id);
+                        if (result) {
+                            await this.addIMSLPToLibrary(result);
+                            btn.textContent = 'Added';
+                            btn.disabled = true;
+                        }
+                    });
+                });
+            }
+        } catch (error) {
+            console.error('IMSLP search error:', error);
             if (resultsEl) {
                 resultsEl.innerHTML = `
-                    <div class="search-result-item">
-                        <div class="result-info">
-                            <h4>Bach - Cello Suite No. 1</h4>
-                            <p>J.S. Bach • Cello</p>
-                        </div>
-                        <button class="btn btn-secondary">Download</button>
-                    </div>
-                    <div class="search-result-item">
-                        <div class="result-info">
-                            <h4>Vivaldi - Four Seasons</h4>
-                            <p>A. Vivaldi • Violin</p>
-                        </div>
-                        <button class="btn btn-secondary">Download</button>
+                    <div class="empty-state">
+                        <p>Search failed. Please try again.</p>
                     </div>
                 `;
             }
-        }, 1500);
+            this.showToast('IMSLP search failed: ' + error.message, 'error');
+        }
+    }
+
+    async addIMSLPToLibrary(result) {
+        try {
+            const score = new Score(result.title, result.composer);
+            score.instrument = result.instrument || 'violin';
+            score.difficulty = result.difficulty || 3;
+            score.thumbnail = result.thumbnail || null;
+            score._source = 'imslp';
+            score._imslpId = result.id;
+            score.uploadedAt = new Date().toISOString();
+
+            await this.scoreLibrary.addScore(score);
+            await this.scoreLibrary.loadScores();
+            this.renderLibrary();
+            this.showToast('Added to library', 'success');
+        } catch (error) {
+            console.error('Error adding IMSLP score to library:', error);
+            this.showToast('Failed to add to library', 'error');
+        }
     }
 
     showToast(message, type = 'info') {
