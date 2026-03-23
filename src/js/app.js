@@ -91,6 +91,11 @@ class ConcertmasterApp {
             // Initialize teacher mode if enabled
             this.initTeacherMode();
 
+            // Initialize student widget when teacher mode is not active
+            if (!this.isTeacherMode) {
+                await this.initStudentWidget();
+            }
+
             console.log('Concertmaster initialized successfully');
         } catch (error) {
             console.error('Initialization error:', error);

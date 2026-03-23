@@ -224,22 +224,25 @@ class UpNextWidget {
      * Handle start practice button click
      */
     async _handleStartPractice(assignmentId) {
-        if (this.onStartPractice) {
-            const assignment = await this.assignmentService.getAssignment(assignmentId);
-            this.onStartPractice(assignment);
-        }
-
-        // Navigate to practice view with assignment
+        // Navigate first to avoid race condition with callback
         if (window.app && window.app.navigateTo) {
             window.app.navigateTo('practice');
+        }
+
+        // Get assignment for callback and piece loading
+        let assignment = null;
+        if (assignmentId) {
+            assignment = await this.assignmentService.getAssignment(assignmentId);
 
             // Load the assignment's piece if specified
-            if (assignmentId) {
-                const assignment = await this.assignmentService.getAssignment(assignmentId);
-                if (assignment && assignment.pieceId && window.app.loadPiece) {
-                    window.app.loadPiece(assignment.pieceId);
-                }
+            if (assignment && assignment.pieceId && window.app && window.app.loadPiece) {
+                window.app.loadPiece(assignment.pieceId);
             }
+        }
+
+        // Call callback after navigation
+        if (this.onStartPractice && assignment) {
+            this.onStartPractice(assignment);
         }
     }
 
