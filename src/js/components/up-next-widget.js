@@ -17,13 +17,13 @@ class UpNextWidget {
      */
     get studentId() {
         if (this._studentId) return this._studentId;
-        this._studentId = localStorage.getItem('user_id') || 'student-' + Date.now();
+        this._studentId = localStorage.getItem('student_id') || 'student-' + Date.now();
         return this._studentId;
     }
 
     set studentId(id) {
         this._studentId = id;
-        localStorage.setItem('user_id', id);
+        localStorage.setItem('student_id', id);
     }
 
     /**
@@ -35,7 +35,7 @@ class UpNextWidget {
         if (!this.container) return;
 
         // Ensure we have a student ID
-        if (!localStorage.getItem('user_id')) {
+        if (!localStorage.getItem('student_id')) {
             this.studentId = 'student-' + Date.now();
         }
 
@@ -248,11 +248,13 @@ class UpNextWidget {
 
     /**
      * Handle view all button click
+     * Note: Students don't have a dedicated assignments view,
+     * so View All scrolls to show the widget on the library page
      */
     _handleViewAll() {
-        // Navigate to assignments list
+        // Navigate to library where widget is displayed
         if (window.app && window.app.navigateTo) {
-            window.app.navigateTo('assignments');
+            window.app.navigateTo('library');
         }
     }
 

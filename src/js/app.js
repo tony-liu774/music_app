@@ -236,6 +236,35 @@ class ConcertmasterApp {
         }
     }
 
+    /**
+     * Navigate to a view by name (used by widgets)
+     */
+    navigateTo(viewName) {
+        // Map view names to view IDs
+        const viewMap = {
+            'library': 'library-view',
+            'practice': 'practice-view',
+            'metronome': 'metronome-view',
+            'settings': 'settings-view',
+            'tuner': 'tuner-view',
+            'studio': 'studio-dashboard-view'
+        };
+
+        const viewId = viewMap[viewName];
+        if (viewId) {
+            this.showView(viewId);
+        }
+    }
+
+    /**
+     * Load a piece/score by ID (used by widgets)
+     */
+    loadPiece(pieceId) {
+        if (pieceId && this.selectScore) {
+            this.selectScore(pieceId);
+        }
+    }
+
     setupModals() {
         // Close buttons
         document.querySelectorAll('.modal-close, .modal-backdrop').forEach(el => {

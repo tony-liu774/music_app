@@ -21,13 +21,13 @@ class AssignmentUI {
      */
     get teacherId() {
         if (this._teacherId) return this._teacherId;
-        this._teacherId = localStorage.getItem('user_id') || 'teacher-' + Date.now();
+        this._teacherId = localStorage.getItem('teacher_id') || 'teacher-' + Date.now();
         return this._teacherId;
     }
 
     set teacherId(id) {
         this._teacherId = id;
-        localStorage.setItem('user_id', id);
+        localStorage.setItem('teacher_id', id);
     }
 
     /**
@@ -54,7 +54,7 @@ class AssignmentUI {
     async refresh() {
         try {
             // Ensure we have a teacher ID
-            if (!localStorage.getItem('user_id')) {
+            if (!localStorage.getItem('teacher_id')) {
                 this.teacherId = 'teacher-' + Date.now();
             }
 

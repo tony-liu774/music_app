@@ -5,9 +5,13 @@
 
 /**
  * Get the user ID from localStorage
+ * Checks for teacher_id or student_id to avoid collisions when
+ * teacher and student use the same device
  */
 function getUserId() {
-    return localStorage.getItem('user_id') || 'anonymous';
+    return localStorage.getItem('teacher_id') ||
+           localStorage.getItem('student_id') ||
+           'anonymous';
 }
 
 class AssignmentAPIClient {
