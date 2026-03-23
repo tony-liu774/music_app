@@ -68,16 +68,21 @@
     --primary-light: #ddb832;
     --primary-dark: #a68520;
     --primary-glow: rgba(201, 162, 39, 0.3);
+    --primary-bg-subtle: rgba(201, 162, 39, 0.08);
+    --primary-bg-faint: rgba(201, 162, 39, 0.03);
 
     /* Secondary Accent - Emerald (correct intonation) */
     --success: #10b981;
     --success-light: #34d399;
     --success-glow: rgba(16, 185, 129, 0.4);
+    --success-bg-subtle: rgba(16, 185, 129, 0.1);
 
     /* Error Accent - Crimson (sharp/flat) */
     --error: #dc2626;
     --error-light: #ef4444;
     --error-glow: rgba(220, 38, 38, 0.4);
+    --error-bg-subtle: rgba(220, 38, 38, 0.08);
+    --error-bg-faint: rgba(220, 38, 38, 0.05);
 
     /* Warning - Amber/Yellow */
     --warning: #c9a227;
@@ -91,6 +96,9 @@
     /* Accent (alias for primary, used in onboarding/tuner) */
     --accent: #c9a227;
     --accent-glow: rgba(201, 162, 39, 0.3);
+
+    /* Overlay */
+    --bg-deep-overlay: rgba(10, 10, 18, 0.95);
 
     /* Surface Aliases */
     --bg-card: #1a1a28;
@@ -2956,7 +2964,7 @@
       left: 0;
       right: 0;
       bottom: 0;
-      background: rgba(10, 10, 18, 0.95);
+      background: var(--bg-deep-overlay);
       z-index: 1000;
       display: none;
       align-items: center;
@@ -2978,8 +2986,8 @@
       overflow-y: auto;
       position: relative;
       box-shadow:
-          0 0 60px rgba(201, 162, 39, 0.1),
-          0 25px 50px rgba(0, 0, 0, 0.5);
+          0 0 60px var(--primary-bg-subtle),
+          0 25px 50px var(--shadow-lg, rgba(0, 0, 0, 0.5));
   }
 
   .onboarding-progress-bar {
@@ -3024,10 +3032,10 @@
 
   @keyframes pulse-glow {
       0%, 100% {
-          filter: drop-shadow(0 0 10px rgba(201, 162, 39, 0.3));
+          filter: drop-shadow(0 0 10px var(--primary-glow));
       }
       50% {
-          filter: drop-shadow(0 0 25px rgba(201, 162, 39, 0.6));
+          filter: drop-shadow(0 0 25px var(--primary-glow));
       }
   }
 
@@ -3085,7 +3093,7 @@
 
   .permission-card.granted {
       border-color: var(--success);
-      background: rgba(16, 185, 129, 0.1);
+      background: var(--success-bg-subtle);
   }
 
   .permission-card .permission-icon {
@@ -3106,7 +3114,105 @@
       margin-bottom: 16px;
   }
 
-  /* Instrument Selection Step */
+  /* Permission Denied State */
+  .permission-card.denied {
+      border-color: var(--error);
+      background: var(--error-bg-faint);
+  }
+
+  .permission-denied-msg {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      margin-top: 12px;
+      padding: 12px;
+      background: var(--error-bg-subtle);
+      border-radius: 8px;
+      font-size: 0.8rem;
+      color: var(--error);
+  }
+
+  .permission-denied-msg .denied-icon {
+      color: var(--error);
+  }
+
+  .permission-denied-msg .denied-icon svg {
+      width: 16px;
+      height: 16px;
+  }
+
+  .btn-link {
+      background: none;
+      border: none;
+      color: var(--primary);
+      cursor: pointer;
+      text-decoration: underline;
+      font-size: 0.85rem;
+      padding: 0;
+      font-family: var(--font-body);
+  }
+
+  .btn-link:hover {
+      color: var(--primary-light);
+  }
+
+  /* Settings Guidance Toast */
+  .settings-guidance-toast {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 20px;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      max-width: 90%;
+      opacity: 0;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      pointer-events: none;
+      z-index: 10;
+      box-shadow: var(--shadow-lg, 0 10px 15px rgba(0, 0, 0, 0.5));
+  }
+
+  .settings-guidance-toast.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+  }
+
+  /* Mic Blocked Banner (shown in Tuner/Practice views) */
+  .mic-blocked-banner {
+      background: var(--bg-surface);
+      border: 1px solid var(--error);
+      border-radius: 16px;
+      padding: 40px 32px;
+      text-align: center;
+      max-width: 500px;
+      margin: 60px auto;
+      box-shadow: 0 0 40px var(--error-bg-subtle);
+  }
+
+  .mic-blocked-banner h3 {
+      font-family: var(--font-heading);
+      color: var(--error);
+      margin-bottom: 8px;
+  }
+
+  .mic-blocked-banner p {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      margin-bottom: 24px;
+  }
+
+  .mic-blocked-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+  }
+
+  /* Instrument Selection Step — Carousel */
   .instrument-step {
       text-align: center;
       width: 100%;
@@ -3115,14 +3221,152 @@
   .instrument-step h2 {
       font-family: var(--font-heading);
       font-size: 1.75rem;
+      color: var(--text-primary);
       margin-bottom: 12px;
   }
 
   .instrument-step > p {
       color: var(--text-secondary);
+      font-family: var(--font-body);
       margin-bottom: 32px;
   }
 
+  .instrument-carousel {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 20px;
+      position: relative;
+  }
+
+  .carousel-arrow {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--text-secondary);
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+  }
+
+  .carousel-arrow:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+      box-shadow: 0 0 12px var(--primary-glow);
+  }
+
+  .carousel-arrow svg {
+      width: 24px;
+      height: 24px;
+  }
+
+  .carousel-track-wrapper {
+      overflow: hidden;
+      width: 100%;
+      border-radius: 16px;
+  }
+
+  .carousel-track {
+      display: flex;
+      transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  .carousel-card {
+      background: var(--bg-deep);
+      border: 2px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 32px 24px;
+      min-width: 100%;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-sizing: border-box;
+      outline: none;
+  }
+
+  .carousel-card:focus-visible {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px var(--primary-glow);
+  }
+
+  .carousel-card.active {
+      border-color: var(--primary);
+      background: var(--primary-bg-subtle);
+      box-shadow:
+          0 0 30px var(--primary-glow),
+          inset 0 0 20px var(--primary-bg-faint);
+  }
+
+  .carousel-card-icon {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 16px;
+      color: var(--primary);
+      transition: transform 0.3s ease;
+  }
+
+  .carousel-card.active .carousel-card-icon {
+      transform: scale(1.1);
+      filter: drop-shadow(0 0 8px var(--primary-glow));
+  }
+
+  .carousel-card h3 {
+      font-family: var(--font-heading);
+      font-size: 1.3rem;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+  }
+
+  .carousel-card p {
+      font-size: 0.9rem;
+      font-family: var(--font-body);
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+      line-height: 1.5;
+  }
+
+  .carousel-card .instrument-range {
+      display: inline-block;
+      font-size: 0.8rem;
+      color: var(--primary);
+      background: var(--primary-bg-subtle);
+      padding: 4px 14px;
+      border-radius: 20px;
+  }
+
+  .carousel-dots {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 28px;
+  }
+
+  .carousel-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 1px solid var(--border-subtle);
+      background: transparent;
+      cursor: pointer;
+      padding: 0;
+      transition: all 0.3s ease;
+  }
+
+  .carousel-dot.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      box-shadow: 0 0 8px var(--primary-glow);
+  }
+
+  .carousel-dot:hover {
+      border-color: var(--primary);
+  }
+
+  /* Legacy instrument-grid / instrument-card (kept for backward compat) */
   .instrument-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
@@ -3140,24 +3384,24 @@
   }
 
   .instrument-card:hover {
-      border-color: var(--accent);
+      border-color: var(--primary);
       transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+      box-shadow: var(--shadow-lg, 0 10px 15px rgba(0, 0, 0, 0.5));
   }
 
   .instrument-card.selected {
-      border-color: var(--accent);
-      background: rgba(201, 162, 39, 0.1);
+      border-color: var(--primary);
+      background: var(--primary-bg-subtle);
       box-shadow:
-          0 0 20px rgba(201, 162, 39, 0.2),
-          inset 0 0 20px rgba(201, 162, 39, 0.05);
+          0 0 20px var(--primary-glow),
+          inset 0 0 20px var(--primary-bg-faint);
   }
 
   .instrument-card .instrument-icon {
       width: 48px;
       height: 48px;
       margin: 0 auto 12px;
-      color: var(--accent);
+      color: var(--primary);
   }
 
   .instrument-card h3 {
@@ -3175,8 +3419,8 @@
   .instrument-card .instrument-range {
       display: inline-block;
       font-size: 0.8rem;
-      color: var(--accent);
-      background: rgba(201, 162, 39, 0.1);
+      color: var(--primary);
+      background: var(--primary-bg-subtle);
       padding: 4px 12px;
       border-radius: 20px;
   }
@@ -3305,6 +3549,20 @@
 
       .onboarding-actions .btn {
           width: 100%;
+      }
+
+      .carousel-arrow {
+          width: 32px;
+          height: 32px;
+      }
+
+      .carousel-card {
+          padding: 24px 16px;
+      }
+
+      .carousel-card-icon {
+          width: 48px;
+          height: 48px;
       }
   }
 

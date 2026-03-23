@@ -1,48 +1,28 @@
 /**
  * Onboarding Service - First-time user flow for permissions and instrument calibration
+ * Integrates with InstrumentStore for global state management.
  */
 
 class OnboardingService {
-    constructor() {
+    constructor(store) {
+        this.store = store || (typeof window !== 'undefined' && window.instrumentStore) || null;
         this.currentStep = 0;
         this.steps = ['welcome', 'permissions', 'instrument', 'calibration', 'complete'];
         this.selectedInstrument = null;
         this.microphoneGranted = false;
+        this.microphoneDenied = false;
         this.cameraGranted = false;
+        this.cameraDenied = false;
         this.calibrationComplete = false;
         this.onStepChange = null;
         this.onComplete = null;
 
-        // Instrument frequency ranges (Hz)
-        this.instrumentRanges = {
-            violin: {
-                name: 'Violin',
-                minFreq: 196,   // G3
-                maxFreq: 2637,  // E7
-                typicalFreq: 440, // A4 reference
-                description: 'The highest-pitched member of the violin family'
-            },
-            viola: {
-                name: 'Viola',
-                minFreq: 130,   // C3
-                maxFreq: 1760,  // A6
-                typicalFreq: 261, // C4 reference
-                description: 'Larger than a violin, with a richer, deeper tone'
-            },
-            cello: {
-                name: 'Cello',
-                minFreq: 65,    // C2
-                maxFreq: 987,   // B5
-                typicalFreq: 130.81, // C3 reference
-                description: 'Large instrument played seated, with a warm, singing tone'
-            },
-            bass: {
-                name: 'Double Bass',
-                minFreq: 41,    // E1
-                maxFreq: 523,   // C4
-                typicalFreq: 82.41, // E2 reference
-                description: 'The largest and lowest-pitched member of the violin family'
-            }
+        // Delegate to store's canonical instrument ranges
+        this.instrumentRanges = this.store ? this.store.instrumentRanges : {
+            violin: { name: 'Violin', minFreq: 196, maxFreq: 2637, typicalFreq: 440, description: 'The highest-pitched member of the violin family' },
+            viola: { name: 'Viola', minFreq: 130, maxFreq: 1760, typicalFreq: 261, description: 'Larger than a violin, with a richer, deeper tone' },
+            cello: { name: 'Cello', minFreq: 65, maxFreq: 987, typicalFreq: 130.81, description: 'Large instrument played seated, with a warm, singing tone' },
+            bass: { name: 'Double Bass', minFreq: 41, maxFreq: 523, typicalFreq: 82.41, description: 'The largest and lowest-pitched member of the violin family' }
         };
 
         // Check if onboarding has been completed
@@ -121,10 +101,18 @@ class OnboardingService {
             // Stop the stream immediately - we just wanted permission
             stream.getTracks().forEach(track => track.stop());
             this.microphoneGranted = true;
+            this.microphoneDenied = false;
+            if (this.store) {
+                this.store.setMicrophoneGranted(true);
+            }
             return true;
         } catch (error) {
             console.error('Microphone permission denied:', error);
             this.microphoneGranted = false;
+            this.microphoneDenied = true;
+            if (this.store) {
+                this.store.setMicrophoneGranted(false);
+            }
             return false;
         }
     }
@@ -140,10 +128,18 @@ class OnboardingService {
             });
             stream.getTracks().forEach(track => track.stop());
             this.cameraGranted = true;
+            this.cameraDenied = false;
+            if (this.store) {
+                this.store.setCameraGranted(true);
+            }
             return true;
         } catch (error) {
             console.error('Camera permission denied:', error);
             this.cameraGranted = false;
+            this.cameraDenied = true;
+            if (this.store) {
+                this.store.setCameraGranted(false);
+            }
             return false;
         }
     }
@@ -163,17 +159,30 @@ class OnboardingService {
     }
 
     /**
-     * Set selected instrument
+     * Check if microphone access is required but denied
+     * @returns {boolean}
+     */
+    isMicrophoneBlocked() {
+        return this.microphoneDenied && !this.microphoneGranted;
+    }
+
+    /**
+     * Set selected instrument and sync to global store
      * @param {string} instrument - Instrument key
      */
     selectInstrument(instrument) {
         if (this.instrumentRanges[instrument]) {
             this.selectedInstrument = instrument;
-            // Save to localStorage
-            try {
-                localStorage.setItem('selected_instrument', instrument);
-            } catch (e) {
-                console.warn('Could not save instrument to localStorage');
+            // Delegate persistence to store (single source of truth)
+            if (this.store) {
+                this.store.setInstrument(instrument);
+            } else {
+                // Fallback when no store available
+                try {
+                    localStorage.setItem('selected_instrument', instrument);
+                } catch (e) {
+                    console.warn('Could not save instrument to localStorage');
+                }
             }
         }
     }
@@ -211,13 +220,18 @@ class OnboardingService {
     }
 
     /**
-     * Finish onboarding
+     * Finish onboarding and sync state to store
      */
     finishOnboarding() {
-        try {
-            localStorage.setItem('onboarding_complete', 'true');
-        } catch (e) {
-            console.warn('Could not save onboarding status');
+        // Delegate persistence to store (single source of truth)
+        if (this.store) {
+            this.store.setOnboardingComplete(true);
+        } else {
+            try {
+                localStorage.setItem('onboarding_complete', 'true');
+            } catch (e) {
+                console.warn('Could not save onboarding status');
+            }
         }
 
         if (this.onComplete) {
@@ -252,6 +266,9 @@ class OnboardingService {
         this.hasCompletedOnboarding = false;
         this.selectedInstrument = null;
         this.currentStep = 0;
+        if (this.store) {
+            this.store.reset();
+        }
     }
 
     /**
@@ -279,4 +296,10 @@ class OnboardingService {
     }
 }
 
-window.OnboardingService = OnboardingService;
+if (typeof window !== 'undefined') {
+    window.OnboardingService = OnboardingService;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { OnboardingService };
+}
