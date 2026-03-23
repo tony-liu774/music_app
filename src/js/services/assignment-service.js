@@ -404,7 +404,7 @@ class AssignmentService {
             }
         }
 
-        if (allTargetsMet && assignment.status === 'assigned' || assignment.status === 'in_progress') {
+        if (allTargetsMet && (assignment.status === 'assigned' || assignment.status === 'in_progress')) {
             await this.updateAssignment(assignmentId, { status: 'completed' });
         }
     }

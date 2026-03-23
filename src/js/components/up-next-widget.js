@@ -7,9 +7,23 @@ class UpNextWidget {
     constructor(assignmentService) {
         this.assignmentService = assignmentService;
         this.container = null;
-        this.studentId = 'student-1'; // TODO: Get from auth
+        this._studentId = null;
         this.refreshInterval = null;
         this.onStartPractice = null;
+    }
+
+    /**
+     * Get the current student ID from localStorage
+     */
+    get studentId() {
+        if (this._studentId) return this._studentId;
+        this._studentId = localStorage.getItem('user_id') || 'student-' + Date.now();
+        return this._studentId;
+    }
+
+    set studentId(id) {
+        this._studentId = id;
+        localStorage.setItem('user_id', id);
     }
 
     /**
@@ -19,6 +33,11 @@ class UpNextWidget {
         // Find the widget container in the DOM
         this.container = document.getElementById('up-next-widget');
         if (!this.container) return;
+
+        // Ensure we have a student ID
+        if (!localStorage.getItem('user_id')) {
+            this.studentId = 'student-' + Date.now();
+        }
 
         await this.assignmentService.init();
         this.assignmentService.onUpdate = () => this.refresh();

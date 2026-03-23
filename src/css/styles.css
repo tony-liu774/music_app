@@ -3604,7 +3604,7 @@ button.btn-icon.student-remove-btn:hover {
 
 .detail-badge.overdue {
     color: var(--error);
-    background: rgba(220, 38, 38, 0.1);
+    background: var(--error-bg);
 }
 
 .up-next-targets {
@@ -3884,17 +3884,17 @@ button.btn-icon.student-remove-btn:hover {
 }
 
 .assignment-status.in-progress {
-    background: rgba(201, 162, 39, 0.2);
+    background: var(--primary-bg);
     color: var(--primary);
 }
 
 .assignment-status.completed {
-    background: rgba(16, 185, 129, 0.2);
+    background: var(--success-bg);
     color: var(--success);
 }
 
 .assignment-status.overdue {
-    background: rgba(220, 38, 38, 0.2);
+    background: var(--error-bg);
     color: var(--error);
 }
 

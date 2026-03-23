@@ -13,6 +13,21 @@ class AssignmentUI {
         this.assignments = [];
         this.selectedStudent = null;
         this.onAssignmentCreated = null;
+        this._teacherId = null;
+    }
+
+    /**
+     * Get the current teacher ID from localStorage
+     */
+    get teacherId() {
+        if (this._teacherId) return this._teacherId;
+        this._teacherId = localStorage.getItem('user_id') || 'teacher-' + Date.now();
+        return this._teacherId;
+    }
+
+    set teacherId(id) {
+        this._teacherId = id;
+        localStorage.setItem('user_id', id);
     }
 
     /**
@@ -38,8 +53,13 @@ class AssignmentUI {
      */
     async refresh() {
         try {
+            // Ensure we have a teacher ID
+            if (!localStorage.getItem('user_id')) {
+                this.teacherId = 'teacher-' + Date.now();
+            }
+
             this.students = await this.teacherService.getAllStudents();
-            this.assignments = await this.assignmentService.getTeacherAssignments('teacher-1'); // TODO: Get from auth
+            this.assignments = await this.assignmentService.getTeacherAssignments(this.teacherId);
             this.render();
         } catch (err) {
             console.error('Failed to refresh assignments:', err);
@@ -392,7 +412,7 @@ class AssignmentUI {
 
         try {
             await this.assignmentService.createAssignment({
-                teacherId: 'teacher-1', // TODO: Get from auth
+                teacherId: this.teacherId,
                 studentId,
                 pieceId,
                 pieceTitle: pieceTitle !== 'Select a piece (optional)' ? pieceTitle : '',

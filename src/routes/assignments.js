@@ -188,11 +188,11 @@ router.post('/', requireAuth, (req, res) => {
 
     assignments.set(assignment.id, assignment);
 
-    // TODO: Send push notification to student via FCM
-    // sendPushNotification(studentId, {
-    //     title: 'New Assignment',
-    //     body: `${assignment.title || 'Practice Assignment'}: ${assignment.pieceTitle}`
-    // });
+    // Push notification stub (FCM integration pending)
+    console.warn('[PushNotification] Would send to student:', studentId, {
+        title: 'New Assignment',
+        body: `${assignment.title || 'Practice Assignment'}: ${assignment.pieceTitle}`
+    });
 
     res.status(201).json(assignment);
 });
@@ -261,11 +261,11 @@ router.put('/:id', requireAuth, (req, res) => {
 
     assignments.set(updated.id, updated);
 
-    // Notify student of update
-    // TODO: sendPushNotification(updated.studentId, {
-    //     title: 'Assignment Updated',
-    //     body: `${updated.title || 'Practice Assignment'} has been updated`
-    // });
+    // Push notification stub (FCM integration pending)
+    console.warn('[PushNotification] Would notify student of update:', updated.studentId, {
+        title: 'Assignment Updated',
+        body: `${updated.title || 'Practice Assignment'} has been updated`
+    });
 
     res.json(updated);
 });
