@@ -587,8 +587,8 @@ class OMRClient {
             // Normalize: remove shadow effect and enhance local contrast
             const normalized = ((gray / (localIllum || 180)) * avgIllumination);
 
-            // Apply mild contrast enhancement
-            const enhanced = ((normalized - 128) * 1.1) + 128;
+            // Apply mild contrast enhancement using configured factor
+            const enhanced = ((normalized - 128) * this.config.contrastFactor) + 128;
 
             const final = Math.max(0, Math.min(255, enhanced));
 
@@ -890,9 +890,9 @@ class OMRClient {
             }
         }
 
-        // Apply adaptive contrast enhancement
-        const contrastFactor = 1.4;
-        const outputContrast = 1.2;
+        // Apply adaptive contrast enhancement using config values
+        const contrastFactor = this.config.contrastFactor;
+        const outputContrast = this.config.contrastFactor * 0.95; // Slightly lower for output
 
         for (let i = 0; i < data.length; i += 4) {
             // Convert to grayscale
@@ -1084,7 +1084,7 @@ class OMRClient {
             const video = document.createElement('video');
             video.setAttribute('playsinline', 'true');
             video.setAttribute('autoplay', 'true');
-            video.style.cssText = 'position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); max-width: 100%; max-height: 100%;';
+            video.className = 'camera-guide-video';
 
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
@@ -1168,7 +1168,7 @@ class OMRClient {
                     // Create capture button
                     const captureBtn = document.createElement('button');
                     captureBtn.className = 'btn btn-primary';
-                    captureBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;margin-right:8px;"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>Capture';
+                    captureBtn.innerHTML = '<svg class="camera-guide-capture-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>Capture';
 
                     // Create cancel button
                     const cancelBtn = document.createElement('button');
