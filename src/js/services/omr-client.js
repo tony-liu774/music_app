@@ -1173,6 +1173,7 @@ class OMRClient {
                     // Create cancel button
                     const cancelBtn = document.createElement('button');
                     cancelBtn.className = 'btn btn-secondary';
+                    cancelBtn.style.left = '30%';
                     cancelBtn.textContent = 'Cancel';
 
                     buttonContainer.appendChild(cancelBtn);
