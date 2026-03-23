@@ -202,7 +202,7 @@ a:hover {
     justify-content: space-around;
     align-items: center;
     padding: 0 var(--space-3);
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 -4px 20px var(--shadow-md);
 }
 
 .mobile-nav-link {
@@ -1360,7 +1360,7 @@ a:hover {
     border-top-color: var(--primary);
     border-radius: 50%;
     animation: spin 1.5s linear infinite;
-    box-shadow: 0 0 20px rgba(201, 162, 39, 0.3);
+    box-shadow: 0 0 20px var(--primary-glow);
 }
 
 .processing-ring-delay {
@@ -2090,7 +2090,7 @@ a:hover {
 }
 
 .radar-polygon {
-    fill: rgba(201, 162, 39, 0.3);
+    fill: var(--primary-glow);
     stroke: var(--primary);
     stroke-width: 2;
 }
@@ -2282,7 +2282,7 @@ h1, h2, h3, h4, h5, h6 {
 
 @keyframes pulse-glow {
     0%, 100% {
-        filter: drop-shadow(0 0 10px rgba(201, 162, 39, 0.3));
+        filter: drop-shadow(0 0 10px var(--primary-glow));
     }
     50% {
         filter: drop-shadow(0 0 25px rgba(201, 162, 39, 0.6));
@@ -2400,7 +2400,7 @@ h1, h2, h3, h4, h5, h6 {
 .instrument-card:hover {
     border-color: var(--accent);
     transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--shadow-lg);
 }
 
 .instrument-card.selected {
@@ -3147,8 +3147,8 @@ h1, h2, h3, h4, h5, h6 {
 
 .metric-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-    border-color: rgba(201, 162, 39, 0.3);
+    box-shadow: var(--shadow-md);
+    border-color: var(--primary-glow);
 }
 
 .metric-icon {

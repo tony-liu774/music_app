@@ -59,6 +59,9 @@ class ConcertmasterApp {
         // Score detail modal
         this.currentDetailScoreId = null;
         this.scoreZoomLevel = 1;
+
+        // Last IMSLP search results cache
+        this.lastImslpResults = [];
     }
 
     async init() {
@@ -774,47 +777,6 @@ class ConcertmasterApp {
 
         this.renderLibraryFiltered(sortedScores);
     }
-                <p class="library-card-composer">${score.composer}</p>
-                <div class="library-card-meta">
-                    <span class="instrument-badge">${score.instrument || 'Violin'}</span>
-                    <span>${this.formatDate(score.addedAt)}</span>
-                </div>
-            </div>
-        `).join('');
-
-        // Setup lazy loading with IntersectionObserver
-        this.setupLazyLoading();
-
-        // Add click handlers
-        grid.querySelectorAll('.library-card').forEach(card => {
-            card.addEventListener('click', () => {
-                const id = card.dataset.id;
-                this.selectScore(id);
-            });
-        });
-    }
-
-    setupLazyLoading() {
-        // Use IntersectionObserver for lazy loading thumbnails
-        if ('IntersectionObserver' in window) {
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        const img = entry.target.querySelector('.lazy-thumbnail');
-                        if (img && img.dataset.src) {
-                            img.src = img.dataset.src;
-                            img.classList.add('loaded');
-                            observer.unobserve(entry.target);
-                        }
-                    }
-                });
-            }, { rootMargin: '50px' });
-
-            document.querySelectorAll('.library-card').forEach(card => {
-                observer.observe(card);
-            });
-        }
-    }
 
     formatDate(dateString) {
         if (!dateString) return '';
@@ -840,6 +802,9 @@ class ConcertmasterApp {
             searchLocal ? this.searchLocalLibrary(query, instrumentFilter, sortBy, difficultyFilter) : Promise.resolve([]),
             searchImslp ? this.searchIMSLPConcurrently(query, instrumentFilter) : Promise.resolve([])
         ]).then(([localResults, imslpResults]) => {
+            // Store IMSLP results for later reference (e.g., when clicking a card)
+            this.lastImslpResults = imslpResults;
+
             // Merge and deduplicate results
             const mergedResults = this.mergeSearchResults(localResults, imslpResults);
 
@@ -1096,17 +1061,31 @@ class ConcertmasterApp {
         let score = this.scoreLibrary.scores.find(s => s.id === id);
 
         if (!score && isImslp) {
-            // For IMSLP cards not yet in library, create a temporary score object
-            score = {
-                id: id,
-                title: 'IMSLP Score',
-                composer: 'Unknown',
-                isFavorited: true,
-                _source: 'imslp'
-            };
-            // Add to library
-            this.scoreLibrary.scores.push(score);
-            this.showToast('Added to favorites', 'success');
+            // Look up actual IMSLP metadata from cache
+            const imslpResult = this.lastImslpResults.find(r => `imslp-${r.id}` === id);
+            if (imslpResult) {
+                score = {
+                    id: id,
+                    title: imslpResult.title,
+                    composer: imslpResult.composer,
+                    instrument: imslpResult.instrument || 'violin',
+                    difficulty: imslpResult.difficulty || 3,
+                    thumbnail: imslpResult.thumbnail || null,
+                    isFavorited: true,
+                    _source: 'imslp',
+                    _imslpId: imslpResult.id,
+                    _downloadUrl: imslpResult.downloadUrl
+                };
+                this.scoreLibrary.scores.push(score);
+                this.showToast('Added to favorites', 'success');
+            } else {
+                // Fallback if not found in cache
+                score = this.scoreLibrary.scores.find(s => s.id === id);
+                if (score) {
+                    score.isFavorited = !score.isFavorited;
+                    this.showToast(score.isFavorited ? 'Added to favorites' : 'Removed from favorites', 'success');
+                }
+            }
         } else if (score) {
             score.isFavorited = !score.isFavorited;
             this.showToast(score.isFavorited ? 'Added to favorites' : 'Removed from favorites', 'success');
@@ -1171,22 +1150,39 @@ class ConcertmasterApp {
         let score = this.scoreLibrary.scores.find(s => s.id === id);
 
         if (!score) {
-            // Need to create score from IMSLP result - search for it in the last IMSLP results
-            this.showToast('Adding to library...', 'info');
+            // Look up the actual IMSLP result from our cached results
+            const imslpResult = this.lastImslpResults.find(r => r.id === id || `imslp-${r.id}` === id);
 
-            // Create a basic score object for now
-            score = {
-                id: id,
-                title: 'IMSLP Score',
-                composer: 'Unknown',
-                instrument: 'violin',
-                difficulty: 3,
-                _source: 'imslp',
-                _imslpId: id.replace('imslp-', '')
-            };
+            if (imslpResult) {
+                // Use actual metadata from IMSLP result
+                score = {
+                    id: id,
+                    title: imslpResult.title,
+                    composer: imslpResult.composer,
+                    instrument: imslpResult.instrument || 'violin',
+                    difficulty: imslpResult.difficulty || 3,
+                    thumbnail: imslpResult.thumbnail || null,
+                    addedAt: new Date().toISOString(),
+                    _source: 'imslp',
+                    _imslpId: imslpResult.id,
+                    _downloadUrl: imslpResult.downloadUrl
+                };
+            } else {
+                // Fallback if result not found
+                score = {
+                    id: id,
+                    title: 'IMSLP Score',
+                    composer: 'Unknown Composer',
+                    instrument: 'violin',
+                    difficulty: 3,
+                    _source: 'imslp',
+                    _imslpId: id.replace('imslp-', '')
+                };
+            }
 
             // Add to library
             this.scoreLibrary.scores.push(score);
+            this.showToast('Added to library', 'success');
         }
 
         // Show the detail modal
