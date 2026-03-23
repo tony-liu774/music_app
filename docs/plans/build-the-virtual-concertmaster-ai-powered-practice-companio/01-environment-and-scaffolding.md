@@ -2,13 +2,14 @@
 
 ## Goal
 
-Set up a Vite + React project alongside the existing Express backend, configure Tailwind v4 with the existing CSS-first `@theme` palette, enforce code quality with ESLint + Prettier (no inline styling), and build the foundational UI component library in the Midnight Conservatory theme.
+Set up a Vite + React project alongside the existing Express backend, configure Tailwind v4 with the existing CSS-first `@theme` palette, enforce code quality with ESLint + Prettier (no inline styling), set up Supabase Auth with Google/Apple OAuth, and build the foundational UI component library in the Midnight Conservatory theme.
 
 ## Scope
 
 - Vite + React project initialization (separate from Express backend)
 - Tailwind v4 integration using the existing `src/css/app.css` `@theme` block (no `tailwind.config.js`)
 - ESLint + Prettier configuration enforcing no inline styles and no hardcoded hex codes
+- Supabase project setup, Google/Apple OAuth configuration, auth context and session management, protected routes
 - Base UI components: Button, Modal, Card, Navigation (top nav + mobile bottom tab bar), Layout shell
 - Zustand store architecture: separate UI store and Audio store
 - Routing setup (hash-based to match existing nav: dashboard, library, practice, tuner, settings)
@@ -52,7 +53,7 @@ Set up a Vite + React project alongside the existing Express backend, configure 
 
 **Subtasks:**
 1. Install ESLint with React and hooks plugins, plus Prettier
-2. Create `.eslintrc.cjs` with rules: `no-restricted-syntax` to ban `style=` JSX attributes containing color values, custom rule or pattern to flag hex color literals in `.jsx`/`.tsx` files
+2. Create `.eslintrc.cjs` with rules: `no-restricted-syntax` to ban `style=` JSX attributes containing color values, custom rule or pattern to flag hex color literals (`#xxxxxx`) in `.jsx`/`.tsx` files — this enforces the "no hardcoded hex codes" zero-tolerance policy and ensures all colors flow through `@theme` variables
 3. Create `.prettierrc` with consistent formatting (single quotes, trailing commas, 2-space indent)
 4. Add `lint` and `format` scripts to `client/package.json`
 5. Verify lint passes on all existing files and catches violations when inline hex codes are added
@@ -60,6 +61,7 @@ Set up a Vite + React project alongside the existing Express backend, configure 
 **Acceptance criteria:**
 - `npm run lint` passes with zero errors on clean codebase
 - Adding `style={{ color: '#ff0000' }}` to a component triggers a lint error
+- Using a raw hex code like `text-[#c9a227]` in a className triggers a lint error (must use `@theme` variable like `text-amber` instead)
 - Prettier formats all files consistently
 - Changes must be on a feature branch with a GitHub PR created via `gh pr create`
 
@@ -140,4 +142,34 @@ Set up a Vite + React project alongside the existing Express backend, configure 
 - UI store and Audio store are fully separate with no cross-dependencies
 - Zustand devtools show store state in browser devtools
 - Unit tests pass for all store state transitions
+- Changes must be on a feature branch with a GitHub PR created via `gh pr create`
+
+---
+
+### Task 6: Supabase Auth Integration
+
+**Description:** Set up Supabase as the auth provider, configure Google and Apple OAuth, wire the Supabase client SDK into the React app with auth context, session management, and protected routes. Migrate auth away from the existing Express auth routes to Supabase Auth.
+
+**Agent type:** coder
+
+**Depends on:** Task 1 (Initialize Vite + React Project), Task 4 (Navigation and Layout Shell)
+
+**Subtasks:**
+1. Install `@supabase/supabase-js` in the `client/` project
+2. Create `client/src/lib/supabase.js` — initialize the Supabase client with environment variables (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`)
+3. Configure Google OAuth and Apple OAuth providers in the Supabase dashboard (document the required Supabase project settings in a `SUPABASE_SETUP.md`)
+4. Create `client/src/contexts/AuthContext.jsx` — React context providing `user`, `session`, `signInWithGoogle()`, `signInWithApple()`, `signOut()`, `loading` state. Subscribe to `onAuthStateChange` for session persistence
+5. Create `client/src/components/auth/LoginPage.jsx` — branded login screen with Google and Apple OAuth buttons, styled in Midnight Conservatory theme (amber accent buttons, Oxford Blue background)
+6. Create `client/src/components/auth/ProtectedRoute.jsx` — wrapper component that redirects unauthenticated users to the login page
+7. Wrap app routes with `ProtectedRoute` (except the login page itself)
+8. Create `client/src/stores/useAuthStore.js` — Zustand store holding user profile, subscription status, and auth loading state (mirrors AuthContext for components that prefer Zustand)
+9. Add `.env.example` with placeholder Supabase keys (never commit real keys)
+
+**Acceptance criteria:**
+- Users can sign in with Google OAuth and Apple OAuth via Supabase
+- Session persists across page reloads (Supabase handles token refresh)
+- Unauthenticated users are redirected to the login page
+- Auth state is available via both React context and Zustand store
+- No Express auth routes are used by the React frontend
+- No Supabase keys are hardcoded — all sourced from environment variables
 - Changes must be on a feature branch with a GitHub PR created via `gh pr create`

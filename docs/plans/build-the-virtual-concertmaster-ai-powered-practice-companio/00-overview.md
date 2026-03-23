@@ -2,7 +2,7 @@
 
 ## Goal
 
-Migrate the existing vanilla-JS + Express monolith into a modern **Vite + React + Zustand** frontend application with the "Midnight Conservatory" design system, real-time audio analysis via Web Workers, VexFlow-based sheet music rendering, and AI-powered coaching. The Express backend remains as-is for API routes; the frontend is rebuilt from scratch as a React SPA.
+Migrate the existing vanilla-JS + Express monolith into a modern **Vite + React + Zustand** frontend application with the "Midnight Conservatory" design system, real-time audio analysis via Web Workers, VexFlow-based sheet music rendering, and AI-powered coaching. Auth is migrated from Express to **Supabase** (Google/Apple OAuth), while remaining Express API routes are preserved. The frontend is rebuilt from scratch as a React SPA.
 
 ## Current State
 
@@ -21,19 +21,20 @@ The migration strategy is to **wrap existing logic into React components and Zus
 ## Approach
 
 1. Scaffold a Vite + React project alongside the existing Express backend (dual-entry setup)
-2. Build the base component library using existing Midnight Conservatory tokens
-3. Port audio DSP to Web Worker architecture with React hooks
-4. Build the "Ghost" practice UI with VexFlow sheet music and predictive cursor
-5. Integrate AI coaching, analytics, and heat map overlays
-6. Add offline support, AudioContext handling, and polish
+2. Set up Supabase project, configure Google/Apple OAuth, and migrate auth from Express to Supabase Auth
+3. Build the base component library using existing Midnight Conservatory tokens
+4. Port audio DSP to Web Worker architecture with React hooks
+5. Build the "Ghost" practice UI with VexFlow sheet music and predictive cursor
+6. Integrate AI coaching, analytics, and heat map overlays
+7. Add offline support, AudioContext handling, and polish
 
 ## Milestones
 
-1. **Environment and Scaffolding** -- Initialize Vite + React alongside Express, configure Tailwind v4 CSS-first, build base UI component library (Buttons, Modals, Nav, Layout) in Midnight Conservatory theme, set up Zustand stores
+1. **Environment and Scaffolding** -- Initialize Vite + React alongside Express, configure Tailwind v4 CSS-first, set up Supabase Auth with Google/Apple OAuth, build base UI component library (Buttons, Modals, Nav, Layout) in Midnight Conservatory theme, set up Zustand stores
 2. **The Ear -- DSP and Hardware** -- Port audio capture and pitch detection to Web Worker architecture, build React hooks for microphone access with graceful denial handling, implement vibrato filter and continuous session logging
 3. **The Ghost Practice UI** -- Build the main practice view with distraction-free fade behavior, integrate VexFlow for MusicXML sheet music rendering, implement predictive amber cursor and intonation needle
 4. **AI Coach and Analytics** -- Wire post-session AI coaching via LLM backend, build crimson heat map overlay on sheet music, implement smart loop extraction with tempo reduction
-5. **Edge Cases and Offline Support** -- Add offline caching with IndexedDB sync, handle AudioContext suspension, final integration testing and polish
+5. **Edge Cases and Offline Support** -- Add offline caching with IndexedDB sync, handle AudioContext suspension, build tuner and settings pages, final integration testing and polish
 
 ## Cross-Milestone Dependencies
 
@@ -44,4 +45,4 @@ The migration strategy is to **wrap existing logic into React components and Zus
 
 ## Estimated Task Count
 
-22 tasks across 5 milestones.
+24 tasks across 5 milestones.

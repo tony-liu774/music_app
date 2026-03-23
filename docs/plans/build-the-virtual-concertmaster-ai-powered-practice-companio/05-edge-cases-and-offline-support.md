@@ -28,7 +28,7 @@ Harden the application for real-world usage: add offline caching with IndexedDB 
 3. Implement score library caching: on first load, cache all score metadata and MusicXML data to IndexedDB. On subsequent loads, serve from cache if offline
 4. Implement session data queuing: when offline, queue session logs and AI debrief requests in IndexedDB. When back online, process the queue in order
 5. Add a subtle offline indicator in the nav bar (ivory-dim "Offline" badge) when disconnected
-6. Port the service worker from `sw.js` to cache static assets for the React build output
+6. Port the service worker from `sw.js` to cache static assets for the new Vite/React build output — note the existing `sw.js` cache list references vanilla JS paths and must be updated to match `client/dist/` asset hashes and paths
 7. Handle conflict resolution: if a session was logged both offline and synced by another device, use timestamp-based last-write-wins
 
 **Acceptance criteria:**
@@ -93,28 +93,54 @@ Harden the application for real-world usage: add offline caching with IndexedDB 
 
 ---
 
-### Task 4: Settings Page and Final Integration
+### Task 4: Settings Page
 
-**Description:** Build the settings page and perform final integration testing across the entire practice flow: library selection, practice with ghost mode, AI debrief, heat map, and smart loop.
+**Description:** Build the settings page with instrument selection, tuning reference, sensitivity controls, and account management. Ensure settings propagate correctly to all dependent systems (tuner, sheet music renderer, DSP engine).
 
 **Agent type:** coder
 
-**Depends on:** All prior milestones
+**Depends on:** Milestone 1 / Task 3 (Base UI Component Library), Milestone 1 / Task 6 (Supabase Auth Integration)
 
 **Subtasks:**
-1. Create `client/src/pages/SettingsPage.jsx` with sections: Instrument (violin/viola/cello/double bass), Tuning Reference (A4 = 440Hz, adjustable 430-450), Sensitivity (confidence threshold 0.7-0.95), Display (cursor speed, needle sensitivity), Account (linked to auth)
-2. Persist all settings to localStorage and sync to Zustand UI store
-3. Ensure instrument selection propagates to: tuner reference strings, clef in sheet music renderer, DSP engine frequency ranges
-4. Integration test: walk through full flow from library -> select score -> start practice -> play for 30 seconds -> stop -> view AI debrief -> view heat map -> start smart loop -> exit
-5. Verify ghost mode fade works end-to-end: nav fades on play, reappears on stop
-6. Verify offline: disable network, practice a cached score, re-enable, verify sync
-7. Performance audit: ensure main thread stays at 60fps during practice with Web Worker DSP active
+1. Create `client/src/pages/SettingsPage.jsx` with sections: Instrument (violin/viola/cello/double bass), Tuning Reference (A4 = 440Hz, adjustable 430-450), Sensitivity (confidence threshold 0.7-0.95), Display (cursor speed, needle sensitivity), Account (linked to Supabase auth — show user email, sign out button)
+2. Create `client/src/stores/useSettingsStore.js` — Zustand store for all user preferences with localStorage persistence
+3. Persist all settings to localStorage and sync to Zustand settings store
+4. Ensure instrument selection propagates to: tuner reference strings, clef in sheet music renderer, DSP engine frequency ranges
+5. Style all form controls (sliders, dropdowns, radio groups) with Midnight Conservatory theme
 
 **Acceptance criteria:**
 - Settings page allows configuration of all key parameters
-- Instrument changes propagate correctly to all dependent systems
+- Settings persist across page reloads via localStorage
+- Instrument changes propagate correctly to tuner, sheet music, and DSP systems
+- Account section shows current user info from Supabase auth
+- No hardcoded hex codes in the settings page
+- Changes must be on a feature branch with a GitHub PR created via `gh pr create`
+
+---
+
+### Task 5: End-to-End Integration Testing
+
+**Description:** Perform comprehensive integration testing across the full practice flow and verify all systems work together: library selection → practice with ghost mode → AI debrief → heat map → smart loop. Includes performance audit and offline verification.
+
+**Agent type:** coder
+
+**Depends on:** All prior milestones and tasks (Task 1-4 in this milestone)
+
+**Subtasks:**
+1. Integration test: walk through full flow from library → select score → start practice → play for 30 seconds → stop → view AI debrief → view heat map → start smart loop → exit
+2. Verify ghost mode fade works end-to-end: nav fades on play, reappears on stop
+3. Verify offline: disable network, practice a cached score, re-enable, verify sync
+4. Performance audit: ensure main thread stays at 60fps during practice with Web Worker DSP active (use Chrome DevTools Performance tab)
+5. Verify AudioContext suspension handling across browsers (Chrome, Firefox, Safari)
+6. Verify Supabase auth flow: login → protected routes → session persistence → logout
+7. Verify the existing `sw.js` service worker correctly caches the new Vite build output paths (update service worker cache list if needed for the new `client/dist/` asset structure)
+8. Fix any integration bugs found during testing
+
+**Acceptance criteria:**
 - Full practice flow works end-to-end without errors
-- Ghost mode transitions are smooth
-- Offline practice and sync work correctly
+- Ghost mode transitions are smooth (500ms fade)
+- Offline practice and sync work correctly with no data loss
 - Main thread maintains 60fps during active practice
+- Auth flow works end-to-end with Supabase
+- Service worker caches Vite build assets correctly
 - Changes must be on a feature branch with a GitHub PR created via `gh pr create`
