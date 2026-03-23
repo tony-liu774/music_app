@@ -3613,7 +3613,7 @@ button.btn-icon.student-remove-btn:hover {
 .filter-chip:hover {
     border-color: var(--primary);
     color: var(--primary);
-    background: rgba(201, 162, 39, 0.08);
+    background: var(--bg-hover);
 }
 
 .filter-chip.active {
@@ -3814,7 +3814,7 @@ button.btn-icon.student-remove-btn:hover {
     width: 32px;
     height: 32px;
     border-radius: var(--radius-md);
-    background: rgba(10, 10, 18, 0.85);
+    background: var(--bg-deep);
     border: 1px solid var(--border);
     color: var(--text-primary);
     cursor: pointer;
@@ -4104,7 +4104,7 @@ button.btn-icon.student-remove-btn:hover {
     display: flex;
     gap: var(--space-2);
     padding: var(--space-2);
-    background: rgba(10, 10, 18, 0.9);
+    background: var(--bg-deep);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     backdrop-filter: blur(8px);

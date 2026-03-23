@@ -141,12 +141,21 @@
 
                 <div class="library-filters">
                     <div class="filter-chips" id="filter-chips">
-                        <span class="filter-label">Filter:</span>
-                        <button class="filter-chip active" data-filter="all">All</button>
-                        <button class="filter-chip" data-filter="violin">Violin</button>
-                        <button class="filter-chip" data-filter="viola">Viola</button>
-                        <button class="filter-chip" data-filter="cello">Cello</button>
-                        <button class="filter-chip" data-filter="bass">Bass</button>
+                        <span class="filter-label">Instrument:</span>
+                        <button class="filter-chip active" data-filter="all" data-filter-type="instrument">All</button>
+                        <button class="filter-chip" data-filter="violin" data-filter-type="instrument">Violin</button>
+                        <button class="filter-chip" data-filter="viola" data-filter-type="instrument">Viola</button>
+                        <button class="filter-chip" data-filter="cello" data-filter-type="instrument">Cello</button>
+                        <button class="filter-chip" data-filter="bass" data-filter-type="instrument">Bass</button>
+                    </div>
+                    <div class="filter-chips" id="difficulty-filter-chips">
+                        <span class="filter-label">Difficulty:</span>
+                        <button class="filter-chip active" data-filter="all" data-filter-type="difficulty">All</button>
+                        <button class="filter-chip" data-filter="1" data-filter-type="difficulty">Beginner</button>
+                        <button class="filter-chip" data-filter="2" data-filter-type="difficulty">Easy</button>
+                        <button class="filter-chip" data-filter="3" data-filter-type="difficulty">Intermediate</button>
+                        <button class="filter-chip" data-filter="4" data-filter-type="difficulty">Advanced</button>
+                        <button class="filter-chip" data-filter="5" data-filter-type="difficulty">Expert</button>
                     </div>
                     <div class="sort-controls">
                         <label class="sort-label">Sort:</label>

@@ -277,26 +277,46 @@ class ConcertmasterApp {
             // Debounce search
             if (searchTimeout) clearTimeout(searchTimeout);
             searchTimeout = setTimeout(() => {
-                this.filterLibrary(e.target.value);
+                this.applyFiltersAndSearch();
             }, 300);
         });
 
-        // Filter chips
+        // Filter chips - handle both instrument and difficulty
         document.querySelectorAll('.filter-chip').forEach(chip => {
             chip.addEventListener('click', () => {
-                document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+                const filterType = chip.dataset.filterType;
+                // Only deactivate chips of the same type
+                document.querySelectorAll(`.filter-chip[data-filter-type="${filterType}"]`).forEach(c => c.classList.remove('active'));
                 chip.classList.add('active');
-                const query = searchInput?.value || '';
-                this.filterLibrary(query, chip.dataset.filter);
+                this.applyFiltersAndSearch();
             });
         });
 
         // Sort dropdown
+        let sortTimeout = null;
         document.getElementById('library-sort-select')?.addEventListener('change', (e) => {
-            const query = searchInput?.value || '';
-            const activeFilter = document.querySelector('.filter-chip.active')?.dataset.filter || 'all';
-            this.filterLibrary(query, activeFilter, e.target.value);
+            // Debounce sort changes
+            if (sortTimeout) clearTimeout(sortTimeout);
+            sortTimeout = setTimeout(() => {
+                this.applyFiltersAndSearch();
+            }, 150);
         });
+    }
+
+    applyFiltersAndSearch() {
+        const searchInput = document.getElementById('library-search-input');
+        const query = searchInput?.value || '';
+
+        // Get active instrument filter
+        const activeInstrumentFilter = document.querySelector('.filter-chip[data-filter-type="instrument"].active')?.dataset.filter || 'all';
+
+        // Get active difficulty filter
+        const activeDifficultyFilter = document.querySelector('.filter-chip[data-filter-type="difficulty"].active')?.dataset.filter || 'all';
+
+        // Get sort preference
+        const sortBy = document.getElementById('library-sort-select')?.value || 'recent';
+
+        this.filterLibrary(query, activeInstrumentFilter, sortBy, activeDifficultyFilter);
     }
 
     setupPracticeControls() {
@@ -802,7 +822,7 @@ class ConcertmasterApp {
         return date.toLocaleDateString();
     }
 
-    filterLibrary(query, instrumentFilter = 'all', sortBy = null) {
+    filterLibrary(query, instrumentFilter = 'all', sortBy = null, difficultyFilter = 'all') {
         // Get sort preference if not passed
         if (!sortBy) {
             sortBy = document.getElementById('library-sort-select')?.value || 'recent';
@@ -817,7 +837,7 @@ class ConcertmasterApp {
 
         // Concurrent search
         Promise.all([
-            searchLocal ? this.searchLocalLibrary(query, instrumentFilter, sortBy) : Promise.resolve([]),
+            searchLocal ? this.searchLocalLibrary(query, instrumentFilter, sortBy, difficultyFilter) : Promise.resolve([]),
             searchImslp ? this.searchIMSLPConcurrently(query, instrumentFilter) : Promise.resolve([])
         ]).then(([localResults, imslpResults]) => {
             // Merge and deduplicate results
@@ -828,15 +848,15 @@ class ConcertmasterApp {
 
             // Render results
             this.renderLibraryFiltered(sortedResults);
-        }).catch(error => {
+        }).catch(async error => {
             console.error('Search error:', error);
             // Fallback to local search only
-            const localResults = this.searchLocalLibrary(query, instrumentFilter, sortBy);
+            const localResults = await this.searchLocalLibrary(query, instrumentFilter, sortBy, difficultyFilter);
             this.renderLibraryFiltered(localResults);
         });
     }
 
-    async searchLocalLibrary(query, instrumentFilter, sortBy) {
+    async searchLocalLibrary(query, instrumentFilter, sortBy, difficultyFilter = 'all') {
         let scores = this.scoreLibrary.scores;
 
         // Apply text search
@@ -853,6 +873,14 @@ class ConcertmasterApp {
         if (instrumentFilter && instrumentFilter !== 'all') {
             scores = scores.filter(score =>
                 score.instrument?.toLowerCase() === instrumentFilter.toLowerCase()
+            );
+        }
+
+        // Apply difficulty filter
+        if (difficultyFilter && difficultyFilter !== 'all') {
+            const diffNum = parseInt(difficultyFilter);
+            scores = scores.filter(score =>
+                score.difficulty === diffNum
             );
         }
 
@@ -994,8 +1022,7 @@ class ConcertmasterApp {
             </div>
         `).join('');
 
-        // Setup lazy loading
-        this.setupLazyLoading();
+        // Note: Native lazy loading (loading="lazy") is used on thumbnails
 
         // Add click handlers for cards
         grid.querySelectorAll('.library-card').forEach(card => {
@@ -1064,16 +1091,32 @@ class ConcertmasterApp {
     }
 
     toggleFavorite(id) {
-        const score = this.scoreLibrary.scores.find(s => s.id === id);
-        if (score) {
+        // Check if it's an IMSLP result first
+        const isImslp = id.startsWith('imslp-');
+        let score = this.scoreLibrary.scores.find(s => s.id === id);
+
+        if (!score && isImslp) {
+            // For IMSLP cards not yet in library, create a temporary score object
+            score = {
+                id: id,
+                title: 'IMSLP Score',
+                composer: 'Unknown',
+                isFavorited: true,
+                _source: 'imslp'
+            };
+            // Add to library
+            this.scoreLibrary.scores.push(score);
+            this.showToast('Added to favorites', 'success');
+        } else if (score) {
             score.isFavorited = !score.isFavorited;
-            // Update button state
-            const btn = document.querySelector(`.favorite-btn[data-id="${id}"]`);
-            if (btn) {
-                btn.classList.toggle('favorited', score.isFavorited);
-                btn.querySelector('svg').setAttribute('fill', score.isFavorited ? 'currentColor' : 'none');
-            }
             this.showToast(score.isFavorited ? 'Added to favorites' : 'Removed from favorites', 'success');
+        }
+
+        // Update button state
+        const btn = document.querySelector(`.favorite-btn[data-id="${id}"]`);
+        if (btn && score) {
+            btn.classList.toggle('favorited', score.isFavorited);
+            btn.querySelector('svg').setAttribute('fill', score.isFavorited ? 'currentColor' : 'none');
         }
     }
 
@@ -1081,8 +1124,26 @@ class ConcertmasterApp {
         const score = this.scoreLibrary.scores.find(s => s.id === id);
         if (score) {
             this.showToast('Downloading score...', 'info');
-            // Implementation for downloading local score
-            console.log('Downloading score:', score.title);
+
+            // If it's an IMSLP score, download from IMSLP
+            if (score._source === 'imslp' && score._imslpId) {
+                const imslpClient = new IMSLPClient();
+                imslpClient.download(score._imslpId).then(blob => {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${score.title.replace(/[^a-z0-9]/gi, '_')}.pdf`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    this.showToast('Download complete', 'success');
+                }).catch(error => {
+                    this.showToast('Download failed: ' + error.message, 'error');
+                });
+            } else {
+                // For local scores, create a MusicXML export if available
+                // or show a message that download isn't available
+                this.showToast('Score download not available for local files', 'info');
+            }
         }
     }
 
@@ -1105,10 +1166,31 @@ class ConcertmasterApp {
         });
     }
 
-    handleIMSLPResultClick(id) {
-        const imslpId = id.replace('imslp-', '');
-        // Show a modal or navigate to practice view with the IMSLP score
-        this.showToast('IMSLP scores open in external viewer', 'info');
+    async handleIMSLPResultClick(id) {
+        // Check if already in library
+        let score = this.scoreLibrary.scores.find(s => s.id === id);
+
+        if (!score) {
+            // Need to create score from IMSLP result - search for it in the last IMSLP results
+            this.showToast('Adding to library...', 'info');
+
+            // Create a basic score object for now
+            score = {
+                id: id,
+                title: 'IMSLP Score',
+                composer: 'Unknown',
+                instrument: 'violin',
+                difficulty: 3,
+                _source: 'imslp',
+                _imslpId: id.replace('imslp-', '')
+            };
+
+            // Add to library
+            this.scoreLibrary.scores.push(score);
+        }
+
+        // Show the detail modal
+        this.showScoreDetail(id);
     }
 
     showScoreDetail(id) {
