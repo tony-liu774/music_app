@@ -1737,6 +1737,23 @@ a:hover {
     margin-bottom: var(--space-2);
 }
 
+/* Camera Guide Video */
+.camera-guide-video {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    max-width: 100%;
+    max-height: 100%;
+}
+
+/* Camera Guide Capture Icon */
+.camera-guide-capture-icon {
+    width: 20px;
+    height: 20px;
+    margin-right: var(--space-2);
+}
+
 /* Import Options */
 .import-options {
     display: grid;
