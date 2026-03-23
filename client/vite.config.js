@@ -16,5 +16,13 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/test/setup.js',
+    env: {
+      NODE_ENV: 'test',
+    },
+    server: {
+      deps: {
+        inline: ['react', 'react-dom'],
+      },
+    },
   },
 })
