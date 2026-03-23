@@ -230,14 +230,14 @@ class UpNextWidget {
         }
 
         // Navigate to practice view with assignment
-        if (window.App && window.App.navigateTo) {
-            window.App.navigateTo('practice');
+        if (window.app && window.app.navigateTo) {
+            window.app.navigateTo('practice');
 
             // Load the assignment's piece if specified
             if (assignmentId) {
                 const assignment = await this.assignmentService.getAssignment(assignmentId);
-                if (assignment && assignment.pieceId && window.App.loadPiece) {
-                    window.App.loadPiece(assignment.pieceId);
+                if (assignment && assignment.pieceId && window.app.loadPiece) {
+                    window.app.loadPiece(assignment.pieceId);
                 }
             }
         }
@@ -248,8 +248,8 @@ class UpNextWidget {
      */
     _handleViewAll() {
         // Navigate to assignments list
-        if (window.App && window.App.navigateTo) {
-            window.App.navigateTo('assignments');
+        if (window.app && window.app.navigateTo) {
+            window.app.navigateTo('assignments');
         }
     }
 

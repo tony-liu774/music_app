@@ -20,14 +20,23 @@ function generateId(prefix) {
 
 /**
  * Middleware: require authentication
+ * SECURITY NOTE: This is a stub implementation. In production, verify JWT token
+ * from Authorization header. X-User-Id header is only acceptable for trusted
+ * internal services behind authentication gateway.
  */
 function requireAuth(req, res, next) {
-    // In production, verify JWT token
-    // For now, accept X-User-Id header
     const userId = req.headers['x-user-id'];
-    if (!userId) {
+
+    // Validate userId format (non-empty string, reasonable length)
+    if (!userId || typeof userId !== 'string' || userId.length < 1 || userId.length > 100) {
         return res.status(401).json({ error: 'Authentication required' });
     }
+
+    // Basic format validation - should match pattern like "user-xxx" or UUID
+    if (!/^[a-zA-Z0-9_-]+$/.test(userId)) {
+        return res.status(401).json({ error: 'Invalid user ID format' });
+    }
+
     req.userId = userId;
     next();
 }

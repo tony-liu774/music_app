@@ -88,10 +88,6 @@ class AssignmentUI {
      * Render assignment statistics
      */
     _renderAssignmentStats() {
-        const stats = this.assignmentService.getTeacherStats
-            ? this.assignmentService.getTeacherStats(this.assignments)
-            : { total: 0, assigned: 0, inProgress: 0, completed: 0, overdue: 0 };
-
         // Calculate stats from current assignments
         const now = Date.now();
         const computedStats = {
@@ -497,8 +493,12 @@ class AssignmentUI {
 
         // Bind modal events
         modal.querySelector('.modal-close').addEventListener('click', () => modal.remove());
-        modal.querySelector('.modal-overlay').addEventListener('click', (e) => {
-            if (e.target === modal) modal.remove();
+        modal.addEventListener('click', (e) => {
+            // Close if clicking on the overlay backdrop (not on the modal content)
+            const modalContent = modal.querySelector('.modal');
+            if (e.target === modal || (modalContent && !modalContent.contains(e.target))) {
+                modal.remove();
+            }
         });
     }
 
