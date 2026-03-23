@@ -113,7 +113,7 @@ describe('Teacher Routes - Auth Middleware Behavior', () => {
 
         let statusCode = null;
         let responseBody = null;
-        const mockReq = { headers: {} };
+        const mockReq = { headers: {}, path: '/students' };
         const mockRes = {
             status: (code) => {
                 statusCode = code;
@@ -137,7 +137,7 @@ describe('Teacher Routes - Auth Middleware Behavior', () => {
         assert.ok(middlewareLayer);
 
         let nextCalled = false;
-        const mockReq = { headers: { 'x-teacher-mode': 'true' } };
+        const mockReq = { headers: { 'x-teacher-mode': 'true' }, path: '/students' };
         const mockRes = {
             status: () => mockRes,
             json: () => mockRes

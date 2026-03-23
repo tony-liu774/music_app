@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- maximum-scale=1 prevents zoomed-in render on mobile (PR #27). Trade-off: disables pinch-to-zoom (WCAG 1.4.4). -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
     <meta name="description" content="The Virtual Concertmaster - Practice bowed string instruments with real-time feedback">
     <meta name="theme-color" content="#0a0a12">
     <title>The Virtual Concertmaster</title>
@@ -10,10 +11,24 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@600;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="src/css/themes/midnight-conservatory.css">
-    <link rel="stylesheet" href="src/css/styles.css">
+    <!-- Tailwind CSS v4 compiled output (source: src/css/app.css) -->
+    <link rel="stylesheet" href="public/styles.css">
+
+    <!-- Firebase Realtime Database (compat SDK - no bundler needed) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <!-- Optional: populate with real config for cloud sync; omit for local-only mode -->
+    <script>
+      window.FIREBASE_CONFIG = null; // Set to { apiKey, databaseURL, ... } to enable sync
+    </script>
 </head>
 <body>
+    <!-- SSO Login Screen (shown on launch for unauthenticated users) -->
+    <div id="sso-login-screen" class="sso-login-screen" aria-hidden="true" role="dialog" aria-label="Sign in"></div>
+
+    <!-- Role Selection Screen (shown once after first sign-in) -->
+    <div id="role-selection-screen" class="role-selection-screen" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Choose your role"></div>
+
     <div id="app">
         <!-- Navigation -->
         <nav class="main-nav">
@@ -26,12 +41,13 @@
                     <span>Concertmaster</span>
                 </a>
                 <div class="nav-links desktop-only">
-                    <a href="#library" class="nav-link active">Library</a>
+                    <a href="#dashboard" class="nav-link active">Home</a>
+                    <a href="#library" class="nav-link">Library</a>
                     <a href="#practice" class="nav-link">Practice</a>
-                    <a href="#metronome" class="nav-link">Metronome</a>
                     <a href="#tuner" class="nav-link">Tuner</a>
                     <a href="#settings" class="nav-link">Settings</a>
                     <a href="#studio-dashboard" class="nav-link studio-nav-link" style="display:none">Studio</a>
+                    <a href="#license" class="nav-link license-nav-link">License</a>
                 </div>
                 <button class="mobile-menu-btn mobile-only" aria-label="Menu">
                     <span></span>
@@ -41,9 +57,16 @@
             </div>
         </nav>
 
-        <!-- Mobile Navigation -->
+        <!-- Mobile Navigation — Tonic-style bottom tab bar -->
         <div class="mobile-nav mobile-only">
-            <a href="#library" class="mobile-nav-link active">
+            <a href="#dashboard" class="mobile-nav-link active">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                    <polyline points="9 22 9 12 15 12 15 22"/>
+                </svg>
+                <span>Home</span>
+            </a>
+            <a href="#library" class="mobile-nav-link">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
                     <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
@@ -58,19 +81,19 @@
                 </svg>
                 <span>Practice</span>
             </a>
-            <a href="#metronome" class="mobile-nav-link">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 2v6l4 2"/>
-                    <circle cx="12" cy="14" r="8"/>
-                </svg>
-                <span>Metronome</span>
-            </a>
             <a href="#tuner" class="mobile-nav-link">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="10"/>
                     <path d="M12 6v6l4 2"/>
                 </svg>
                 <span>Tuner</span>
+            </a>
+            <a href="#metronome" class="mobile-nav-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2v6l4 2"/>
+                    <circle cx="12" cy="14" r="8"/>
+                </svg>
+                <span>Metronome</span>
             </a>
             <a href="#settings" class="mobile-nav-link">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -92,8 +115,167 @@
 
         <!-- Main Content Area -->
         <main class="main-content">
+            <!-- Dashboard View — Tonic/Edulastic Style Landing Page -->
+            <section id="dashboard-view" class="view active">
+                <!-- Welcome Header -->
+                <div class="dashboard-welcome">
+                    <h1>Welcome Back</h1>
+                    <p>Ready to practice? Pick up where you left off.</p>
+                </div>
+
+                <!-- Hero Practice Session Card -->
+                <div class="hero-card" id="hero-practice-card">
+                    <div class="hero-card-header">
+                        <div>
+                            <h2 id="hero-piece-title">No recent piece</h2>
+                            <span class="hero-card-subtitle" id="hero-last-practiced">Start a practice session</span>
+                        </div>
+                        <span class="hero-card-badge" id="hero-instrument-badge">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 18V5l12-2v13"/>
+                                <circle cx="6" cy="18" r="3"/>
+                                <circle cx="18" cy="16" r="3"/>
+                            </svg>
+                            <span id="hero-instrument-label">Violin</span>
+                        </span>
+                    </div>
+                    <div class="hero-card-stats" id="hero-stats">
+                        <div class="hero-stat">
+                            <span class="hero-stat-value" id="hero-overall-score">--</span>
+                            <span class="hero-stat-label">Overall Score</span>
+                        </div>
+                        <div class="hero-stat">
+                            <span class="hero-stat-value" id="hero-practice-time">0m</span>
+                            <span class="hero-stat-label">Today</span>
+                        </div>
+                        <div class="hero-stat">
+                            <span class="hero-stat-value" id="hero-streak">0</span>
+                            <span class="hero-stat-label">Day Streak</span>
+                        </div>
+                    </div>
+                    <div class="hero-card-action">
+                        <button class="btn btn-primary press-scale" id="hero-resume-btn">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                                <polygon points="5 3 19 12 5 21 5 3"/>
+                            </svg>
+                            Resume Practice
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Stats Row — Circular Progress Rings -->
+                <div class="stats-row" id="dashboard-stats-row">
+                    <div class="stat-card">
+                        <div class="progress-ring-container">
+                            <!-- stroke-dasharray must equal circumference: 2 * PI * r (r=24) ≈ 150.8 -->
+                            <svg width="56" height="56" viewBox="0 0 56 56" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Intonation progress">
+                                <circle class="progress-ring-bg" cx="28" cy="28" r="24"/>
+                                <circle class="progress-ring-fill emerald" id="ring-intonation" cx="28" cy="28" r="24"
+                                    stroke-dasharray="150.8" stroke-dashoffset="150.8"/>
+                            </svg>
+                            <span class="progress-ring-label" id="ring-intonation-label">--%</span>
+                        </div>
+                        <div class="stat-card-info">
+                            <span class="stat-card-value" id="stat-intonation">--</span>
+                            <span class="stat-card-label">Intonation</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="progress-ring-container">
+                            <svg width="56" height="56" viewBox="0 0 56 56" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Rhythm progress">
+                                <circle class="progress-ring-bg" cx="28" cy="28" r="24"/>
+                                <circle class="progress-ring-fill amber" id="ring-rhythm" cx="28" cy="28" r="24"
+                                    stroke-dasharray="150.8" stroke-dashoffset="150.8"/>
+                            </svg>
+                            <span class="progress-ring-label" id="ring-rhythm-label">--%</span>
+                        </div>
+                        <div class="stat-card-info">
+                            <span class="stat-card-value" id="stat-rhythm">--</span>
+                            <span class="stat-card-label">Rhythm</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="progress-ring-container">
+                            <svg width="56" height="56" viewBox="0 0 56 56" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Pitch accuracy progress">
+                                <circle class="progress-ring-bg" cx="28" cy="28" r="24"/>
+                                <circle class="progress-ring-fill indigo" id="ring-pitch" cx="28" cy="28" r="24"
+                                    stroke-dasharray="150.8" stroke-dashoffset="150.8"/>
+                            </svg>
+                            <span class="progress-ring-label" id="ring-pitch-label">--%</span>
+                        </div>
+                        <div class="stat-card-info">
+                            <span class="stat-card-value" id="stat-pitch">--</span>
+                            <span class="stat-card-label">Pitch Acc.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick-Access Cards — Tonic-style large tap targets -->
+                <div class="dashboard-grid" id="dashboard-cards">
+                    <div class="dashboard-card press-scale" data-navigate="practice" role="button" tabindex="0" aria-label="Practice — Start a session">
+                        <div class="dashboard-card-icon practice-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+                                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                                <line x1="12" y1="19" x2="12" y2="22"/>
+                            </svg>
+                        </div>
+                        <span class="dashboard-card-label">Practice</span>
+                        <span class="dashboard-card-sublabel">Start a session</span>
+                    </div>
+                    <div class="dashboard-card press-scale" data-navigate="tuner" role="button" tabindex="0" aria-label="Tuner — Tune up">
+                        <div class="dashboard-card-icon tuner-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 6v6l4 2"/>
+                            </svg>
+                        </div>
+                        <span class="dashboard-card-label">Tuner</span>
+                        <span class="dashboard-card-sublabel">Tune up</span>
+                    </div>
+                    <div class="dashboard-card press-scale" data-navigate="library" role="button" tabindex="0" aria-label="Library — Your scores">
+                        <div class="dashboard-card-icon library-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                            </svg>
+                        </div>
+                        <span class="dashboard-card-label">Library</span>
+                        <span class="dashboard-card-sublabel">Your scores</span>
+                    </div>
+                    <div class="dashboard-card press-scale" data-navigate="metronome" role="button" tabindex="0" aria-label="Metronome — Keep time">
+                        <div class="dashboard-card-icon metronome-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                <path d="M12 2v6l4 2"/>
+                                <circle cx="12" cy="14" r="8"/>
+                            </svg>
+                        </div>
+                        <span class="dashboard-card-label">Metronome</span>
+                        <span class="dashboard-card-sublabel">Keep time</span>
+                    </div>
+                </div>
+
+                <!-- Assignments — Edulastic-style list -->
+                <div class="assignment-section" id="assignment-section">
+                    <h3 class="assignment-section-title">
+                        Recent Pieces
+                        <span class="assignment-count-badge" id="assignment-count">0</span>
+                    </h3>
+                    <div class="assignment-list" id="assignment-list">
+                        <!-- Assignment items populated by DashboardUI -->
+                        <div class="assignment-item" id="assignment-empty-state">
+                            <div class="assignment-status-dot pending"></div>
+                            <div class="assignment-info">
+                                <div class="assignment-title">No pieces yet</div>
+                                <div class="assignment-meta">Import sheet music to see your pieces here</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- Library View -->
-            <section id="library-view" class="view active">
+            <section id="library-view" class="view">
                 <div class="section-header">
                     <h1>Your Library</h1>
                     <p class="subtitle">Import and manage your sheet music</p>
@@ -159,567 +341,39 @@
                                 <polygon points="5 3 19 12 5 21 5 3"/>
                             </svg>
                         </button>
-                    </div>
-                </div>
-
-                <div class="sheet-music-container" id="sheet-music-container">
-                    <div class="sheet-music-placeholder">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                            <polyline points="14 2 14 8 20 8"/>
-                            <line x1="16" y1="13" x2="8" y2="13"/>
-                            <line x1="16" y1="17" x2="8" y2="17"/>
-                            <polyline points="10 9 9 9 8 9"/>
-                        </svg>
-                        <p>Select a piece from your library to start practicing</p>
-                    </div>
-                </div>
-
-                <div class="feedback-panel" id="feedback-panel">
-                    <div class="feedback-current-note">
-                        <span class="note-display" id="current-note">--</span>
-                        <span class="note-octave" id="current-octave"></span>
-                    </div>
-                    <div class="feedback-indicators">
-                        <div class="pitch-indicator">
-                            <span class="indicator-label">Pitch</span>
-                            <div class="pitch-meter" id="pitch-meter">
-                                <div class="pitch-center"></div>
-                                <div class="pitch-marker" id="pitch-marker"></div>
-                            </div>
-                            <span class="cents-display" id="cents-display">0¢</span>
-                        </div>
-                        <div class="timing-indicator">
-                            <span class="indicator-label">Timing</span>
-                            <span class="timing-display" id="timing-display">0ms</span>
-                        </div>
-                    </div>
-                    <div class="score-display">
-                        <span class="score-label">Accuracy</span>
-                        <span class="score-value" id="accuracy-score">--%</span>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Metronome View -->
-            <section id="metronome-view" class="view">
-                <div class="section-header">
-                    <h1>Metronome</h1>
-                    <p class="subtitle">Keep steady time</p>
-                </div>
-
-                <div class="metronome-display">
-                    <div class="bpm-display" id="bpm-display">120</div>
-                    <div class="tempo-label" id="tempo-label">Allegro</div>
-                </div>
-
-                <div class="tempo-slider-container">
-                    <input type="range" id="tempo-slider" min="20" max="300" value="120" class="tempo-slider">
-                    <div class="tempo-marks">
-                        <span>20</span>
-                        <span>60</span>
-                        <span>120</span>
-                        <span>200</span>
-                        <span>300</span>
-                    </div>
-                </div>
-
-                <div class="tempo-presets">
-                    <button class="preset-btn" data-tempo="50">Largo</button>
-                    <button class="preset-btn" data-tempo="66">Adagio</button>
-                    <button class="preset-btn" data-tempo="76">Andante</button>
-                    <button class="preset-btn" data-tempo="108">Moderato</button>
-                    <button class="preset-btn active" data-tempo="120">Allegro</button>
-                    <button class="preset-btn" data-tempo="168">Presto</button>
-                </div>
-
-                <div class="beat-indicator" id="beat-indicator">
-                    <div class="beat-dot active"></div>
-                    <div class="beat-dot"></div>
-                    <div class="beat-dot"></div>
-                    <div class="beat-dot"></div>
-                </div>
-
-                <div class="metronome-controls">
-                    <button class="btn btn-ghost" id="tap-tempo-btn">Tap Tempo</button>
-                    <button class="btn btn-primary btn-large" id="metronome-toggle">
-                        <svg viewBox="0 0 24 24" fill="currentColor" class="play-icon">
-                            <polygon points="5 3 19 12 5 21 5 3"/>
-                        </svg>
-                        <svg viewBox="0 0 24 24" fill="currentColor" class="pause-icon" style="display:none">
-                            <rect x="6" y="4" width="4" height="16"/>
-                            <rect x="14" y="4" width="4" height="16"/>
-                        </svg>
-                        <span>Start</span>
-                    </button>
-                    <button class="btn btn-ghost" id="reset-tempo-btn">Reset</button>
-                </div>
-            </section>
-
-            <!-- Tuner View -->
-            <section id="tuner-view" class="view">
-                <div id="tuner-container"></div>
-            </section>
-
-            <!-- Settings View -->
-            <section id="settings-view" class="view">
-                <div class="section-header">
-                    <h1>Settings</h1>
-                    <p class="subtitle">Customize your experience</p>
-                </div>
-
-                <div class="settings-group">
-                    <h3>Instrument</h3>
-                    <div class="instrument-selector">
-                        <button class="instrument-option active" data-instrument="violin">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <path d="M12 2v20M8 6c2-2 6-2 8 0M6 10c3-2 9-2 12 0M8 16c2-2 6-2 8 0M10 22c1-2 5-2 4 0"/>
-                            </svg>
-                            <span>Violin</span>
-                        </button>
-                        <button class="instrument-option" data-instrument="viola">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <path d="M12 2v20M8 5c2-1.5 5-1.5 8 0M6 9c2.5-1.5 5.5-1.5 12 0M8 15c2-1.5 5-1.5 8 0"/>
-                            </svg>
-                            <span>Viola</span>
-                        </button>
-                        <button class="instrument-option" data-instrument="cello">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <path d="M12 2v20M7 4c2.5-1 6-1 10 0M5 8c3-1.5 8-1.5 14 0M7 14c2-1.5 6-1.5 10 0"/>
-                            </svg>
-                            <span>Cello</span>
-                        </button>
-                        <button class="instrument-option" data-instrument="bass">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <path d="M12 2v20M8 6c2-1 5-1 8 0M6 12c2-1.5 5-1.5 12 0"/>
-                            </svg>
-                            <span>Bass</span>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="settings-group">
-                    <h3>Audio Sensitivity</h3>
-                    <div class="slider-setting">
-                        <label for="sensitivity-slider">Detection Threshold</label>
-                        <input type="range" id="sensitivity-slider" min="0.5" max="1" step="0.05" value="0.85">
-                        <span class="setting-value" id="sensitivity-value">0.85</span>
-                    </div>
-                </div>
-
-                <div class="settings-group">
-                    <h3>Display</h3>
-                    <div class="toggle-setting">
-                        <label for="show-heatmap-toggle">Show Heat Map After Practice</label>
-                        <button class="toggle-btn active" id="show-heatmap-toggle" role="switch" aria-checked="true">
-                            <span class="toggle-slider"></span>
-                        </button>
-                    </div>
-                    <div class="toggle-setting">
-                        <label for="show-cursor-toggle">Follow-the-Ball Cursor</label>
-                        <button class="toggle-btn" id="show-cursor-toggle" role="switch" aria-checked="false">
-                            <span class="toggle-slider"></span>
-                        </button>
-                    </div>
-                </div>
-            </section>
-        </main>
-        <!-- Onboarding Modal -->
-        <div class="modal" id="onboarding-modal">
-            <div class="modal-backdrop"></div>
-            <div class="modal-content modal-large onboarding-content">
-                <!-- Welcome Step -->
-                <div class="onboarding-step" id="onboarding-step-welcome">
-                    <div class="onboarding-header">
-                        <div class="onboarding-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <path d="M9 18V5l12-2v13"/>
-                                <circle cx="6" cy="18" r="3"/>
-                                <circle cx="18" cy="16" r="3"/>
-                            </svg>
-                        </div>
-                        <h2>Welcome to Virtual Concertmaster</h2>
-                        <p class="onboarding-subtitle">Your personal AI-powered practice companion</p>
-                    </div>
-                    <div class="onboarding-features">
-                        <div class="feature-item">
+                        <button class="btn btn-icon video-snippet-btn" id="video-snippet-btn" title="Record for Teacher">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="12" cy="12" r="10"/>
-                                <path d="M12 6v6l4 2"/>
-                            </svg>
-                            <span>Real-time pitch detection</span>
-                        </div>
-                        <div class="feature-item">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M12 2a10 10 0 1 0 10 10"/>
-                                <path d="M12 2v10l4 4"/>
-                            </svg>
-                            <span>AI-powered feedback</span>
-                        </div>
-                        <div class="feature-item">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="3" y="3" width="18" height="18" rx="2"/>
-                                <path d="M3 9h18"/>
-                            </svg>
-                            <span>Smart practice loops</span>
-                        </div>
-                    </div>
-                    <button class="btn btn-primary btn-large" id="onboarding-start-btn">Get Started</button>
-                </div>
-
-                <!-- Permissions Step -->
-                <div class="onboarding-step" id="onboarding-step-permissions" style="display: none;">
-                    <div class="onboarding-header">
-                        <div class="onboarding-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                                <line x1="12" y1="19" x2="12" y2="23"/>
-                            </svg>
-                        </div>
-                        <h2>Microphone Access</h2>
-                        <p class="onboarding-subtitle">We need access to listen to your instrument</p>
-                    </div>
-                    <div class="permissions-info">
-                        <p>To analyze your playing in real-time, we need permission to use your device's microphone. Your audio is processed locally and never stored or uploaded.</p>
-                    </div>
-                    <button class="btn btn-primary btn-large" id="request-mic-btn">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                        </svg>
-                        Enable Microphone
-                    </button>
-                    <button class="btn btn-ghost" id="skip-permissions-btn">Skip for now</button>
-                </div>
-
-                <!-- Instrument Step -->
-                <div class="onboarding-step" id="onboarding-step-instrument" style="display: none;">
-                    <div class="onboarding-header">
-                        <div class="onboarding-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <path d="M12 2v20M8 6c2-2 6-2 8 0M6 10c3-2 9-2 12 0M8 16c2-2 6-2 8 0"/>
-                            </svg>
-                        </div>
-                        <h2>Select Your Instrument</h2>
-                        <p class="onboarding-subtitle">Calibrate the pitch detection for your instrument</p>
-                    </div>
-                    <div class="instrument-selector-large" id="instrument-selector">
-                        <button class="instrument-option-large active" data-instrument="violin">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <path d="M12 2v20M8 6c2-2 6-2 8 0M6 10c3-2 9-2 12 0M8 16c2-2 6-2 8 0M10 22c1-2 5-2 4 0"/>
-                            </svg>
-                            <span class="instrument-name">Violin</span>
-                            <span class="instrument-range">G3 - E7</span>
-                        </button>
-                        <button class="instrument-option-large" data-instrument="viola">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <path d="M12 2v20M8 5c2-1.5 5-1.5 8 0M6 9c2.5-1.5 5.5-1.5 12 0M8 15c2-1.5 5-1.5 8 0"/>
-                            </svg>
-                            <span class="instrument-name">Viola</span>
-                            <span class="instrument-range">C3 - A6</span>
-                        </button>
-                        <button class="instrument-option-large" data-instrument="cello">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <path d="M12 2v20M7 4c2.5-1 6-1 10 0M5 8c3-1.5 8-1.5 14 0M7 14c2-1.5 6-1.5 10 0"/>
-                            </svg>
-                            <span class="instrument-name">Cello</span>
-                            <span class="instrument-range">C2 - B5</span>
-                        </button>
-                        <button class="instrument-option-large" data-instrument="bass">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <path d="M12 2v20M8 6c2-1 5-1 8 0M6 12c2-1.5 5-1.5 12 0"/>
-                            </svg>
-                            <span class="instrument-name">Double Bass</span>
-                            <span class="instrument-range">E1 - C4</span>
-                        </button>
-                    </div>
-                    <button class="btn btn-primary btn-large" id="confirm-instrument-btn">Continue</button>
-                </div>
-
-                <!-- Calibration Step -->
-                <div class="onboarding-step" id="onboarding-step-calibration" style="display: none;">
-                    <div class="onboarding-header">
-                        <div class="onboarding-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <circle cx="12" cy="12" r="10"/>
-                                <path d="M12 6v6l4 2"/>
-                            </svg>
-                        </div>
-                        <h2>Calibrating...</h2>
-                        <p class="onboarding-subtitle">Setting up frequency detection for your instrument</p>
-                    </div>
-                    <div class="calibration-animation">
-                        <div class="calibration-wave"></div>
-                        <div class="calibration-wave delay-1"></div>
-                        <div class="calibration-wave delay-2"></div>
-                    </div>
-                    <button class="btn btn-primary btn-large" id="calibration-complete-btn">Ready!</button>
-                </div>
-
-                <!-- Complete Step -->
-                <div class="onboarding-step" id="onboarding-step-complete" style="display: none;">
-                    <div class="onboarding-header">
-                        <div class="onboarding-icon success">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                                <polyline points="22 4 12 14.01 9 11.01"/>
-                            </svg>
-                        </div>
-                        <h2>You're All Set!</h2>
-                        <p class="onboarding-subtitle">Ready to start your practice journey</p>
-                    </div>
-                    <div class="onboarding-summary">
-                        <div class="summary-item">
-                            <span class="summary-label">Instrument</span>
-                            <span class="summary-value" id="summary-instrument">Violin</span>
-                        </div>
-                        <div class="summary-item">
-                            <span class="summary-label">Frequency Range</span>
-                            <span class="summary-value" id="summary-range">G3 - E7</span>
-                        </div>
-                    </div>
-                    <button class="btn btn-primary btn-large" id="onboarding-finish-btn">Start Practicing</button>
-                </div>
-
-                <!-- Progress Indicator -->
-                <div class="onboarding-progress">
-                    <div class="progress-dot active" data-step="welcome"></div>
-                    <div class="progress-dot" data-step="permissions"></div>
-                    <div class="progress-dot" data-step="instrument"></div>
-                    <div class="progress-dot" data-step="calibration"></div>
-                    <div class="progress-dot" data-step="complete"></div>
-                </div>
-            </div>
-        </div>
-        <!-- Import Modal -->
-        <div class="modal" id="import-modal">
-            <div class="modal-backdrop"></div>
-            <div class="modal-content">
-                <button class="modal-close" aria-label="Close">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="18" y1="6" x2="6" y2="18"/>
-                        <line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
-                </button>
-                <h2>Import Score</h2>
-                <div class="import-options">
-                    <label class="import-option">
-                        <input type="file" accept=".musicxml,.xml,.mei" hidden>
-                        <div class="import-option-content">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                                <polyline points="14 2 14 8 20 8"/>
-                            </svg>
-                            <span>Upload File</span>
-                            <small>MusicXML, MEI</small>
-                        </div>
-                    </label>
-                    <label class="import-option">
-                        <input type="file" accept="image/*" capture="environment" hidden>
-                        <div class="import-option-content">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                                <circle cx="8.5" cy="8.5" r="1.5"/>
-                                <polyline points="21 15 16 10 5 21"/>
-                            </svg>
-                            <span>Scan Image</span>
-                            <small>Photo of sheet music</small>
-                        </div>
-                    </label>
-                </div>
-            </div>
-        </div>
-
-        <!-- IMSLP Search Modal -->
-        <div class="modal" id="imslp-modal">
-            <div class="modal-backdrop"></div>
-            <div class="modal-content modal-large">
-                <button class="modal-close" aria-label="Close">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="18" y1="6" x2="6" y2="18"/>
-                        <line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
-                </button>
-                <h2>Search IMSLP</h2>
-                <div class="search-form">
-                    <input type="text" placeholder="Search by composer, title, or opus..." id="imslp-search-input">
-                    <button class="btn btn-primary" id="imslp-search-btn">Search</button>
-                </div>
-                <div class="search-results" id="imslp-results">
-                    <div class="empty-state">
-                        <p>Search for public domain sheet music</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Session Summary Modal -->
-        <div class="modal" id="session-summary-modal">
-            <div class="modal-backdrop"></div>
-            <div class="modal-content modal-large modal-dark">
-                <button class="modal-close" aria-label="Close">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="18" y1="6" x2="6" y2="18"/>
-                        <line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
-                </button>
-                <div class="session-summary">
-                    <h2>Practice Complete</h2>
-                    <div class="summary-score">
-                        <span class="big-score" id="final-score">85%</span>
-                        <span class="score-label">Overall Accuracy</span>
-                    </div>
-                    <div class="summary-breakdown">
-                        <div class="breakdown-item">
-                            <span class="breakdown-label">Pitch Accuracy</span>
-                            <span class="breakdown-value" id="pitch-accuracy">92%</span>
-                        </div>
-                        <div class="breakdown-item">
-                            <span class="breakdown-label">Timing Accuracy</span>
-                            <span class="breakdown-value" id="timing-accuracy">78%</span>
-                        </div>
-                        <div class="breakdown-item">
-                            <span class="breakdown-label">Duration</span>
-                            <span class="breakdown-value" id="session-duration">5:32</span>
-                        </div>
-                    </div>
-                    <!-- AI Feedback Section -->
-                    <div class="ai-feedback-section" id="ai-feedback-section" style="display: none;">
-                        <h3>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ai-icon">
-                                <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
-                                <circle cx="8" cy="14" r="2"/>
-                                <circle cx="16" cy="14" r="2"/>
-                            </svg>
-                            AI Coach Feedback
-                        </h3>
-                        <div class="ai-assessment" id="ai-assessment">
-                            <!-- AI assessment will be inserted here -->
-                        </div>
-                        <div class="ai-strengths" id="ai-strengths">
-                            <!-- Strengths will be inserted here -->
-                        </div>
-                        <div class="ai-guidance" id="ai-guidance">
-                            <!-- Specific guidance will be inserted here -->
-                        </div>
-                        <div class="ai-loading" id="ai-loading">
-                            <div class="loading-spinner"></div>
-                            <span>Analyzing your performance...</span>
-                        </div>
-                    </div>
-
-                    <div class="heatmap-section">
-                        <h3>Practice Areas</h3>
-                        <p class="heatmap-note">Measures colored crimson need the most practice</p>
-
-                        <div class="heatmap-preview" id="heatmap-preview">
-                            <!-- Heat map will be rendered here -->
-                        </div>
-                    </div>
-
-                    <!-- Practice Loop Section -->
-                    <div class="practice-loop-section" id="practice-loop-section" style="display: none;">
-                        <h3>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="loop-icon">
-                                <polyline points="23 4 23 10 17 10"/>
-                                <polyline points="1 20 1 14 7 14"/>
-                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-                            </svg>
-                            Smart Practice Loop
-                        </h3>
-                        <p class="loop-description" id="loop-description">
-                            Focus on these measures at a slower tempo:
-                        </p>
-                        <div class="loop-measures" id="loop-measures">
-                            <!-- Loop measures will be inserted here -->
-                        </div>
-                        <div class="loop-tempo">
-                            <span class="tempo-label">Suggested Tempo:</span>
-                            <span class="tempo-value" id="loop-tempo-value">80 BPM</span>
-                        </div>
-                        <button class="btn btn-primary btn-loop" id="start-loop-btn">
-                            <svg viewBox="0 0 24 24" fill="currentColor">
-                                <polygon points="5 3 19 12 5 21 5 3"/>
-                            </svg>
-                            Start Practice Loop
-                        </button>
-                    </div>
-
-                    <div class="summary-actions">
-                        <button class="btn btn-secondary" id="practice-again-btn">Practice Again</button>
-                        <button class="btn btn-primary" id="view-details-btn">View Details</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Toast Notifications -->
-        <main class="main-content">
-            <!-- Library View -->
-            <section id="library-view" class="view active">
-                <div class="section-header">
-                    <h1>Your Library</h1>
-                    <p class="subtitle">Import and manage your sheet music</p>
-                </div>
-
-                <div class="library-actions">
-                    <button class="btn btn-primary" id="import-score-btn">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                            <polyline points="17 8 12 3 7 8"/>
-                            <line x1="12" y1="3" x2="12" y2="15"/>
-                        </svg>
-                        Import Score
-                    </button>
-                    <button class="btn btn-secondary" id="scan-music-btn">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                            <line x1="3" y1="9" x2="21" y2="9"/>
-                            <line x1="9" y1="21" x2="9" y2="9"/>
-                        </svg>
-                        Scan Music
-                    </button>
-                    <button class="btn btn-secondary" id="search-imslp-btn">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="11" cy="11" r="8"/>
-                            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                        </svg>
-                        Search IMSLP
-                    </button>
-                </div>
-
-                <div class="library-search">
-                    <input type="text" placeholder="Search your library..." id="library-search-input">
-                </div>
-
-                <div class="library-grid" id="library-grid">
-                    <div class="empty-state">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <path d="M9 18V5l12-2v13"/>
-                            <circle cx="6" cy="18" r="3"/>
-                            <circle cx="18" cy="16" r="3"/>
-                        </svg>
-                        <h3>No scores yet</h3>
-                        <p>Import sheet music to get started with practice</p>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Practice View -->
-            <section id="practice-view" class="view">
-                <div class="practice-header">
-                    <div class="practice-info">
-                        <h2 id="current-piece-title">Select a piece to practice</h2>
-                        <span class="instrument-badge" id="current-instrument">Violin</span>
-                    </div>
-                    <div class="practice-controls">
-                        <button class="btn btn-icon" id="start-practice-btn" disabled>
-                            <svg viewBox="0 0 24 24" fill="currentColor">
-                                <polygon points="5 3 19 12 5 21 5 3"/>
+                                <path d="M23 7l-7 5 7 5V7z"/>
+                                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
                             </svg>
                         </button>
+                    </div>
+                </div>
+
+                <!-- Scale Engine Warm-Up Generator -->
+                <div id="scale-engine-container"></div>
+
+                <!-- Annotation Toolbar -->
+                <div id="annotation-toolbar-wrapper">
+                    <div id="annotation-toolbar" aria-label="Annotation Tools">
+                        <button class="annotation-tool-btn active" data-tool="pen" title="Pen">✏️</button>
+                        <button class="annotation-tool-btn" data-tool="eraser" title="Eraser">⌫</button>
+                        <button class="annotation-tool-btn" data-tool="upbow" title="Up Bow">∩</button>
+                        <button class="annotation-tool-btn" data-tool="downbow" title="Down Bow">□</button>
+                        <button class="annotation-tool-btn" data-tool="fingering" title="Fingering 1-4">1</button>
+                        <div class="annotation-separator"></div>
+                        <input type="color" id="annotation-color" value="#00d4ff" title="Color">
+                        <input type="range" id="annotation-line-width" min="1" max="8" value="2" title="Line Width">
+                        <div class="annotation-separator"></div>
+                        <button id="annotation-undo-btn" title="Undo (Ctrl+Z)">↩</button>
+                        <button id="annotation-redo-btn" title="Redo (Ctrl+Shift+Z)">↪</button>
+                        <button id="annotation-clear-btn" title="Clear All">🗑</button>
+                        <div class="annotation-separator"></div>
+                        <span class="annotation-sync-status" id="annotation-sync-status">●</span>
+                    </div>
+                    <div id="annotation-layers" class="annotation-layers">
+                        <label><input type="checkbox" checked data-layer="my"> My Annotations</label>
+                        <label><input type="checkbox" checked data-layer="shared"> Shared</label>
                     </div>
                 </div>
 
@@ -1018,6 +672,17 @@
                     <div class="assignments-content">
                         <!-- Dynamic content rendered by AssignmentUI -->
                     </div>
+                </div>
+            </section>
+
+            <!-- License View -->
+            <section id="license-view" class="view">
+                <div class="section-header">
+                    <h1>License</h1>
+                    <p class="subtitle">Manage your subscription and features</p>
+                </div>
+                <div class="license-content">
+                    <!-- Dynamic content rendered by StudioLicenseUI -->
                 </div>
             </section>
         </main>
@@ -1435,6 +1100,153 @@
                 </div>
             </div>
         </div>
+
+        <!-- Video Snippet Recording Modal (Office Hours Drop) -->
+        <div class="modal" id="video-snippet-modal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-large">
+                <button class="modal-close" aria-label="Close" id="video-snippet-close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+                <div class="video-recorder">
+                    <h2>Office Hours Drop</h2>
+                    <p class="video-recorder-subtitle">Record a 15-second video for your teacher</p>
+
+                    <div class="video-preview-container">
+                        <video id="video-preview" playsinline muted></video>
+                        <div class="video-overlay" id="video-overlay">
+                            <button class="record-button" id="start-record-btn">
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <circle cx="12" cy="12" r="8"/>
+                                </svg>
+                                <span>Start Recording</span>
+                            </button>
+                        </div>
+                        <div class="recording-indicator" id="recording-indicator" style="display: none;">
+                            <span class="recording-dot"></span>
+                            <span class="recording-time" id="recording-time">0:00 / 0:15</span>
+                        </div>
+                    </div>
+
+                    <div class="video-form" id="video-form" style="display: none;">
+                        <div class="video-trim-controls">
+                            <label>Trim Video (optional)</label>
+                            <div class="trim-slider-container">
+                                <div class="trim-slider" id="trim-slider">
+                                    <div class="trim-range" id="trim-range"></div>
+                                    <div class="trim-handle trim-handle-start" id="trim-handle-start"></div>
+                                    <div class="trim-handle trim-handle-end" id="trim-handle-end"></div>
+                                </div>
+                                <div class="trim-times">
+                                    <span id="trim-start-time">0:00</span>
+                                    <span id="trim-end-time">0:15</span>
+                                </div>
+                            </div>
+                            <p class="trim-hint">Drag handles to trim your recording</p>
+                        </div>
+                        <div class="form-group">
+                            <label for="snippet-title">Title (optional)</label>
+                            <input type="text" id="snippet-title" placeholder="e.g., Scales practice - C major">
+                        </div>
+                        <div class="form-group">
+                            <label for="snippet-notes">Notes for teacher (optional)</label>
+                            <textarea id="snippet-notes" placeholder="What would you like feedback on?"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="video-actions">
+                        <button class="btn btn-secondary" id="cancel-video-btn">Cancel</button>
+                        <button class="btn btn-primary" id="submit-video-btn" style="display: none;">Send to Teacher</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Teacher Inbox Modal -->
+        <div class="modal" id="teacher-inbox-modal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-large modal-dark">
+                <button class="modal-close" aria-label="Close" id="inbox-close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+                <div class="teacher-inbox">
+                    <h2>Teacher Inbox</h2>
+                    <div class="inbox-tabs">
+                        <button class="inbox-tab active" data-tab="received">Received</button>
+                        <button class="inbox-tab" data-tab="sent">Sent</button>
+                    </div>
+
+                    <div class="inbox-content" id="inbox-received">
+                        <div class="inbox-empty" id="inbox-empty-received">
+                            <p>No video snippets received yet</p>
+                        </div>
+                        <div class="inbox-list" id="received-snippets-list"></div>
+                    </div>
+
+                    <div class="inbox-content" id="inbox-sent" style="display: none;">
+                        <div class="inbox-empty" id="inbox-empty-sent">
+                            <p>No video snippets sent yet</p>
+                        </div>
+                        <div class="inbox-list" id="sent-snippets-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Video Reply Modal -->
+        <div class="modal" id="video-reply-modal">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content">
+                <button class="modal-close" aria-label="Close" id="reply-close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+                <div class="video-reply-form">
+                    <h3>Reply to Recording</h3>
+                    <div class="reply-video-container">
+                        <video id="reply-video-player" controls></video>
+                    </div>
+                    <div class="reply-form">
+                        <div class="reply-type-selector">
+                            <button class="reply-type-btn active" data-type="text">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                </svg>
+                                Text
+                            </button>
+                            <button class="reply-type-btn" data-type="voice">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                                </svg>
+                                Voice
+                            </button>
+                        </div>
+                        <textarea id="reply-text" placeholder="Write your feedback..."></textarea>
+                        <div class="voice-recorder" id="voice-reply-recorder" style="display: none;">
+                            <button class="voice-record-btn" id="voice-record-btn">
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <circle cx="12" cy="12" r="8"/>
+                                </svg>
+                            </button>
+                            <span class="voice-status" id="voice-status">Click to record</span>
+                        </div>
+                    </div>
+                    <div class="reply-actions">
+                        <button class="btn btn-secondary" id="cancel-reply-btn">Cancel</button>
+                        <button class="btn btn-primary" id="send-reply-btn">Send Reply</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Toast Notifications -->
@@ -1447,11 +1259,10 @@
     <script src="src/js/audio/pitch-detector.js"></script>
     <script src="src/js/audio/instrument-detector.js"></script>
     <script src="src/js/audio/metronome.js"></script>
-    <script src="src/js/audio/volume-envelope-analyzer.js"></script>
-    <script src="src/js/audio/articulation-detector.js"></script>
     <script src="src/js/analysis/performance-comparator.js"></script>
     <script src="src/js/analysis/session-logger.js"></script>
-    <script src="src/js/analysis/dynamics-comparator.js"></script>
+    <!-- Core DSP Engine: pYIN pitch detection, sympathetic vibration filter, vibrato smoother -->
+    <script src="src/js/audio/dsp-engine.js"></script>
     <script src="src/js/analysis/ai-summary-generator.js"></script>
     <script src="src/js/services/llm-service.js"></script>
     <script src="src/js/services/onboarding-service.js"></script>
@@ -1481,10 +1292,17 @@
     <script src="src/js/audio/scale-engine.js"></script>
     <script src="src/js/components/scale-engine-ui.js"></script>
     <script src="src/js/services/teacher-service.js"></script>
+    <script src="src/js/services/video-snippet-service.js"></script>
+    <script src="src/js/services/video-storage-service.js"></script>
+    <script src="src/js/services/push-notification-service.js"></script>
     <script src="src/js/components/studio-dashboard.js"></script>
-    <!-- Cloud Sync & Teacher Export -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
+    <script src="src/js/services/license-service.js"></script>
+    <script src="src/js/components/studio-license-ui.js"></script>
+    <script src="src/js/services/annotation-service.js"></script>
+    <script src="src/js/components/annotation-canvas.js"></script>
+    <!-- SSO / OAuth -->
     <script src="src/js/services/auth-service.js"></script>
+    <script src="src/js/services/oauth-service.js"></script>
     <script src="src/js/services/cloud-sync-service.js"></script>
     <script src="src/js/services/pdf-export-service.js"></script>
     <script src="src/js/components/teacher-report.js"></script>
@@ -1493,5 +1311,26 @@
     <script src="src/js/services/assignment-api-client.js"></script>
     <script src="src/js/components/assignment-ui.js"></script>
     <script src="src/js/components/up-next-widget.js"></script>
+    <!-- Offline Session Management -->
+    <script src="src/js/services/offline-session-manager.js"></script>
+    <script src="src/js/services/session-persistence-service.js"></script>
+    <script src="src/js/components/sso-login-ui.js"></script>
+    <!-- Role Selection -->
+    <script src="src/js/services/role-selection-service.js"></script>
+    <script src="src/js/components/role-selection-ui.js"></script>
+    <!-- Dashboard UI -->
+    <script src="src/js/components/dashboard-ui.js"></script>
     <script src="src/js/app.js"></script>
+
+    <!-- Onboarding Modal -->
+    <div id="onboarding-modal" class="modal onboarding-modal">
+        <div class="onboarding-container">
+            <div class="onboarding-progress-bar">
+                <div class="onboarding-progress"></div>
+            </div>
+            <div class="onboarding-content">
+                <!-- Dynamic content rendered by OnboardingUI -->
+            </div>
+        </div>
+    </div>
 </body>

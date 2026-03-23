@@ -23,13 +23,24 @@ class ConcertmasterApp {
         this.sessionData = null;
         this.accuracyScorer = null;
         this.intonationAnalyzer = null;
-        this.dynamicsComparator = null;
-        this.sessionLogger = null;
 
         // UI Components
         this.sheetMusicRenderer = null;
         this.heatMapRenderer = null;
         this.followTheBall = null;
+
+        // Scale Engine (warm-up generator)
+        this.scaleEngine = null;
+        this.scaleEngineUI = null;
+
+        // Annotations
+        this.annotationCanvas = null;
+        this.annotationService = null;
+        this.annotationCanvasClickHandler = null;
+
+        // Onboarding
+        this.onboardingService = null;
+        this.onboardingUI = null;
 
         // DOM Elements
         this.views = {};
@@ -62,12 +73,28 @@ class ConcertmasterApp {
 
         // Up Next widget (Student view)
         this.upNextWidget = null;
+
+        // SSO / OAuth
+        this.authService = null;
+        this.oauthService = null;
+        this.ssoLoginUI = null;
+
+        // License service
+        this.licenseService = null;
+        this.licenseUI = null;
+
+        // Role Selection
+        this.roleSelectionService = null;
+        this.roleSelectionUI = null;
     }
 
     async init() {
         console.log('Initializing Virtual Concertmaster...');
 
         try {
+            // Initialize SSO / OAuth
+            await this.initSSO();
+
             // Initialize components
             this.initializeComponents();
 
@@ -82,6 +109,9 @@ class ConcertmasterApp {
             // Initialize accessibility features
             this.initAccessibility();
 
+            // Initialize onboarding
+            this.initOnboarding();
+
             // Initialize audio engine
             await this.initializeAudio();
 
@@ -95,6 +125,15 @@ class ConcertmasterApp {
             if (!this.isTeacherMode) {
                 await this.initStudentWidget();
             }
+
+            // Initialize license service (always needed for feature gating)
+            await this.initLicense();
+
+            // Initialize video snippet feature
+            this.initVideoSnippets();
+
+            // Initialize dashboard UI
+            this.initDashboard();
 
             console.log('Concertmaster initialized successfully');
         } catch (error) {
@@ -112,17 +151,17 @@ class ConcertmasterApp {
         this.rhythmAnalyzer = new RhythmAnalyzer();
         this.accuracyScorer = new AccuracyScorer();
         this.intonationAnalyzer = new IntonationAnalyzer();
-        this.dynamicsComparator = new DynamicsComparator();
-        this.sessionLogger = new SessionLogger();
 
         // Get DOM elements
         this.views = {
+            dashboard: document.getElementById('dashboard-view'),
             library: document.getElementById('library-view'),
             practice: document.getElementById('practice-view'),
             metronome: document.getElementById('metronome-view'),
             settings: document.getElementById('settings-view'),
             tuner: document.getElementById('tuner-view'),
-            studio: document.getElementById('studio-dashboard-view')
+            studio: document.getElementById('studio-dashboard-view'),
+            license: document.getElementById('license-view')
         };
 
         this.toastContainer = document.getElementById('toast-container');
@@ -135,6 +174,12 @@ class ConcertmasterApp {
 
         // Initialize renderers
         this.initRenderers();
+
+        // Initialize annotations
+        this.initAnnotations();
+
+        // Initialize scale engine
+        this.initScaleEngine();
     }
 
     initRenderers() {
@@ -171,6 +216,410 @@ class ConcertmasterApp {
         this.integrationController.init();
     }
 
+    /**
+     * Initialize Annotation Canvas and Service
+     */
+    initAnnotations() {
+        const sheetWrapper = document.getElementById('sheet-music-wrapper');
+        if (sheetWrapper && typeof AnnotationCanvas !== 'undefined') {
+            this.annotationCanvas = new AnnotationCanvas(sheetWrapper);
+            this.annotationCanvas.init();
+
+            if (typeof AnnotationService !== 'undefined') {
+                this.annotationService = new AnnotationService();
+                this.annotationService.init(this.annotationCanvas, null);
+
+                this.setupAnnotationToolbar();
+            }
+        }
+    }
+
+    /**
+     * Setup annotation toolbar event handlers
+     */
+    setupAnnotationToolbar() {
+        if (!this.annotationCanvas) return;
+
+        // Tool buttons with symbol placement support
+        document.querySelectorAll('.annotation-tool-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.annotation-tool-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const tool = btn.dataset.tool;
+                this.annotationCanvas.setTool(tool);
+
+                // For symbol tools, set up click handler on canvas for placement
+                if (['upbow', 'downbow', 'fingering'].includes(tool)) {
+                    this.enableSymbolPlacement(tool);
+                } else {
+                    this.disableSymbolPlacement();
+                }
+            });
+        });
+
+        // Color picker with validation
+        const colorPicker = document.getElementById('annotation-color');
+        if (colorPicker) {
+            colorPicker.addEventListener('input', e => {
+                const color = e.target.value;
+                // Color input type already validates format, but validate anyway
+                if (/^#[0-9a-fA-F]{6}$/.test(color)) {
+                    this.annotationCanvas.setColor(color);
+                }
+            });
+        }
+
+        // Line width with bounds checking
+        const lineWidthSlider = document.getElementById('annotation-line-width');
+        if (lineWidthSlider) {
+            lineWidthSlider.addEventListener('input', e => {
+                const width = parseInt(e.target.value);
+                if (!isNaN(width) && width >= 1 && width <= 8) {
+                    this.annotationCanvas.setLineWidth(width);
+                }
+            });
+        }
+
+        // Undo/Redo
+        const undoBtn = document.getElementById('annotation-undo-btn');
+        if (undoBtn) {
+            undoBtn.addEventListener('click', () => this.annotationCanvas.undo());
+        }
+
+        const redoBtn = document.getElementById('annotation-redo-btn');
+        if (redoBtn) {
+            redoBtn.addEventListener('click', () => this.annotationCanvas.redo());
+        }
+
+        const clearBtn = document.getElementById('annotation-clear-btn');
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+                this.annotationCanvas.clearAll();
+                if (this.annotationService) {
+                    this.annotationService.clearAll();
+                }
+            });
+        }
+
+        // Keyboard shortcuts (don't trigger in input fields)
+        document.addEventListener('keydown', e => {
+            // Check if user is typing in an input/textarea
+            if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+                return;
+            }
+
+            if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                this.annotationCanvas.undo();
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey) {
+                e.preventDefault();
+                this.annotationCanvas.redo();
+            }
+        });
+
+        // Layer toggles
+        document.querySelectorAll('#annotation-layers input[data-layer]').forEach(cb => {
+            cb.addEventListener('change', () => {
+                this.annotationCanvas.setLayerVisible(cb.dataset.layer, cb.checked);
+            });
+        });
+
+        // Sync status from AnnotationService
+        if (this.annotationService) {
+            this.annotationService.on('syncStatus', status => {
+                const el = document.getElementById('annotation-sync-status');
+                if (el) {
+                    el.style.color = status === 'synced' ? '#00d4ff' : '#c9a227';
+                    el.title = status === 'synced' ? 'Synced' : 'Syncing...';
+                }
+            });
+
+            this.annotationService.on('quotaExceeded', data => {
+                this.showToast(data.message, 'error');
+            });
+        }
+    }
+
+    enableSymbolPlacement(tool) {
+        if (!this.annotationCanvas || !this.annotationCanvas.canvas) return;
+
+        const canvas = this.annotationCanvas.canvas;
+        const handler = (e) => {
+            if (this.annotationCanvas.currentTool !== tool) {
+                canvas.removeEventListener('click', handler);
+                return;
+            }
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            this.annotationCanvas.placeSymbol(x, y, tool);
+        };
+
+        canvas.addEventListener('click', handler);
+        this.annotationCanvasClickHandler = handler;
+    }
+
+    disableSymbolPlacement() {
+        if (!this.annotationCanvas || !this.annotationCanvas.canvas) return;
+        if (this.annotationCanvasClickHandler) {
+            this.annotationCanvas.canvas.removeEventListener('click', this.annotationCanvasClickHandler);
+            this.annotationCanvasClickHandler = null;
+        }
+    }
+
+    /**
+     * Initialize Scale Engine warm-up generator
+     */
+    initScaleEngine() {
+        this.scaleEngine = new ScaleEngine();
+
+        const scaleContainer = document.getElementById('scale-engine-container');
+        if (scaleContainer) {
+            this.scaleEngineUI = new ScaleEngineUI(scaleContainer);
+            this.scaleEngineUI.init(this.scaleEngine);
+            this.scaleEngineUI.connectModules({
+                metronome: this.metronome,
+                followTheBall: this.followTheBall,
+                intonationAnalyzer: this.intonationAnalyzer,
+                sheetMusicRenderer: this.sheetMusicRenderer
+            });
+        }
+    }
+
+    /**
+     * Initialize onboarding flow
+     */
+    initOnboarding() {
+        // Create onboarding service
+        this.onboardingService = new OnboardingService();
+
+        // Load saved instrument if available
+        const savedInstrument = localStorage.getItem('selected_instrument');
+        if (savedInstrument && this.onboardingService.instrumentRanges[savedInstrument]) {
+            this.selectedInstrument = savedInstrument;
+        }
+
+        // Create onboarding UI
+        this.onboardingUI = new OnboardingUI(this.onboardingService);
+
+        // Set up completion callback to apply calibration
+        this.onboardingService.setOnComplete((data) => {
+            // Apply instrument calibration to audio engine
+            if (this.audioEngine && data.instrument) {
+                this.audioEngine.setInstrumentCalibration(data.instrument);
+                this.selectedInstrument = data.instrument;
+            }
+
+            // Request microphone access if not already granted
+            if (data.permissions?.microphone) {
+                this.requestMicrophoneAccess();
+            }
+        });
+
+        // Initialize UI
+        this.onboardingUI.init();
+    }
+
+    /**
+     * Request microphone access
+     */
+    async requestMicrophoneAccess() {
+        if (this.audioEngine) {
+            try {
+                await this.audioEngine.requestMicrophoneAccess();
+            } catch (error) {
+                console.warn('Microphone access not granted:', error);
+            }
+        }
+    }
+
+    /**
+     * Initialize SSO / OAuth services and show login screen if needed.
+     */
+    async initSSO() {
+        if (typeof AuthService === 'undefined' || typeof OAuthService === 'undefined') {
+            return;
+        }
+
+        this.authService = new AuthService();
+        this.oauthService = new OAuthService(this.authService);
+
+        // Initialize role selection service
+        if (typeof RoleSelectionService !== 'undefined') {
+            this.roleSelectionService = new RoleSelectionService(this.authService);
+        }
+
+        // Initialize offline session manager and session persistence
+        if (typeof OfflineSessionManager !== 'undefined') {
+            this.offlineSessionManager = new OfflineSessionManager();
+        }
+
+        const syncService = typeof CloudSyncService !== 'undefined'
+            ? new CloudSyncService(this.authService)
+            : null;
+
+        if (typeof SessionPersistenceService !== 'undefined') {
+            this.sessionPersistence = new SessionPersistenceService(
+                this.authService,
+                this.offlineSessionManager || null,
+                { syncService }
+            );
+
+            // Restore session on startup (keeps user logged in across restarts)
+            await this.sessionPersistence.initialize();
+
+            // Register the service worker for offline caching and queue replay
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/sw.js').catch(err =>
+                    console.warn('SW registration failed:', err)
+                );
+
+                // Respond to SW token requests for offline queue replay
+                navigator.serviceWorker.addEventListener('message', async (event) => {
+                    if (event.data && event.data.type === 'REQUEST_AUTH_TOKEN') {
+                        if (event.ports && event.ports[0]) {
+                            const token = await this.authService.getToken();
+                            event.ports[0].postMessage({ token });
+                        }
+                    }
+                });
+            }
+        }
+
+        // Fetch OAuth client IDs from the server endpoint
+        await this.oauthService.fetchConfig();
+
+        // Listen for logout events to clear OAuth provider, role, and session
+        this.authService.onAuthStateChange((event) => {
+            if (event === 'logout') {
+                this.oauthService.clearProvider();
+                if (this.roleSelectionService) {
+                    this.roleSelectionService.clearRole();
+                }
+                if (this.sessionPersistence) {
+                    this.sessionPersistence.onLogout();
+                }
+                // Clear API cache in SW to prevent cross-user data leakage
+                if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+                    navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_API_CACHE' });
+                }
+            }
+        });
+
+        // Initialize role selection UI
+        this._initRoleSelectionUI();
+
+        // Show SSO login screen if user is not authenticated
+        if (typeof SSOLoginUI !== 'undefined') {
+            this.ssoLoginUI = new SSOLoginUI(this.oauthService, this.authService);
+            this.ssoLoginUI.init({
+                onSuccess: (user, provider) => {
+                    if (user) {
+                        this.showToast(`Signed in as ${user.displayName || user.email}`, 'success');
+                        // Track session on login
+                        if (this.sessionPersistence) {
+                            this.sessionPersistence.onLogin(user);
+                        }
+                    }
+                    // Show role selection for new users (first sign-in)
+                    if (user && this.roleSelectionService && !this.roleSelectionService.hasSelectedRole()) {
+                        this._showRoleSelection();
+                    } else if (this.roleSelectionService) {
+                        this._applyUserRole(this.roleSelectionService.getRole());
+                    }
+                },
+                onError: (error, provider) => {
+                    console.warn(`SSO error (${provider}):`, error.message);
+                }
+            });
+
+            if (!this.authService.isAuthenticated()) {
+                this.ssoLoginUI.show();
+            } else if (this.roleSelectionService && !this.roleSelectionService.hasSelectedRole()) {
+                // User is authenticated but hasn't picked a role yet
+                this._showRoleSelection();
+            } else if (this.roleSelectionService) {
+                // Apply saved role on app load
+                this._applyUserRole(this.roleSelectionService.getRole());
+            }
+        }
+    }
+
+    /**
+     * Initialize the role selection UI component.
+     * @private
+     */
+    _initRoleSelectionUI() {
+        if (typeof RoleSelectionUI === 'undefined' || !this.roleSelectionService) {
+            return;
+        }
+
+        this.roleSelectionUI = new RoleSelectionUI(this.roleSelectionService);
+        this.roleSelectionUI.init({
+            onRoleSelected: (role, inviteLink) => {
+                if (role === 'skip') {
+                    // Default to student view so the user is not left in limbo.
+                    // Mark role as selected so the screen does not re-appear on reload.
+                    this.roleSelectionService.setRole('student');
+                    this._applyUserRole('student');
+                    return;
+                }
+                this._applyUserRole(role);
+                if (role === 'teacher' && inviteLink) {
+                    this.showToast('Studio invite link generated!', 'success');
+                }
+            }
+        });
+    }
+
+    /**
+     * Show the role selection screen.
+     * @private
+     */
+    _showRoleSelection() {
+        if (this.roleSelectionUI) {
+            this.roleSelectionUI.show();
+        }
+    }
+
+    /**
+     * Apply user role: route to correct dashboard and trigger appropriate flows.
+     * Student → Home Dashboard → Trigger Instrument Calibration
+     * Teacher → Studio Dashboard → Generate Studio Invite Link
+     * @param {string} role - 'student' or 'teacher'
+     * @private
+     */
+    _applyUserRole(role) {
+        if (!role) {
+            // Corrupted state: selected flag is set but role is missing.
+            // Re-show role selection or default to student view.
+            if (this.roleSelectionService) {
+                this.roleSelectionService.clearRole();
+            }
+            this._showRoleSelection();
+            return;
+        }
+
+        if (role === 'teacher') {
+            // Enable teacher mode and show studio dashboard
+            this.toggleTeacherMode(true);
+            const teacherToggle = document.getElementById('teacher-mode-toggle');
+            if (teacherToggle) {
+                teacherToggle.classList.add('active');
+                teacherToggle.setAttribute('aria-checked', 'true');
+            }
+            localStorage.setItem('teacher_mode', 'true');
+            this.showView('studio-dashboard-view');
+        } else if (role === 'student') {
+            // Show home dashboard (library) and trigger calibration if needed
+            this.showView('library-view');
+            if (this.onboardingService && !this.onboardingService.hasCompletedOnboarding) {
+                this.onboardingService.start();
+            }
+        }
+    }
+
     async initializeAudio() {
         this.audioEngine = new AudioEngine();
         this.audioEngine.onError = (error) => {
@@ -178,6 +627,16 @@ class ConcertmasterApp {
         };
 
         await this.audioEngine.init();
+    }
+
+    /**
+     * Initialize the Dashboard UI component
+     */
+    initDashboard() {
+        if (typeof DashboardUI !== 'undefined') {
+            this.dashboardUI = new DashboardUI(this);
+            this.dashboardUI.init();
+        }
     }
 
     setupNavigation() {
@@ -211,6 +670,44 @@ class ConcertmasterApp {
                 console.log('Toggle mobile menu');
             });
         }
+
+        // Dashboard quick-access card navigation
+        document.querySelectorAll('.dashboard-card[data-navigate]').forEach(card => {
+            const navigate = () => {
+                const target = card.dataset.navigate;
+                const viewId = target + '-view';
+                this.showView(viewId);
+
+                // Update mobile nav active state
+                document.querySelectorAll('.mobile-nav-link').forEach(l => {
+                    l.classList.remove('active');
+                    if (l.getAttribute('href') === '#' + target) {
+                        l.classList.add('active');
+                    }
+                });
+            };
+            card.addEventListener('click', navigate);
+            card.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    navigate();
+                }
+            });
+        });
+
+        // Hero resume practice button
+        const heroResumeBtn = document.getElementById('hero-resume-btn');
+        if (heroResumeBtn) {
+            heroResumeBtn.addEventListener('click', () => {
+                this.showView('practice-view');
+                document.querySelectorAll('.mobile-nav-link').forEach(l => {
+                    l.classList.remove('active');
+                    if (l.getAttribute('href') === '#practice') {
+                        l.classList.add('active');
+                    }
+                });
+            });
+        }
     }
 
     showView(viewId) {
@@ -233,6 +730,11 @@ class ConcertmasterApp {
         const targetView = document.getElementById(viewId);
         if (targetView) {
             targetView.classList.add('active');
+        }
+
+        // Refresh dashboard when navigating back to it
+        if (viewId === 'dashboard-view' && this.dashboardUI) {
+            this.dashboardUI.refresh();
         }
     }
 
@@ -306,10 +808,336 @@ class ConcertmasterApp {
             });
         });
 
-        // Library search
+        // Library search - Global search (local + IMSLP)
         document.getElementById('library-search-input')?.addEventListener('input', (e) => {
-            this.filterLibrary(e.target.value);
+            this.globalSearch(e.target.value);
         });
+
+        // Search source toggle (local only vs global)
+        document.getElementById('search-local-only')?.addEventListener('change', (e) => {
+            const query = document.getElementById('library-search-input').value;
+            this.globalSearch(query);
+        });
+
+        // Filter chips - Instrument
+        document.getElementById('instrument-chips')?.addEventListener('click', (e) => {
+            if (e.target.classList.contains('chip')) {
+                document.querySelectorAll('#instrument-chips .chip').forEach(c => c.classList.remove('active'));
+                e.target.classList.add('active');
+                this.applyFilters();
+            }
+        });
+
+        // Filter chips - Difficulty
+        document.getElementById('difficulty-chips')?.addEventListener('click', (e) => {
+            if (e.target.classList.contains('chip')) {
+                document.querySelectorAll('#difficulty-chips .chip').forEach(c => c.classList.remove('active'));
+                e.target.classList.add('active');
+                this.applyFilters();
+            }
+        });
+
+        // Composer filter dropdown
+        document.getElementById('composer-filter')?.addEventListener('change', (e) => {
+            this.applyFilters();
+        });
+
+        // Populate composer filter from library
+        this.populateComposerFilter();
+    }
+
+    /**
+     * Global search - queries both local library and IMSLP
+     */
+    async globalSearch(query) {
+        const searchLocalOnly = document.getElementById('search-local-only')?.checked ?? true;
+        const localResults = this.filterLibrary(query);
+
+        if (searchLocalOnly) {
+            this.renderLibrary(localResults);
+            return;
+        }
+
+        if (query && query.trim().length > 0) {
+            try {
+                const imslpResults = await this.searchIMSLP(query);
+                const allResults = [...localResults, ...imslpResults.map(item => ({
+                    ...item,
+                    isIMSLP: true
+                }))];
+                this.renderLibrary(allResults);
+            } catch (error) {
+                console.error('IMSLP search error:', error);
+                this.renderLibrary(localResults);
+            }
+        } else {
+            this.renderLibrary(localResults);
+        }
+    }
+
+    /**
+     * Search IMSLP database
+     */
+    async searchIMSLP(query) {
+        try {
+            const imslpClient = new IMSLPClient();
+            const results = await imslpClient.search(query);
+            return results.map(item => ({
+                id: item.id || item.scoreId,
+                title: item.title || item.compositionTitle,
+                composer: item.composer || 'Unknown',
+                instrument: item.instrument || 'violin',
+                difficulty: 3,
+                addedAt: new Date().toISOString(),
+                isIMSLP: true,
+                thumbnail: item.thumbnail || null,
+                source: 'IMSLP'
+            }));
+        } catch (error) {
+            console.error('IMSLP search failed:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Apply all filters (instrument, difficulty, composer)
+     */
+    applyFilters() {
+        const query = document.getElementById('library-search-input').value;
+        let results = this.scoreLibrary.scores;
+
+        if (query) {
+            results = this.scoreLibrary.search(query);
+        }
+
+        // Apply instrument filter
+        const activeInstrument = document.querySelector('#instrument-chips .chip.active');
+        const instrumentFilter = activeInstrument?.dataset.value || 'all';
+        if (instrumentFilter !== 'all') {
+            results = results.filter(score =>
+                score.instrument?.toLowerCase() === instrumentFilter.toLowerCase()
+            );
+        }
+
+        // Apply difficulty filter
+        const activeDifficulty = document.querySelector('#difficulty-chips .chip.active');
+        const difficultyFilter = activeDifficulty?.dataset.value || 'all';
+        if (difficultyFilter !== 'all') {
+            const diffLevel = parseInt(difficultyFilter);
+            results = results.filter(score => score.difficulty === diffLevel);
+        }
+
+        // Apply composer filter
+        const composerFilter = document.getElementById('composer-filter')?.value || 'all';
+        if (composerFilter !== 'all') {
+            results = results.filter(score =>
+                score.composer?.toLowerCase() === composerFilter.toLowerCase()
+            );
+        }
+
+        this.renderLibrary(results);
+    }
+
+    /**
+     * Populate composer filter dropdown from library
+     */
+    populateComposerFilter() {
+        const scores = this.scoreLibrary?.scores || [];
+        const composers = [...new Set(scores.map(s => s.composer).filter(Boolean))].sort();
+
+        const select = document.getElementById('composer-filter');
+        if (!select) return;
+
+        select.innerHTML = '<option value="all">All Composers</option>';
+        composers.forEach(composer => {
+            const option = document.createElement('option');
+            option.value = composer;
+            option.textContent = composer;
+            select.appendChild(option);
+        });
+    }
+
+    filterLibrary(query) {
+        return this.scoreLibrary.search(query);
+    }
+
+    /**
+     * Generate difficulty stars HTML
+     */
+    generateDifficultyStars(difficulty = 3) {
+        const stars = [];
+        for (let i = 1; i <= 5; i++) {
+            stars.push(`<span class="${i <= difficulty ? 'star-filled' : 'star-empty'}">★</span>`);
+        }
+        return stars.join('');
+    }
+
+    /**
+     * Format last practiced date
+     */
+    formatLastPracticed(dateString) {
+        if (!dateString) return 'Never practiced';
+        const date = new Date(dateString);
+        const now = new Date();
+        const diff = now - date;
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+        if (days === 0) return 'Today';
+        if (days === 1) return 'Yesterday';
+        if (days < 7) return `${days} days ago`;
+        if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+        return date.toLocaleDateString();
+    }
+
+    /**
+     * Render library - accepts optional scores array
+     */
+    renderLibrary(scores = null) {
+        const grid = document.getElementById('library-grid');
+        if (!grid) return;
+
+        const displayScores = scores !== null ? scores : this.scoreLibrary.scores;
+
+        if (displayScores.length === 0) {
+            grid.innerHTML = `
+                <div class="empty-state">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M9 18V5l12-2v13"/>
+                        <circle cx="6" cy="18" r="3"/>
+                        <circle cx="18" cy="16" r="3"/>
+                    </svg>
+                    <h3>No scores found</h3>
+                    <p>${scores !== null ? 'Try adjusting your filters' : 'Import sheet music to get started with practice'}</p>
+                </div>
+            `;
+            return;
+        }
+
+        grid.innerHTML = displayScores.map((score, index) => `
+            <div class="library-card ${score.isIMSLP ? 'imslp-card' : ''}" data-id="${score.id}" data-index="${index}" tabindex="0" role="option">
+                <div class="library-card-thumbnail">
+                    ${score.thumbnail ? `<img data-src="${score.thumbnail}" alt="" class="lazy-thumbnail" loading="lazy">` : `
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                    `}
+                    ${score.isIMSLP ? '<span class="imslp-badge">IMSLP</span>' : ''}
+                </div>
+                <h3 class="library-card-title">${score.title}</h3>
+                <p class="library-card-composer">${score.composer}</p>
+                <div class="library-card-meta">
+                    <span class="instrument-badge">${score.instrument || 'Violin'}</span>
+                    <span class="difficulty-stars">${this.generateDifficultyStars(score.difficulty)}</span>
+                    <button class="share-btn" data-id="${score.id}" title="Share score" aria-label="Share ${score.title}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="18" cy="5" r="3"/>
+                            <circle cx="6" cy="12" r="3"/>
+                            <circle cx="18" cy="19" r="3"/>
+                            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="library-card-stats">
+                    <span class="practice-count">${score.practiceCount || 0} practices</span>
+                    <span class="last-practiced">${this.formatLastPracticed(score.lastPracticed)}</span>
+                </div>
+            </div>
+        `).join('');
+
+        this.setupLazyLoading();
+
+        grid.querySelectorAll('.library-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                if (e.target.closest('.share-btn')) return;
+                const id = card.dataset.id;
+                const isIMSLP = card.classList.contains('imslp-card');
+                if (isIMSLP) {
+                    this.handleIMSLPCardClick(card, id);
+                } else {
+                    this.selectScore(id);
+                }
+            });
+        });
+
+        grid.querySelectorAll('.share-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const id = btn.dataset.id;
+                this.shareScore(id);
+            });
+        });
+    }
+
+    /**
+     * Handle IMSLP card click
+     */
+    async handleIMSLPCardClick(cardElement, imslpId) {
+        const confirmed = confirm('Add this IMSLP score to your local library?');
+        if (confirmed) {
+            alert('IMSLP download functionality - Score added to library!');
+        }
+    }
+
+    /**
+     * Share a score from the library
+     */
+    async shareScore(id) {
+        const score = this.scoreLibrary.scores.find(s => s.id === id);
+        if (!score) {
+            alert('Score not found');
+            return;
+        }
+
+        const shareData = {
+            title: score.title,
+            composer: score.composer,
+            instrument: score.instrument,
+            difficulty: score.difficulty
+        };
+
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: `${shareData.title} by ${shareData.composer}`,
+                    text: `Check out this sheet music: ${shareData.title}`,
+                    url: window.location.href
+                });
+                return;
+            } catch (err) {
+                console.log('Share cancelled:', err);
+            }
+        }
+
+        const shareText = `${shareData.title} by ${shareData.composer} (${shareData.instrument}, ${shareData.difficulty} stars)`;
+        try {
+            await navigator.clipboard.writeText(shareText);
+            alert('Score info copied to clipboard!');
+        } catch (err) {
+            prompt('Copy this to share:', shareText);
+        }
+    }
+
+    setupLazyLoading() {
+        if ('IntersectionObserver' in window) {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const img = entry.target.querySelector('.lazy-thumbnail');
+                        if (img && img.dataset.src) {
+                            img.src = img.dataset.src;
+                            img.classList.add('loaded');
+                            observer.unobserve(entry.target);
+                        }
+                    }
+                });
+            }, { rootMargin: '50px' });
+
+            document.querySelectorAll('.library-card').forEach(card => {
+                observer.observe(card);
+            });
+        }
     }
 
     setupPracticeControls() {
@@ -547,6 +1375,439 @@ class ConcertmasterApp {
             }
         } else {
             await this.upNextWidget.refresh();
+        }
+    }
+
+    // ============================================
+    // License Service
+    // ============================================
+
+    async initLicense() {
+        // Initialize license service
+        if (!this.licenseService) {
+            this.licenseService = new LicenseService(this.apiBaseUrl);
+            this.licenseService.init();
+        }
+
+        // Initialize license UI
+        if (!this.licenseUI) {
+            this.licenseUI = new StudioLicenseUI(
+                this.licenseService,
+                this.authService,
+                () => this.applyFeatureGating() // Callback to re-apply feature gating on license change
+            );
+            await this.licenseUI.init();
+        }
+
+        // Apply feature gating
+        this.applyFeatureGating();
+    }
+
+    /**
+     * Apply feature gating based on license status
+     */
+    applyFeatureGating() {
+        if (!this.licenseService) return;
+
+        // Feature gating for navigation and UI elements
+        const featuresToGate = [
+            { id: 'studioDashboard', selector: '.studio-nav-link' },
+            { id: 'aiCoach', selector: '#ai-coach-toggle, .ai-coach-section' },
+            { id: 'heatMap', selector: '#heatmap-btn' },
+            { id: 'omrScanner', selector: '#scan-music-btn' },
+            { id: 'communityLibrary', selector: '#library-upload-btn' },
+            { id: 'scaleEngine', selector: '#scale-engine-btn' },
+            { id: 'annotations', selector: '#annotation-toolbar' },
+            { id: 'teacherReports', selector: '#generate-report-btn' },
+            { id: 'videoSnippets', selector: '#video-snippet-btn' },
+            { id: 'bluetoothPedal', selector: '#bluetooth-pedal-toggle' },
+            { id: 'advancedDSP', selector: '.advanced-dsp-toggle' }
+        ];
+
+        featuresToGate.forEach(feature => {
+            const hasFeature = this.licenseService.hasFeature(feature.id);
+            document.querySelectorAll(feature.selector).forEach(el => {
+                // Only apply gating if element wasn't explicitly hidden by other code
+                // Use data attribute to track explicit hides vs license-gated hides
+                if (el.dataset.explicitHide === 'true') return;
+                el.style.display = hasFeature ? '' : 'none';
+            });
+        });
+
+        // Show/hide studio dashboard based on license
+        const tier = this.licenseService.getTier();
+        const studioNavLinks = document.querySelectorAll('.studio-nav-link');
+        studioNavLinks.forEach(link => {
+            // Show studio dashboard if pro/studio or teacher mode enabled
+            link.style.display = (tier === 'pro' || tier === 'studio' || this.isTeacherMode) ? '' : 'none';
+        });
+    }
+
+    // ============================================
+    // Video Snippet / Office Hours Drop
+    // ============================================
+
+    initVideoSnippets() {
+        // Video snippet button in practice view
+        const videoSnippetBtn = document.getElementById('video-snippet-btn');
+        const videoSnippetModal = document.getElementById('video-snippet-modal');
+        const videoSnippetClose = document.getElementById('video-snippet-close');
+        const cancelVideoBtn = document.getElementById('cancel-video-btn');
+        const submitVideoBtn = document.getElementById('submit-video-btn');
+        const startRecordBtn = document.getElementById('start-record-btn');
+        const videoPreview = document.getElementById('video-preview');
+        const videoOverlay = document.getElementById('video-overlay');
+        const recordingIndicator = document.getElementById('recording-indicator');
+        const recordingTime = document.getElementById('recording-time');
+        const videoForm = document.getElementById('video-form');
+        const snippetTitle = document.getElementById('snippet-title');
+        const snippetNotes = document.getElementById('snippet-notes');
+
+        // Teacher inbox elements
+        const teacherInboxModal = document.getElementById('teacher-inbox-modal');
+        const inboxClose = document.getElementById('inbox-close');
+        const inboxTabs = document.querySelectorAll('.inbox-tab');
+
+        // Video reply elements
+        const videoReplyModal = document.getElementById('video-reply-modal');
+        const replyClose = document.getElementById('reply-close');
+        const cancelReplyBtn = document.getElementById('cancel-reply-btn');
+        const sendReplyBtn = document.getElementById('send-reply-btn');
+        const replyTypeBtns = document.querySelectorAll('.reply-type-btn');
+        const replyText = document.getElementById('reply-text');
+        const voiceReplyRecorder = document.getElementById('voice-reply-recorder');
+        const voiceRecordBtn = document.getElementById('voice-record-btn');
+
+        let currentRecording = null;
+        let isRecording = false;
+
+        // Open video snippet modal
+        if (videoSnippetBtn && videoSnippetModal) {
+            videoSnippetBtn.addEventListener('click', async () => {
+                this.openModal(videoSnippetModal);
+                await this.startVideoPreview(videoPreview, videoOverlay, startRecordBtn);
+            });
+        }
+
+        // Close video snippet modal
+        const closeVideoModal = () => {
+            this.closeModal(videoSnippetModal);
+            this.stopVideoPreview();
+            resetVideoRecorder();
+        };
+
+        if (videoSnippetClose) videoSnippetClose.addEventListener('click', closeVideoModal);
+        if (cancelVideoBtn) cancelVideoBtn.addEventListener('click', closeVideoModal);
+
+        // Start recording
+        if (startRecordBtn) {
+            startRecordBtn.addEventListener('click', async () => {
+                if (!window.videoSnippetService) {
+                    this.showToast('Video service not available', 'error');
+                    return;
+                }
+
+                try {
+                    await window.videoSnippetService.requestPermissions();
+                    window.videoSnippetService.startRecording(videoPreview);
+                    isRecording = true;
+
+                    videoOverlay.style.display = 'none';
+                    recordingIndicator.style.display = 'flex';
+
+                    // Update time display
+                    window.videoSnippetService.onTimeUpdate = (elapsed, max) => {
+                        recordingTime.textContent = `0:${elapsed.toString().padStart(2, '0')} / 0:${max.toString().padStart(2, '0')}`;
+                    };
+
+                    // Handle recording complete
+                    window.videoSnippetService.onRecordingComplete = (recording) => {
+                        currentRecording = recording;
+                        videoForm.style.display = 'block';
+                        submitVideoBtn.style.display = 'inline-block';
+                    };
+                } catch (error) {
+                    this.showToast('Failed to start recording: ' + error.message, 'error');
+                }
+            });
+        }
+
+        // Submit video
+        if (submitVideoBtn) {
+            submitVideoBtn.addEventListener('click', async () => {
+                if (!currentRecording) return;
+
+                try {
+                    const studentId = localStorage.getItem('user_id') || 'student-1';
+                    const studentName = localStorage.getItem('user_name') || 'Student';
+
+                    await window.videoSnippetService.submitSnippet({
+                        studentId,
+                        studentName,
+                        videoData: currentRecording.videoData,
+                        thumbnail: currentRecording.thumbnail,
+                        duration: currentRecording.duration,
+                        title: snippetTitle.value,
+                        notes: snippetNotes.value
+                    });
+
+                    this.showToast('Video sent to teacher!', 'success');
+                    closeVideoModal();
+                } catch (error) {
+                    this.showToast('Failed to send video: ' + error.message, 'error');
+                }
+            });
+        }
+
+        // Reset video recorder
+        const resetVideoRecorder = () => {
+            currentRecording = null;
+            isRecording = false;
+            videoOverlay.style.display = 'flex';
+            recordingIndicator.style.display = 'none';
+            videoForm.style.display = 'none';
+            submitVideoBtn.style.display = 'none';
+            snippetTitle.value = '';
+            snippetNotes.value = '';
+            recordingTime.textContent = '0:00 / 0:15';
+        };
+
+        // Teacher inbox tab switching
+        inboxTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                inboxTabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+
+                const tabName = tab.dataset.tab;
+                document.getElementById('inbox-received').style.display = tabName === 'received' ? 'block' : 'none';
+                document.getElementById('inbox-sent').style.display = tabName === 'sent' ? 'block' : 'none';
+            });
+        });
+
+        // Close inbox modal
+        if (inboxClose) {
+            inboxClose.addEventListener('click', () => this.closeModal(teacherInboxModal));
+        }
+
+        // Close reply modal
+        if (replyClose) {
+            replyClose.addEventListener('click', () => this.closeModal(videoReplyModal));
+        }
+        if (cancelReplyBtn) {
+            cancelReplyBtn.addEventListener('click', () => this.closeModal(videoReplyModal));
+        }
+
+        // Reply type switching
+        let currentReplyType = 'text';
+        let currentSnippetId = null;
+        let voiceRecordingData = null;
+
+        replyTypeBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                replyTypeBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                const type = btn.dataset.type;
+                currentReplyType = type;
+                if (type === 'text') {
+                    replyText.style.display = 'block';
+                    voiceReplyRecorder.style.display = 'none';
+                } else {
+                    replyText.style.display = 'none';
+                    voiceReplyRecorder.style.display = 'flex';
+                }
+            });
+        });
+
+        // Send reply
+        if (sendReplyBtn) {
+            sendReplyBtn.addEventListener('click', async () => {
+                if (!currentSnippetId) {
+                    this.showToast('No snippet selected', 'error');
+                    return;
+                }
+
+                try {
+                    let replyTextValue = null;
+                    let replyVoiceDataValue = null;
+
+                    if (currentReplyType === 'text') {
+                        replyTextValue = replyText.value.trim();
+                        if (!replyTextValue) {
+                            this.showToast('Please enter a reply', 'error');
+                            return;
+                        }
+                    } else {
+                        replyVoiceDataValue = voiceRecordingData;
+                        if (!replyVoiceDataValue) {
+                            this.showToast('Please record a voice note', 'error');
+                            return;
+                        }
+                    }
+
+                    await window.videoSnippetService.submitReply(
+                        currentSnippetId,
+                        replyTextValue,
+                        replyVoiceDataValue,
+                        currentReplyType
+                    );
+
+                    this.showToast('Reply sent!', 'success');
+                    this.closeModal(videoReplyModal);
+                    replyText.value = '';
+                    voiceRecordingData = null;
+                    currentSnippetId = null;
+
+                    // Refresh inbox
+                    this.loadTeacherInbox();
+                } catch (error) {
+                    this.showToast('Failed to send reply: ' + error.message, 'error');
+                }
+            });
+        }
+
+        // Load teacher inbox data
+        this.loadTeacherInbox = async () => {
+            try {
+                const response = await window.videoSnippetService.getAllSnippets();
+                this.renderTeacherInbox(response.snippets);
+            } catch (error) {
+                console.error('Failed to load inbox:', error);
+            }
+        };
+
+        // Render teacher inbox
+        this.renderTeacherInbox = (snippets) => {
+            const receivedList = document.getElementById('received-snippets-list');
+            if (!receivedList) return;
+
+            receivedList.innerHTML = '';
+
+            if (snippets.length === 0) {
+                document.getElementById('inbox-empty-received').style.display = 'block';
+                return;
+            }
+
+            document.getElementById('inbox-empty-received').style.display = 'none';
+
+            snippets.forEach(snippet => {
+                const item = document.createElement('div');
+                item.className = 'inbox-item';
+                item.innerHTML = `
+                    <img class="inbox-item-thumb" src="${snippet.thumbnail || ''}" alt="">
+                    <div class="inbox-item-info">
+                        <div class="inbox-item-title">${snippet.title || 'Untitled'}</div>
+                        <div class="inbox-item-meta">
+                            ${snippet.studentName}
+                            <span class="inbox-item-status ${snippet.status}">${snippet.status}</span>
+                        </div>
+                    </div>
+                `;
+                item.addEventListener('click', () => this.openReplyModal(snippet));
+                receivedList.appendChild(item);
+            });
+        };
+
+        // Open reply modal
+        this.openReplyModal = (snippet) => {
+            currentSnippetId = snippet.id;
+            const videoPlayer = document.getElementById('reply-video-player');
+            if (videoPlayer && snippet.videoData) {
+                // Convert base64 to blob URL
+                const blob = this.base64ToBlob(snippet.videoData, 'video/webm');
+                videoPlayer.src = URL.createObjectURL(blob);
+            }
+            this.openModal(videoReplyModal);
+        };
+
+        // Convert base64 to blob
+        this.base64ToBlob = (base64, mimeType) => {
+            const byteCharacters = atob(base64.split(',')[1]);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            return new Blob([byteArray], { type: mimeType });
+        };
+
+        // Load student's sent snippets
+        this.loadStudentSnippets = async () => {
+            try {
+                const studentId = localStorage.getItem('user_id') || 'student-1';
+                const response = await window.videoSnippetService.getSnippets(studentId);
+                this.renderStudentSnippets(response.snippets);
+            } catch (error) {
+                console.error('Failed to load student snippets:', error);
+            }
+        };
+
+        // Render student sent snippets
+        this.renderStudentSnippets = (snippets) => {
+            const sentList = document.getElementById('sent-snippets-list');
+            if (!sentList) return;
+
+            sentList.innerHTML = '';
+
+            if (snippets.length === 0) {
+                document.getElementById('inbox-empty-sent').style.display = 'block';
+                return;
+            }
+
+            document.getElementById('inbox-empty-sent').style.display = 'none';
+
+            snippets.forEach(snippet => {
+                const card = document.createElement('div');
+                card.className = 'sent-snippet-card';
+
+                const hasReply = snippet.teacherReply && snippet.teacherReply.length > 0;
+
+                card.innerHTML = `
+                    <img class="sent-snippet-thumb" src="${snippet.thumbnail || ''}" alt="">
+                    <div class="sent-snippet-info">
+                        <div class="sent-snippet-title">${snippet.title || 'Untitled'}</div>
+                        <div class="sent-snippet-meta">
+                            ${new Date(snippet.submittedAt).toLocaleDateString()}
+                            <span class="sent-snippet-status ${snippet.status}">${snippet.status}</span>
+                        </div>
+                        ${hasReply ? `<div class="sent-snippet-reply">${snippet.replyType === 'voice' ? 'Voice reply received' : snippet.teacherReply}</div>` : ''}
+                    </div>
+                `;
+                sentList.appendChild(card);
+            });
+        };
+
+        // Listen for tab changes to load student snippets
+        inboxTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                if (tab.dataset.tab === 'sent') {
+                    this.loadStudentSnippets();
+                }
+            });
+        });
+    }
+
+    async startVideoPreview(videoElement, overlay, startBtn) {
+        if (!window.videoSnippetService) return;
+
+        try {
+            await window.videoSnippetService.requestPermissions();
+            const stream = window.videoSnippetService.getStream();
+            if (videoElement && stream) {
+                videoElement.srcObject = stream;
+                videoElement.play();
+            }
+            if (overlay && startBtn) {
+                overlay.style.display = 'flex';
+            }
+        } catch (error) {
+            this.showToast('Camera access denied', 'error');
+        }
+    }
+
+    stopVideoPreview() {
+        if (window.videoSnippetService) {
+            window.videoSnippetService.stopPreview();
         }
     }
 
@@ -907,6 +2168,11 @@ class ConcertmasterApp {
             sheetContainer.classList.remove('session-ended');
         }
 
+        // Set annotation score ID for cloud sync
+        if (this.annotationService) {
+            this.annotationService.setScoreId(score.id || score.title);
+        }
+
         // Set up performance comparator with the score
         this.performanceComparator.setScore(score);
 
@@ -1011,22 +2277,14 @@ class ConcertmasterApp {
             </svg>
         `;
 
-        // Reset analyzers before starting capture so the first frame sees clean state
-        this.rhythmAnalyzer.reset();
-        this.intonationAnalyzer.reset();
-        this.dynamicsComparator.reset();
-        this.sessionLogger.clear();
-        this.sessionLogger.startSession(this.currentScore ? this.currentScore.id || 'unknown' : 'unknown');
-
-        // Load score dynamics/articulation data for comparison
-        if (this.currentScore) {
-            this.dynamicsComparator.loadScore(this.currentScore);
-        }
-
-        // Start audio processing (after reset so first frame has correct state)
+        // Start audio processing
         this.audioEngine.startCapture((data) => {
             this.processAudio(data);
         }, 50);
+
+        // Reset analyzers for new session
+        this.rhythmAnalyzer.reset();
+        this.intonationAnalyzer.reset();
 
         this.showToast('Practice started - play your instrument', 'success');
     }
@@ -1117,56 +2375,6 @@ class ConcertmasterApp {
                         const rhythmScore = this.rhythmAnalyzer.calculateOverallTiming();
                         this.intonationAnalyzer.recordRhythmScore(rhythmScore);
 
-                        // Dynamics & articulation analysis
-                        const beat = comparison.expectedNote?.position?.beat || 0;
-                        const dynResult = this.dynamicsComparator.processAudioFrame(
-                            data.level, measure, beat, noteTimestamp
-                        );
-                        this.intonationAnalyzer.recordDynamicsScore(dynResult.combinedScore);
-
-                        // Forward dynamics deviation to session logger
-                        if (Math.abs(dynResult.dynamicDeviation) >= 2 || !dynResult.directionMatch) {
-                            this.sessionLogger.logDynamicsDeviation({
-                                measure,
-                                beat,
-                                expectedDynamic: dynResult.expectedDynamic,
-                                actualDynamic: dynResult.actualDynamic,
-                                deviation: dynResult.dynamicDeviation,
-                                expectedDirection: dynResult.expectedDirection,
-                                actualTrend: dynResult.trend
-                            });
-                        }
-
-                        // Analyze attack envelope for articulation
-                        const attackInfo = this.dynamicsComparator.volumeAnalyzer.analyzeAttack(data.timeData, data.sampleRate);
-                        const expectedDuration = comparison.expectedNote ? comparison.expectedNote.duration * (60000 / (this.currentScore?.tempo || 120)) : 500;
-                        // Use gap since previous note onset as actual duration, fall back to expected
-                        const onsets = this.rhythmAnalyzer.noteOnsets;
-                        const prevOnset = onsets.length >= 2 ? onsets[onsets.length - 2] : null;
-                        const actualDuration = (prevOnset && noteTimestamp > prevOnset) ? noteTimestamp - prevOnset : expectedDuration;
-                        const artResult = this.dynamicsComparator.processNoteArticulation({
-                            timestamp: noteTimestamp,
-                            attackTime: attackInfo.attackTime,
-                            peakAmplitude: attackInfo.peakAmplitude,
-                            decayRate: attackInfo.decayRate,
-                            duration: actualDuration,
-                            expectedDuration: expectedDuration,
-                            measure: measure
-                        }, measure, beat);
-                        this.intonationAnalyzer.recordArticulationScore(artResult.score);
-
-                        // Forward articulation deviation to session logger
-                        if (artResult.expected && !artResult.match) {
-                            this.sessionLogger.logArticulationDeviation({
-                                measure,
-                                beat,
-                                expectedArticulation: artResult.expected,
-                                detectedArticulation: artResult.detected,
-                                score: artResult.score,
-                                feedback: artResult.feedback
-                            });
-                        }
-
                         // Store in session data
                         if (this.sessionData) {
                             this.sessionData.pitchAccuracy.push(accuracy);
@@ -1177,9 +2385,7 @@ class ConcertmasterApp {
                                 measure: measure,
                                 accuracy: accuracy,
                                 rhythmScore: rhythmScore,
-                                matched: comparison.matched,
-                                dynamicsScore: dynResult.combinedScore,
-                                articulationScore: artResult.score
+                                matched: comparison.matched
                             });
                         }
 

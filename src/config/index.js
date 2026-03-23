@@ -16,7 +16,7 @@ if (!jwtSecret) {
 }
 
 module.exports = {
-  port: process.env.PORT || 3000,
+  port: process.env.PORT || 3001,
   nodeEnv,
   cors: {
     origin: parseCorsOrigins(process.env.CORS_ORIGIN),
@@ -29,5 +29,8 @@ module.exports = {
     secret: jwtSecret,
     expiresIn: process.env.JWT_EXPIRES_IN || '1h',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+  },
+  app: {
+    baseUrl: process.env.APP_BASE_URL || 'http://localhost:3001',
   },
 };

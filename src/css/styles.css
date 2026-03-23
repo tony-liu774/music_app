@@ -1539,6 +1539,221 @@ a:hover {
     margin-right: var(--space-2);
 }
 
+/* Camera Alignment Guide */
+.camera-guide-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-deep);
+    opacity: 0.95;
+}
+
+.camera-guide-frame {
+    position: relative;
+    width: 90%;
+    max-width: 600px;
+    aspect-ratio: 8.5 / 11;
+    border: 3px solid var(--primary);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 0 40px var(--primary-glow);
+    overflow: hidden;
+}
+
+.camera-guide-corner {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    border-style: solid;
+    border-width: 4px;
+    border-color: var(--primary);
+}
+
+.camera-guide-corner.top-left {
+    top: -3px;
+    left: -3px;
+    border-top-left-radius: var(--radius-lg);
+}
+
+.camera-guide-corner.top-right {
+    top: -3px;
+    right: -3px;
+    border-top-right-radius: var(--radius-lg);
+}
+
+.camera-guide-corner.bottom-left {
+    bottom: -3px;
+    left: -3px;
+    border-bottom-left-radius: var(--radius-lg);
+}
+
+.camera-guide-corner.bottom-right {
+    bottom: -3px;
+    right: -3px;
+    border-bottom-right-radius: var(--radius-lg);
+}
+
+.camera-guide-grid {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+}
+
+.camera-guide-h-line {
+    position: absolute;
+    left: 8%;
+    right: 8%;
+    height: 1px;
+    background: var(--primary);
+    opacity: 0.25;
+}
+
+.camera-guide-h-line.center {
+    top: 50%;
+}
+
+.camera-guide-h-line.third-1 {
+    top: 33.33%;
+}
+
+.camera-guide-h-line.third-2 {
+    top: 66.66%;
+}
+
+.camera-guide-v-line {
+    position: absolute;
+    top: 8%;
+    bottom: 8%;
+    width: 1px;
+    background: var(--primary);
+    opacity: 0.25;
+}
+
+.camera-guide-v-line.center {
+    left: 50%;
+}
+
+.camera-guide-v-line.third-1 {
+    left: 33.33%;
+}
+
+.camera-guide-v-line.third-2 {
+    left: 66.66%;
+}
+
+.camera-guide-instruction {
+    position: absolute;
+    bottom: 160px;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    color: var(--text-primary);
+    font-size: var(--text-sm);
+    background: var(--bg-deep);
+    padding: var(--space-3) var(--space-5);
+    border-radius: var(--radius-md);
+    max-width: 80%;
+    border: 1px solid var(--border);
+    opacity: 0.9;
+}
+
+.camera-guide-instruction svg {
+    display: block;
+    margin: 0 auto var(--space-2);
+    width: 24px;
+    height: 24px;
+    color: var(--primary);
+}
+
+.camera-guide-buttons {
+    position: fixed;
+    bottom: 40px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    gap: var(--space-4);
+    padding: 0 var(--space-6);
+}
+
+.camera-guide-buttons .btn {
+    padding: var(--space-4) var(--space-6);
+    font-size: var(--text-base);
+}
+
+/* Scanner Quality Warning */
+.scanner-quality-warning {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    background: var(--error);
+    opacity: 0.15;
+    border: 1px solid var(--error);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-4);
+    color: var(--error);
+    font-size: var(--text-sm);
+}
+
+.scanner-quality-warning svg {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+/* Coordinate Mapping Debug (development only) */
+.coordinate-debug {
+    position: fixed;
+    bottom: var(--space-4);
+    right: var(--space-4);
+    background: rgba(10, 10, 18, 0.9);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--space-3);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+    max-width: 200px;
+    z-index: 1000;
+}
+
+.coordinate-debug.hidden {
+    display: none;
+}
+
+.coordinate-debug-title {
+    color: var(--primary);
+    font-weight: 600;
+    margin-bottom: var(--space-2);
+}
+
+/* Camera Guide Video */
+.camera-guide-video {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    max-width: 100%;
+    max-height: 100%;
+}
+
+/* Camera Guide Capture Icon */
+.camera-guide-capture-icon {
+    width: 20px;
+    height: 20px;
+    margin-right: var(--space-2);
+}
+
 /* Import Options */
 .import-options {
     display: grid;

@@ -84,7 +84,8 @@ class SessionLogger {
             measure: measure || 1,
             from_note: fromNote || '?',
             to_note: toNote || '?',
-            transition_quality: Math.round(transitionQuality || 100),
+            // Use nullish coalescing to allow 0 as valid score
+            transition_quality: Math.round(transitionQuality ?? 100),
             issue: issue || 'none',
             timestamp: Date.now() - (this.startTime || Date.now())
         };
@@ -142,10 +143,38 @@ class SessionLogger {
     }
 
     /**
+     * Log a tone quality deviation
+     * @param {Object} params - Deviation parameters
+     * @param {number} params.measure - Measure number
+     * @param {string} params.note - Note name
+     * @param {number} params.qualityScore - Overall quality score 0-100
+     * @param {number} params.purityScore - Harmonic purity score 0-100
+     * @param {number} params.harshnessScore - Harshness score 0-100
+     * @param {boolean} params.wolfToneDetected - Whether a wolf tone was detected
+     * @param {number} params.wolfToneFrequency - Wolf tone frequency if detected
+     */
+    logToneQualityDeviation({ measure, note, qualityScore, purityScore, harshnessScore, wolfToneDetected, wolfToneFrequency }) {
+        const deviation = {
+            type: 'tone_quality',
+            measure: measure || 1,
+            note: note || '?',
+            // Use nullish coalescing to allow 0 as valid score
+            quality_score: Math.round(qualityScore ?? 50),
+            purity_score: Math.round(purityScore ?? 50),
+            harshness_score: Math.round(harshnessScore ?? 50),
+            wolf_tone_detected: wolfToneDetected || false,
+            wolf_tone_frequency: wolfToneFrequency || null,
+            timestamp: Date.now() - (this.startTime || Date.now())
+        };
+        this.deviations.push(deviation);
+    }
+
+    /**
      * Get the complete session log in JSON format
      * @returns {Object} Complete session log
      */
     getSessionLog() {
+        const toneQualityDevs = this.deviations.filter(d => d.type === 'tone_quality');
         return {
             session_id: this.sessionId,
             start_time: this.startTime,
@@ -157,6 +186,10 @@ class SessionLogger {
             intonation_deviations: this.deviations.filter(d => d.type === 'intonation').length,
             dynamics_deviations: this.deviations.filter(d => d.type === 'dynamics').length,
             articulation_deviations: this.deviations.filter(d => d.type === 'articulation').length,
+            tone_quality_deviations: toneQualityDevs.length,
+            tone_quality_average: toneQualityDevs.length > 0
+                ? Math.round(toneQualityDevs.reduce((sum, d) => sum + d.quality_score, 0) / toneQualityDevs.length)
+                : null,
             deviations: this.deviations
         };
     }
@@ -171,6 +204,7 @@ class SessionLogger {
         const intDevs = this.deviations.filter(d => d.type === 'intonation');
         const dynDevs = this.deviations.filter(d => d.type === 'dynamics');
         const artDevs = this.deviations.filter(d => d.type === 'articulation');
+        const toneDevs = this.deviations.filter(d => d.type === 'tone_quality');
 
         const avgPitchDev = pitchDevs.length > 0
             ? pitchDevs.reduce((sum, d) => sum + Math.abs(d.deviation_cents), 0) / pitchDevs.length
@@ -187,6 +221,16 @@ class SessionLogger {
         const avgArtScore = artDevs.length > 0
             ? artDevs.reduce((sum, d) => sum + (d.score || 0), 0) / artDevs.length
             : 100;
+
+        const avgToneQuality = toneDevs.length > 0
+            ? toneDevs.reduce((sum, d) => sum + d.quality_score, 0) / toneDevs.length
+            : 0;
+
+        const avgPurity = toneDevs.length > 0
+            ? toneDevs.reduce((sum, d) => sum + d.purity_score, 0) / toneDevs.length
+            : 0;
+
+        const wolfToneCount = toneDevs.filter(d => d.wolf_tone_detected).length;
 
         // Find most problematic measures
         const measureErrors = {};
@@ -209,10 +253,14 @@ class SessionLogger {
             intonation_deviation_count: intDevs.length,
             dynamics_deviation_count: dynDevs.length,
             articulation_deviation_count: artDevs.length,
+            tone_quality_deviation_count: toneDevs.length,
             average_pitch_deviation_cents: Math.round(avgPitchDev),
             average_rhythm_deviation_ms: Math.round(avgRhythmDev),
             average_dynamics_deviation: Math.round(avgDynDev * 10) / 10,
             average_articulation_score: Math.round(avgArtScore),
+            average_tone_quality_score: Math.round(avgToneQuality),
+            average_purity_score: Math.round(avgPurity),
+            wolf_tone_count: wolfToneCount,
             problem_measures: problemMeasures,
             worst_measure: problemMeasures.length > 0 ? problemMeasures[0].measure : null
         };

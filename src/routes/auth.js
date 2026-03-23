@@ -238,6 +238,64 @@ router.post('/logout', (req, res) => {
     res.json({ message: 'Logged out' });
 });
 
+/**
+ * POST /api/auth/role
+ * Set the user's role (student or teacher). One-time only — rejects if role already set.
+ * Requires authentication via authMiddleware.
+ */
+router.post('/role', authRateLimiter, authMiddleware, (req, res) => {
+    const { role } = req.body;
+    if (!role || (role !== 'student' && role !== 'teacher')) {
+        return res.status(400).json({ error: 'Role must be "student" or "teacher"' });
+    }
+
+    // Find the user
+    let foundUser = null;
+    for (const user of users.values()) {
+        if (user.id === req.user.id) {
+            foundUser = user;
+            break;
+        }
+    }
+
+    if (!foundUser) {
+        return res.status(404).json({ error: 'User not found' });
+    }
+
+    // One-time enforcement: reject if role already set
+    if (foundUser.role) {
+        return res.status(409).json({ error: 'Role already set' });
+    }
+
+    foundUser.role = role;
+
+    res.json({
+        message: 'Role updated successfully',
+        role: foundUser.role
+    });
+});
+
+/**
+ * GET /api/auth/role
+ * Get the current user's role.
+ * Requires authentication via authMiddleware.
+ */
+router.get('/role', authRateLimiter, authMiddleware, (req, res) => {
+    let foundUser = null;
+    for (const user of users.values()) {
+        if (user.id === req.user.id) {
+            foundUser = user;
+            break;
+        }
+    }
+
+    if (!foundUser) {
+        return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ role: foundUser.role || null });
+});
+
 module.exports = router;
 module.exports.authMiddleware = authMiddleware;
 module.exports.users = users;

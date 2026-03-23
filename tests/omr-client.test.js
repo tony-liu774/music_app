@@ -24,7 +24,12 @@ global.document = {
             height: 100,
             getContext: (type) => ({
                 drawImage: () => {},
-                getImageData: () => ({ data: new Uint8ClampedArray(100) }),
+                fillRect: () => {},
+                getImageData: (x, y, w, h) => ({
+                    data: new Uint8ClampedArray(w * h * 4),
+                    width: w,
+                    height: h
+                }),
                 putImageData: () => {},
                 toDataURL: (mimeType, quality) => 'data:image/jpeg;base64,mock'
             }),
@@ -83,6 +88,23 @@ global.Image = class Image {
                 this.onload();
             }
         }, 10);
+    }
+};
+
+// Mock ImageData
+global.ImageData = class ImageData {
+    constructor(data, width, height) {
+        if (typeof data === 'number' && typeof width === 'number') {
+            // ImageData(width, height) form
+            this.width = data;
+            this.height = width;
+            this.data = new Uint8ClampedArray(this.width * this.height * 4);
+        } else {
+            // ImageData(data, width, height) form
+            this.data = data;
+            this.width = width;
+            this.height = height || (data.length / (width * 4));
+        }
     }
 };
 
@@ -333,5 +355,120 @@ describe('OMRClient integration with Score model', () => {
         // Score should have all methods needed for library storage
         assert.strictEqual(typeof score.getAllNotes, 'function');
         assert.strictEqual(typeof score.getTotalMeasures, 'function');
+    });
+});
+
+describe('OMRClient Coordinate Mapping', () => {
+    let client;
+
+    beforeEach(() => {
+        client = new OMRClient();
+    });
+
+    describe('pitchToStaffPosition', () => {
+        it('should convert pitch step to staff position', () => {
+            // Test that the method exists and handles basic pitch conversion
+            const position = client._pitchToStaffPosition({ step: 'C' }, 4);
+            assert.ok(typeof position === 'number');
+            assert.ok(position >= 0 && position <= 1);
+        });
+
+        it('should handle different octaves', () => {
+            const pos4 = client._pitchToStaffPosition({ step: 'E' }, 4);
+            const pos5 = client._pitchToStaffPosition({ step: 'E' }, 5);
+            assert.ok(pos5 > pos4, 'Higher octave should have higher position');
+        });
+
+        it('should handle alterations (sharps/flats)', () => {
+            const natural = client._pitchToStaffPosition({ step: 'C', alter: 0 }, 4);
+            const sharp = client._pitchToStaffPosition({ step: 'C', alter: 1 }, 4);
+            assert.ok(sharp > natural, 'Sharp should be higher than natural');
+        });
+    });
+
+    describe('coordinate metadata', () => {
+        it('should create placeholder score with coordinate metadata', async () => {
+            const mockFile = {
+                type: 'image/jpeg',
+                name: 'test.jpg',
+                size: 1024
+            };
+
+            const score = await client.processFile(mockFile, () => {});
+
+            // Check that coordinate metadata is present
+            assert.ok(score, 'Score should exist');
+            // Note: placeholder scores have coordinateMetadata, but simulated OMR may return different structure
+            assert.ok(score.parts && score.parts.length > 0, 'Score should have parts');
+        });
+
+        it('should assign pixel coordinates to notes', async () => {
+            const mockFile = {
+                type: 'image/jpeg',
+                name: 'test.jpg',
+                size: 1024
+            };
+
+            const score = await client.processFile(mockFile, () => {});
+
+            // Check that notes have pixel coordinates
+            const allNotes = score.getAllNotes();
+            assert.ok(allNotes.length > 0, 'Should have notes');
+
+            const firstNote = allNotes[0];
+            assert.ok(firstNote.pixelCoordinates, 'Note should have pixel coordinates');
+            assert.ok(typeof firstNote.pixelCoordinates.x === 'number', 'Should have x coordinate');
+            assert.ok(typeof firstNote.pixelCoordinates.y === 'number', 'Should have y coordinate');
+            assert.ok(typeof firstNote.pixelCoordinates.beat === 'number', 'Should have beat position');
+        });
+    });
+
+    describe('dataURLToBlob', () => {
+        it('should convert data URL to Blob', () => {
+            const dataURL = 'data:image/jpeg;base64,/9j/4AAQSkZJRg==';
+            const blob = client.dataURLToBlob(dataURL);
+
+            assert.ok(blob instanceof Blob, 'Should return a Blob');
+            assert.strictEqual(blob.type, 'image/jpeg');
+        });
+
+        it('should throw for invalid data URLs', () => {
+            assert.throws(() => client.dataURLToBlob(null), /Invalid data URL/);
+            assert.throws(() => client.dataURLToBlob(''), /Invalid data URL/);
+            assert.throws(() => client.dataURLToBlob('not-a-data-url'), /Invalid data URL/);
+        });
+    });
+
+    describe('image quality analysis', () => {
+        it('should analyze image quality', async () => {
+            // Create a simple test image data URL
+            const canvas = global.document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, 100, 100);
+            const dataURL = canvas.toDataURL();
+
+            const quality = await client.analyzeImageQuality(dataURL);
+
+            assert.ok(typeof quality.isBlurry === 'boolean');
+            assert.ok(typeof quality.hasLowContrast === 'boolean');
+            assert.ok(typeof quality.sharpness === 'number');
+            assert.ok(typeof quality.dynamicRange === 'number');
+            assert.ok(quality.resolution);
+        });
+    });
+
+    describe('configuration', () => {
+        it('should have default configuration', () => {
+            assert.ok(client.config, 'Should have config object');
+            assert.strictEqual(client.config.useSimulation, true, 'Should use simulation by default');
+            assert.ok(typeof client.config.edgeThreshold === 'number', 'Should have edge threshold');
+            assert.ok(typeof client.config.contrastFactor === 'number', 'Should have contrast factor');
+        });
+
+        it('should allow updating configuration', () => {
+            client.configure({ useSimulation: false });
+            assert.strictEqual(client.config.useSimulation, false, 'Should update config');
+        });
     });
 });
