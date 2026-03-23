@@ -1,14 +1,18 @@
 /**
  * Onboarding Service - First-time user flow for permissions and instrument calibration
+ * Integrates with InstrumentStore for global state management.
  */
 
 class OnboardingService {
-    constructor() {
+    constructor(store) {
+        this.store = store || (typeof window !== 'undefined' && window.instrumentStore) || null;
         this.currentStep = 0;
         this.steps = ['welcome', 'permissions', 'instrument', 'calibration', 'complete'];
         this.selectedInstrument = null;
         this.microphoneGranted = false;
+        this.microphoneDenied = false;
         this.cameraGranted = false;
+        this.cameraDenied = false;
         this.calibrationComplete = false;
         this.onStepChange = null;
         this.onComplete = null;
@@ -121,10 +125,18 @@ class OnboardingService {
             // Stop the stream immediately - we just wanted permission
             stream.getTracks().forEach(track => track.stop());
             this.microphoneGranted = true;
+            this.microphoneDenied = false;
+            if (this.store) {
+                this.store.setMicrophoneGranted(true);
+            }
             return true;
         } catch (error) {
             console.error('Microphone permission denied:', error);
             this.microphoneGranted = false;
+            this.microphoneDenied = true;
+            if (this.store) {
+                this.store.setMicrophoneGranted(false);
+            }
             return false;
         }
     }
@@ -140,10 +152,18 @@ class OnboardingService {
             });
             stream.getTracks().forEach(track => track.stop());
             this.cameraGranted = true;
+            this.cameraDenied = false;
+            if (this.store) {
+                this.store.setCameraGranted(true);
+            }
             return true;
         } catch (error) {
             console.error('Camera permission denied:', error);
             this.cameraGranted = false;
+            this.cameraDenied = true;
+            if (this.store) {
+                this.store.setCameraGranted(false);
+            }
             return false;
         }
     }
@@ -163,7 +183,15 @@ class OnboardingService {
     }
 
     /**
-     * Set selected instrument
+     * Check if microphone access is required but denied
+     * @returns {boolean}
+     */
+    isMicrophoneBlocked() {
+        return this.microphoneDenied && !this.microphoneGranted;
+    }
+
+    /**
+     * Set selected instrument and sync to global store
      * @param {string} instrument - Instrument key
      */
     selectInstrument(instrument) {
@@ -174,6 +202,10 @@ class OnboardingService {
                 localStorage.setItem('selected_instrument', instrument);
             } catch (e) {
                 console.warn('Could not save instrument to localStorage');
+            }
+            // Sync to global store
+            if (this.store) {
+                this.store.setInstrument(instrument);
             }
         }
     }
@@ -211,13 +243,17 @@ class OnboardingService {
     }
 
     /**
-     * Finish onboarding
+     * Finish onboarding and sync state to store
      */
     finishOnboarding() {
         try {
             localStorage.setItem('onboarding_complete', 'true');
         } catch (e) {
             console.warn('Could not save onboarding status');
+        }
+
+        if (this.store) {
+            this.store.setOnboardingComplete(true);
         }
 
         if (this.onComplete) {
@@ -252,6 +288,9 @@ class OnboardingService {
         this.hasCompletedOnboarding = false;
         this.selectedInstrument = null;
         this.currentStep = 0;
+        if (this.store) {
+            this.store.reset();
+        }
     }
 
     /**
@@ -279,4 +318,10 @@ class OnboardingService {
     }
 }
 
-window.OnboardingService = OnboardingService;
+if (typeof window !== 'undefined') {
+    window.OnboardingService = OnboardingService;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { OnboardingService };
+}

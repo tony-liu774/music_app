@@ -1,6 +1,7 @@
 /**
  * Onboarding UI Component
- * Handles first-run user experience for permissions and instrument calibration
+ * Handles first-run user experience for permissions and instrument calibration.
+ * Features a visually elegant carousel for instrument selection.
  */
 
 class OnboardingUI {
@@ -8,6 +9,7 @@ class OnboardingUI {
         this.service = onboardingService;
         this.container = null;
         this.currentStep = 'welcome';
+        this.carouselIndex = 0;
 
         // Instrument icons (SVG paths)
         this.instrumentIcons = {
@@ -112,9 +114,9 @@ class OnboardingUI {
             <div class="onboarding-step welcome-step">
                 <div class="onboarding-icon">
                     <svg viewBox="0 0 64 64" fill="none">
-                        <circle cx="32" cy="32" r="30" stroke="var(--accent)" stroke-width="2"/>
-                        <path d="M20 44V20L32 12L44 20V44L32 52L20 44Z" fill="var(--accent)" opacity="0.3"/>
-                        <path d="M32 12V52M20 20L44 44M44 20L20 44" stroke="var(--accent)" stroke-width="2"/>
+                        <circle cx="32" cy="32" r="30" stroke="var(--primary)" stroke-width="2"/>
+                        <path d="M20 44V20L32 12L44 20V44L32 52L20 44Z" fill="var(--primary)" opacity="0.3"/>
+                        <path d="M32 12V52M20 20L44 44M44 20L20 44" stroke="var(--primary)" stroke-width="2"/>
                     </svg>
                 </div>
                 <h2>Welcome to Virtual Concertmaster</h2>
@@ -126,26 +128,26 @@ class OnboardingUI {
             </div>
         `;
 
-        document.getElementById('onboarding-start')?.addEventListener('click', () => {
+        container.querySelector('#onboarding-start')?.addEventListener('click', () => {
             this.service.nextStep();
         });
 
-        document.getElementById('onboarding-skip')?.addEventListener('click', () => {
+        container.querySelector('#onboarding-skip')?.addEventListener('click', () => {
             this.service.skipOnboarding();
         });
     }
 
     /**
-     * Render permissions step
+     * Render permissions step with denied state UI
      */
     renderPermissionsStep(container) {
         container.innerHTML = `
             <div class="onboarding-step permissions-step">
                 <div class="onboarding-icon">
                     <svg viewBox="0 0 64 64" fill="none">
-                        <rect x="8" y="24" width="48" height="28" rx="4" stroke="var(--accent)" stroke-width="2"/>
-                        <path d="M32 32V44" stroke="var(--accent)" stroke-width="2"/>
-                        <circle cx="32" cy="18" r="6" stroke="var(--accent)" stroke-width="2"/>
+                        <rect x="8" y="24" width="48" height="28" rx="4" stroke="var(--primary)" stroke-width="2"/>
+                        <path d="M32 32V44" stroke="var(--primary)" stroke-width="2"/>
+                        <circle cx="32" cy="18" r="6" stroke="var(--primary)" stroke-width="2"/>
                     </svg>
                 </div>
                 <h2>Enable Permissions</h2>
@@ -160,8 +162,17 @@ class OnboardingUI {
                             </svg>
                         </div>
                         <h3>Microphone</h3>
-                        <p>For real-time pitch tracking and performance analysis</p>
+                        <p>Required for real-time pitch tracking and performance analysis</p>
                         <button class="btn btn-outline" id="request-mic">Allow Microphone</button>
+                        <div class="permission-denied-msg" id="mic-denied-msg" style="display:none;">
+                            <span class="denied-icon">
+                                <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd"/>
+                                </svg>
+                            </span>
+                            <span>Permission denied. Tuner &amp; Practice require microphone access.</span>
+                            <button class="btn-link" id="open-mic-settings">Open Settings</button>
+                        </div>
                     </div>
 
                     <div class="permission-card" id="cam-permission-card">
@@ -173,6 +184,15 @@ class OnboardingUI {
                         <h3>Camera</h3>
                         <p>For scanning sheet music using Optical Music Recognition</p>
                         <button class="btn btn-outline" id="request-cam">Allow Camera</button>
+                        <div class="permission-denied-msg" id="cam-denied-msg" style="display:none;">
+                            <span class="denied-icon">
+                                <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd"/>
+                                </svg>
+                            </span>
+                            <span>Permission denied. Camera is optional.</span>
+                            <button class="btn-link" id="open-cam-settings">Open Settings</button>
+                        </div>
                     </div>
                 </div>
 
@@ -187,32 +207,52 @@ class OnboardingUI {
     }
 
     /**
-     * Setup permission request handlers
+     * Setup permission request handlers with denied-state support
      */
     setupPermissionHandlers() {
-        const micBtn = document.getElementById('request-mic');
-        const camBtn = document.getElementById('request-cam');
-        const nextBtn = document.getElementById('onboarding-next-permissions');
-        const backBtn = document.getElementById('onboarding-back');
+        const micBtn = this.container.querySelector('#request-mic');
+        const camBtn = this.container.querySelector('#request-cam');
+        const nextBtn = this.container.querySelector('#onboarding-next-permissions');
+        const backBtn = this.container.querySelector('#onboarding-back');
 
         micBtn?.addEventListener('click', async () => {
             const granted = await this.service.requestMicrophonePermission();
-            const card = document.getElementById('mic-permission-card');
+            const card = this.container.querySelector('#mic-permission-card');
+            const deniedMsg = this.container.querySelector('#mic-denied-msg');
             if (granted) {
                 card.classList.add('granted');
+                card.classList.remove('denied');
                 micBtn.textContent = 'Granted';
                 micBtn.disabled = true;
+                if (deniedMsg) deniedMsg.style.display = 'none';
+            } else {
+                card.classList.add('denied');
+                if (deniedMsg) deniedMsg.style.display = 'flex';
             }
         });
 
         camBtn?.addEventListener('click', async () => {
             const granted = await this.service.requestCameraPermission();
-            const card = document.getElementById('cam-permission-card');
+            const card = this.container.querySelector('#cam-permission-card');
+            const deniedMsg = this.container.querySelector('#cam-denied-msg');
             if (granted) {
                 card.classList.add('granted');
+                card.classList.remove('denied');
                 camBtn.textContent = 'Granted';
                 camBtn.disabled = true;
+                if (deniedMsg) deniedMsg.style.display = 'none';
+            } else {
+                card.classList.add('denied');
+                if (deniedMsg) deniedMsg.style.display = 'flex';
             }
+        });
+
+        // Open OS settings handlers
+        this.container.querySelector('#open-mic-settings')?.addEventListener('click', () => {
+            this._openOSSettings();
+        });
+        this.container.querySelector('#open-cam-settings')?.addEventListener('click', () => {
+            this._openOSSettings();
         });
 
         nextBtn?.addEventListener('click', () => {
@@ -225,66 +265,162 @@ class OnboardingUI {
     }
 
     /**
-     * Render instrument selection step
+     * Attempt to open OS-level permission settings
+     */
+    _openOSSettings() {
+        // On supported platforms, guide the user
+        // Chrome: chrome://settings/content/microphone
+        // Most browsers block navigation to settings URIs, so we show guidance
+        const isMac = navigator.platform?.toUpperCase().indexOf('MAC') >= 0;
+        const guidance = isMac
+            ? 'Open System Settings > Privacy & Security > Microphone, then enable access for your browser.'
+            : 'Open your browser settings and allow microphone access for this site.';
+
+        // Show a toast-style message
+        this._showSettingsGuidance(guidance);
+    }
+
+    /**
+     * Show settings guidance overlay
+     */
+    _showSettingsGuidance(message) {
+        let toast = this.container.querySelector('.settings-guidance-toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.className = 'settings-guidance-toast';
+            this.container.querySelector('.onboarding-container')?.appendChild(toast);
+        }
+        toast.textContent = message;
+        toast.classList.add('visible');
+        setTimeout(() => toast.classList.remove('visible'), 5000);
+    }
+
+    /**
+     * Render instrument selection step as an elegant carousel
      */
     renderInstrumentStep(container) {
         const instruments = this.service.getInstrumentOptions();
+        this.carouselIndex = 0;
 
         container.innerHTML = `
             <div class="onboarding-step instrument-step">
-                <div class="onboarding-icon">
-                    <svg viewBox="0 0 64 64" fill="none">
-                        <circle cx="32" cy="32" r="25" stroke="var(--accent)" stroke-width="2"/>
-                        <path d="M22 42V22H32L42 42H22Z" stroke="var(--accent)" stroke-width="2"/>
-                    </svg>
-                </div>
                 <h2>Select Your Instrument</h2>
                 <p>Choose your primary instrument for optimized pitch detection and feedback.</p>
 
-                <div class="instrument-grid">
-                    ${instruments.map(inst => `
-                        <div class="instrument-card" data-instrument="${inst.id}">
-                            <div class="instrument-icon">${this.instrumentIcons[inst.id]}</div>
-                            <h3>${inst.name}</h3>
-                            <p>${inst.description}</p>
-                            <span class="instrument-range">${inst.range}</span>
+                <div class="instrument-carousel" role="listbox" aria-label="Instrument selection">
+                    <button class="carousel-arrow carousel-arrow-left" id="carousel-prev" aria-label="Previous instrument">
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+                    </button>
+
+                    <div class="carousel-track-wrapper">
+                        <div class="carousel-track" id="carousel-track">
+                            ${instruments.map((inst, i) => `
+                                <div class="carousel-card${i === 0 ? ' active' : ''}" data-instrument="${inst.id}" data-index="${i}" role="option" aria-selected="${i === 0 ? 'true' : 'false'}" tabindex="0">
+                                    <div class="carousel-card-icon">${this.instrumentIcons[inst.id]}</div>
+                                    <h3>${inst.name}</h3>
+                                    <p>${inst.description}</p>
+                                    <span class="instrument-range">${inst.range}</span>
+                                </div>
+                            `).join('')}
                         </div>
-                    `).join('')}
+                    </div>
+
+                    <button class="carousel-arrow carousel-arrow-right" id="carousel-next" aria-label="Next instrument">
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z"/></svg>
+                    </button>
+                </div>
+
+                <div class="carousel-dots" id="carousel-dots">
+                    ${instruments.map((_, i) => `<button class="carousel-dot${i === 0 ? ' active' : ''}" data-index="${i}" aria-label="Go to instrument ${i + 1}"></button>`).join('')}
                 </div>
 
                 <div class="onboarding-actions">
                     <button class="btn btn-secondary" id="onboarding-back-inst">Back</button>
-                    <button class="btn btn-primary" id="onboarding-next-inst" disabled>Continue</button>
+                    <button class="btn btn-primary" id="onboarding-next-inst">Continue</button>
                 </div>
             </div>
         `;
 
-        this.setupInstrumentHandlers(instruments);
+        this.setupCarouselHandlers(instruments);
     }
 
     /**
-     * Setup instrument selection handlers
+     * Setup carousel navigation and selection handlers
      */
-    setupInstrumentHandlers(instruments) {
-        const cards = document.querySelectorAll('.instrument-card');
-        const nextBtn = document.getElementById('onboarding-next-inst');
-        const backBtn = document.getElementById('onboarding-back-inst');
+    setupCarouselHandlers(instruments) {
+        const track = this.container.querySelector('#carousel-track');
+        const prevBtn = this.container.querySelector('#carousel-prev');
+        const nextBtn = this.container.querySelector('#carousel-next');
+        const continueBtn = this.container.querySelector('#onboarding-next-inst');
+        const backBtn = this.container.querySelector('#onboarding-back-inst');
+        const dots = this.container.querySelectorAll('.carousel-dot');
+        const cards = this.container.querySelectorAll('.carousel-card');
 
-        cards.forEach(card => {
-            card.addEventListener('click', () => {
-                // Deselect all
-                cards.forEach(c => c.classList.remove('selected'));
-                // Select clicked
-                card.classList.add('selected');
-                // Save selection
-                const instrument = card.dataset.instrument;
-                this.service.selectInstrument(instrument);
-                // Enable continue
-                nextBtn.disabled = false;
+        // Select first instrument by default
+        this.service.selectInstrument(instruments[0].id);
+
+        const goToIndex = (index) => {
+            if (index < 0) index = instruments.length - 1;
+            if (index >= instruments.length) index = 0;
+            this.carouselIndex = index;
+
+            // Translate the track
+            if (track) {
+                track.style.transform = `translateX(-${index * 100}%)`;
+            }
+
+            // Update active card
+            cards.forEach((card, i) => {
+                card.classList.toggle('active', i === index);
+                card.setAttribute('aria-selected', i === index ? 'true' : 'false');
+            });
+
+            // Update dots
+            dots.forEach((dot, i) => {
+                dot.classList.toggle('active', i === index);
+            });
+
+            // Select instrument
+            this.service.selectInstrument(instruments[index].id);
+        };
+
+        prevBtn?.addEventListener('click', () => goToIndex(this.carouselIndex - 1));
+        nextBtn?.addEventListener('click', () => goToIndex(this.carouselIndex + 1));
+
+        // Dot navigation
+        dots.forEach(dot => {
+            dot.addEventListener('click', () => {
+                goToIndex(parseInt(dot.dataset.index, 10));
             });
         });
 
-        nextBtn?.addEventListener('click', () => {
+        // Card click
+        cards.forEach(card => {
+            card.addEventListener('click', () => {
+                goToIndex(parseInt(card.dataset.index, 10));
+            });
+        });
+
+        // Keyboard navigation
+        this.container.querySelector('.instrument-carousel')?.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') goToIndex(this.carouselIndex - 1);
+            if (e.key === 'ArrowRight') goToIndex(this.carouselIndex + 1);
+        });
+
+        // Touch swipe support
+        let touchStartX = 0;
+        const wrapper = this.container.querySelector('.carousel-track-wrapper');
+        wrapper?.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+        }, { passive: true });
+        wrapper?.addEventListener('touchend', (e) => {
+            const diff = touchStartX - e.changedTouches[0].clientX;
+            if (Math.abs(diff) > 50) {
+                goToIndex(this.carouselIndex + (diff > 0 ? 1 : -1));
+            }
+        }, { passive: true });
+
+        continueBtn?.addEventListener('click', () => {
             this.service.nextStep();
         });
 
@@ -303,9 +439,9 @@ class OnboardingUI {
             <div class="onboarding-step calibration-step">
                 <div class="onboarding-icon">
                     <svg viewBox="0 0 64 64" fill="none">
-                        <circle cx="32" cy="32" r="20" stroke="var(--accent)" stroke-width="2"/>
-                        <circle cx="32" cy="32" r="10" stroke="var(--accent)" stroke-width="2"/>
-                        <circle cx="32" cy="32" r="3" fill="var(--accent)"/>
+                        <circle cx="32" cy="32" r="20" stroke="var(--primary)" stroke-width="2"/>
+                        <circle cx="32" cy="32" r="10" stroke="var(--primary)" stroke-width="2"/>
+                        <circle cx="32" cy="32" r="3" fill="var(--primary)"/>
                     </svg>
                 </div>
                 <h2>Calibrating Audio Engine</h2>
@@ -340,7 +476,7 @@ class OnboardingUI {
             this.service.completeCalibration();
         }, 1500);
 
-        document.getElementById('onboarding-finish')?.addEventListener('click', () => {
+        container.querySelector('#onboarding-finish')?.addEventListener('click', () => {
             this.service.finishOnboarding();
         });
     }
@@ -366,7 +502,7 @@ class OnboardingUI {
             </div>
         `;
 
-        document.getElementById('onboarding-done')?.addEventListener('click', () => {
+        container.querySelector('#onboarding-done')?.addEventListener('click', () => {
             this.service.finishOnboarding();
         });
     }
@@ -382,4 +518,10 @@ class OnboardingUI {
     }
 }
 
-window.OnboardingUI = OnboardingUI;
+if (typeof window !== 'undefined') {
+    window.OnboardingUI = OnboardingUI;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { OnboardingUI };
+}

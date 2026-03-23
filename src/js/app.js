@@ -38,7 +38,8 @@ class ConcertmasterApp {
         this.annotationService = null;
         this.annotationCanvasClickHandler = null;
 
-        // Onboarding
+        // Onboarding & Global State
+        this.instrumentStore = (typeof window !== 'undefined' && window.instrumentStore) || null;
         this.onboardingService = null;
         this.onboardingUI = null;
 
@@ -391,13 +392,24 @@ class ConcertmasterApp {
      * Initialize onboarding flow
      */
     initOnboarding() {
-        // Create onboarding service
-        this.onboardingService = new OnboardingService();
+        // Create onboarding service with global store
+        this.onboardingService = new OnboardingService(this.instrumentStore);
 
-        // Load saved instrument if available
-        const savedInstrument = localStorage.getItem('selected_instrument');
+        // Load saved instrument from store or localStorage
+        const savedInstrument = this.instrumentStore?.getInstrument() ||
+            localStorage.getItem('selected_instrument');
         if (savedInstrument && this.onboardingService.instrumentRanges[savedInstrument]) {
             this.selectedInstrument = savedInstrument;
+        }
+
+        // Subscribe to store changes so DSP engine stays in sync
+        if (this.instrumentStore) {
+            this.instrumentStore.subscribe((key, value) => {
+                if (key === 'instrument' && value && this.audioEngine) {
+                    this.audioEngine.setInstrumentCalibration(value);
+                    this.selectedInstrument = value;
+                }
+            });
         }
 
         // Create onboarding UI
@@ -711,6 +723,12 @@ class ConcertmasterApp {
     }
 
     showView(viewId) {
+        // Block Tuner/Practice views if microphone not granted
+        const micRequiredViews = ['tuner-view', 'practice-view'];
+        if (micRequiredViews.includes(viewId) && this.instrumentStore && !this.instrumentStore.isMicrophoneGranted()) {
+            this._showMicBlockedBanner(viewId);
+        }
+
         // Update nav links
         document.querySelectorAll('.nav-link').forEach(link => {
             link.classList.remove('active');
@@ -765,6 +783,36 @@ class ConcertmasterApp {
         if (pieceId && this.selectScore) {
             this.selectScore(pieceId);
         }
+    }
+
+    /**
+     * Show mic-blocked banner inside a view that requires microphone
+     */
+    _showMicBlockedBanner(viewId) {
+        const view = document.getElementById(viewId);
+        if (!view) return;
+
+        // Don't add duplicate banners
+        if (view.querySelector('.mic-blocked-banner')) return;
+
+        const banner = document.createElement('div');
+        banner.className = 'mic-blocked-banner';
+        banner.innerHTML = `
+            <h3>Microphone Required</h3>
+            <p>This feature needs microphone access for real-time audio analysis. Please enable microphone permissions in your browser or OS settings.</p>
+            <button class="btn btn-primary mic-blocked-settings-btn">Enable Microphone</button>
+        `;
+
+        banner.querySelector('.mic-blocked-settings-btn')?.addEventListener('click', async () => {
+            if (this.onboardingService) {
+                const granted = await this.onboardingService.requestMicrophonePermission();
+                if (granted) {
+                    banner.remove();
+                }
+            }
+        });
+
+        view.prepend(banner);
     }
 
     setupModals() {
