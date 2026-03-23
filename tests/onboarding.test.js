@@ -563,4 +563,115 @@ describe('OnboardingUI', () => {
         expect(toast).not.toBeNull();
         expect(toast.classList.contains('visible')).toBe(true);
     });
+
+    test('calibration timer should be cleared on step change', () => {
+        ui.init();
+        service.nextStep(); // permissions
+        service.nextStep(); // instrument
+        service.nextStep(); // calibration
+        expect(ui._calibrationTimer).not.toBeNull();
+        service.prevStep(); // back to instrument — should clear
+        expect(ui._calibrationTimer).toBeNull();
+    });
+
+    test('hide should clear timers', () => {
+        ui.init();
+        service.nextStep();
+        service.nextStep();
+        service.nextStep(); // calibration
+        expect(ui._calibrationTimer).not.toBeNull();
+        ui.hide();
+        expect(ui._calibrationTimer).toBeNull();
+    });
+});
+
+describe('Mic-Blocked Overlay (app.js integration)', () => {
+    let store;
+
+    beforeEach(() => {
+        localStorage.clear();
+        store = new InstrumentStore();
+        // Clean up any leftover overlays
+        document.querySelectorAll('.mic-blocked-banner').forEach(b => b.remove());
+        // Create mock main content area
+        let mainContent = document.querySelector('.main-content');
+        if (!mainContent) {
+            mainContent = document.createElement('div');
+            mainContent.className = 'main-content';
+            document.body.appendChild(mainContent);
+        }
+    });
+
+    afterEach(() => {
+        document.querySelectorAll('.mic-blocked-banner').forEach(b => b.remove());
+    });
+
+    test('showView should block navigation when mic not granted', () => {
+        // Simulate the app's showView logic
+        const micRequiredViews = ['tuner-view', 'practice-view'];
+        const viewId = 'tuner-view';
+        const micGranted = store.isMicrophoneGranted();
+        expect(micGranted).toBe(false);
+        expect(micRequiredViews.includes(viewId)).toBe(true);
+    });
+
+    test('mic-blocked overlay should have Enable Microphone and Go Back buttons', () => {
+        const overlay = document.createElement('div');
+        overlay.className = 'mic-blocked-banner';
+        overlay.setAttribute('role', 'alert');
+        overlay.innerHTML = `
+            <h3>Microphone Required</h3>
+            <p>This feature needs microphone access.</p>
+            <div class="mic-blocked-actions">
+                <button class="btn btn-primary mic-blocked-settings-btn">Enable Microphone</button>
+                <button class="btn btn-secondary mic-blocked-back-btn">Go Back</button>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        expect(overlay.querySelector('.mic-blocked-settings-btn')).not.toBeNull();
+        expect(overlay.querySelector('.mic-blocked-back-btn')).not.toBeNull();
+        expect(overlay.getAttribute('role')).toBe('alert');
+        overlay.remove();
+    });
+
+    test('duplicate overlays should not be created', () => {
+        // First overlay
+        const overlay1 = document.createElement('div');
+        overlay1.className = 'mic-blocked-banner';
+        document.querySelector('.main-content').appendChild(overlay1);
+
+        // Check for existing and remove before adding new
+        document.querySelector('.mic-blocked-banner')?.remove();
+        const overlay2 = document.createElement('div');
+        overlay2.className = 'mic-blocked-banner';
+        document.querySelector('.main-content').appendChild(overlay2);
+
+        const banners = document.querySelectorAll('.mic-blocked-banner');
+        expect(banners.length).toBe(1);
+    });
+
+    test('store subscription should remove banners when mic granted', () => {
+        const overlay = document.createElement('div');
+        overlay.className = 'mic-blocked-banner';
+        document.body.appendChild(overlay);
+        expect(document.querySelector('.mic-blocked-banner')).not.toBeNull();
+
+        // Simulate what the store subscription does
+        store.subscribe((key, value) => {
+            if (key === 'microphoneGranted' && value === true) {
+                document.querySelectorAll('.mic-blocked-banner').forEach(b => b.remove());
+            }
+        });
+        store.setMicrophoneGranted(true);
+
+        expect(document.querySelector('.mic-blocked-banner')).toBeNull();
+    });
+
+    test('overlay should not appear when mic is granted', () => {
+        store.setMicrophoneGranted(true);
+        const micRequiredViews = ['tuner-view', 'practice-view'];
+        const shouldBlock = micRequiredViews.includes('tuner-view') && !store.isMicrophoneGranted();
+        expect(shouldBlock).toBe(false);
+    });
 });

@@ -406,8 +406,12 @@ class ConcertmasterApp {
         if (this.instrumentStore) {
             this.instrumentStore.subscribe((key, value) => {
                 if (key === 'instrument' && value && this.audioEngine) {
-                    this.audioEngine.setInstrumentCalibration(value);
+                    this.audioEngine.setInstrument(value);
                     this.selectedInstrument = value;
+                }
+                // Remove mic-blocked banners when permission is granted
+                if (key === 'microphoneGranted' && value === true) {
+                    document.querySelectorAll('.mic-blocked-banner').forEach(b => b.remove());
                 }
             });
         }
@@ -419,7 +423,7 @@ class ConcertmasterApp {
         this.onboardingService.setOnComplete((data) => {
             // Apply instrument calibration to audio engine
             if (this.audioEngine && data.instrument) {
-                this.audioEngine.setInstrumentCalibration(data.instrument);
+                this.audioEngine.setInstrument(data.instrument);
                 this.selectedInstrument = data.instrument;
             }
 
@@ -726,9 +730,17 @@ class ConcertmasterApp {
         // Block Tuner/Practice views if microphone not granted
         const micRequiredViews = ['tuner-view', 'practice-view'];
         if (micRequiredViews.includes(viewId) && this.instrumentStore && !this.instrumentStore.isMicrophoneGranted()) {
-            this._showMicBlockedBanner(viewId);
+            this._showMicBlockedOverlay(viewId);
+            return;
         }
 
+        this._activateView(viewId);
+    }
+
+    /**
+     * Activate a view (update nav, show view, refresh if needed)
+     */
+    _activateView(viewId) {
         // Update nav links
         document.querySelectorAll('.nav-link').forEach(link => {
             link.classList.remove('active');
@@ -786,33 +798,42 @@ class ConcertmasterApp {
     }
 
     /**
-     * Show mic-blocked banner inside a view that requires microphone
+     * Show mic-blocked overlay that prevents access to mic-required views
      */
-    _showMicBlockedBanner(viewId) {
-        const view = document.getElementById(viewId);
-        if (!view) return;
+    _showMicBlockedOverlay(viewId) {
+        // Remove any existing overlay
+        document.querySelector('.mic-blocked-banner')?.remove();
 
-        // Don't add duplicate banners
-        if (view.querySelector('.mic-blocked-banner')) return;
-
-        const banner = document.createElement('div');
-        banner.className = 'mic-blocked-banner';
-        banner.innerHTML = `
+        const overlay = document.createElement('div');
+        overlay.className = 'mic-blocked-banner';
+        overlay.setAttribute('role', 'alert');
+        overlay.innerHTML = `
             <h3>Microphone Required</h3>
             <p>This feature needs microphone access for real-time audio analysis. Please enable microphone permissions in your browser or OS settings.</p>
-            <button class="btn btn-primary mic-blocked-settings-btn">Enable Microphone</button>
+            <div class="mic-blocked-actions">
+                <button class="btn btn-primary mic-blocked-settings-btn">Enable Microphone</button>
+                <button class="btn btn-secondary mic-blocked-back-btn">Go Back</button>
+            </div>
         `;
 
-        banner.querySelector('.mic-blocked-settings-btn')?.addEventListener('click', async () => {
+        overlay.querySelector('.mic-blocked-settings-btn')?.addEventListener('click', async () => {
             if (this.onboardingService) {
                 const granted = await this.onboardingService.requestMicrophonePermission();
                 if (granted) {
-                    banner.remove();
+                    overlay.remove();
+                    this._activateView(viewId);
                 }
             }
         });
 
-        view.prepend(banner);
+        overlay.querySelector('.mic-blocked-back-btn')?.addEventListener('click', () => {
+            overlay.remove();
+            this._activateView('dashboard-view');
+        });
+
+        // Show overlay in the app container instead of navigating to the view
+        const mainContent = document.querySelector('.main-content') || document.body;
+        mainContent.appendChild(overlay);
     }
 
     setupModals() {

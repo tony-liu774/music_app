@@ -68,16 +68,21 @@
     --primary-light: #ddb832;
     --primary-dark: #a68520;
     --primary-glow: rgba(201, 162, 39, 0.3);
+    --primary-bg-subtle: rgba(201, 162, 39, 0.08);
+    --primary-bg-faint: rgba(201, 162, 39, 0.03);
 
     /* Secondary Accent - Emerald (correct intonation) */
     --success: #10b981;
     --success-light: #34d399;
     --success-glow: rgba(16, 185, 129, 0.4);
+    --success-bg-subtle: rgba(16, 185, 129, 0.1);
 
     /* Error Accent - Crimson (sharp/flat) */
     --error: #dc2626;
     --error-light: #ef4444;
     --error-glow: rgba(220, 38, 38, 0.4);
+    --error-bg-subtle: rgba(220, 38, 38, 0.08);
+    --error-bg-faint: rgba(220, 38, 38, 0.05);
 
     /* Warning - Amber/Yellow */
     --warning: #c9a227;
@@ -91,6 +96,9 @@
     /* Accent (alias for primary, used in onboarding/tuner) */
     --accent: #c9a227;
     --accent-glow: rgba(201, 162, 39, 0.3);
+
+    /* Overlay */
+    --bg-deep-overlay: rgba(10, 10, 18, 0.95);
 
     /* Surface Aliases */
     --bg-card: #1a1a28;
@@ -2956,7 +2964,7 @@
       left: 0;
       right: 0;
       bottom: 0;
-      background: rgba(10, 10, 18, 0.95);
+      background: var(--bg-deep-overlay);
       z-index: 1000;
       display: none;
       align-items: center;
@@ -2978,8 +2986,8 @@
       overflow-y: auto;
       position: relative;
       box-shadow:
-          0 0 60px rgba(201, 162, 39, 0.1),
-          0 25px 50px rgba(0, 0, 0, 0.5);
+          0 0 60px var(--primary-bg-subtle),
+          0 25px 50px var(--shadow-lg, rgba(0, 0, 0, 0.5));
   }
 
   .onboarding-progress-bar {
@@ -3024,10 +3032,10 @@
 
   @keyframes pulse-glow {
       0%, 100% {
-          filter: drop-shadow(0 0 10px rgba(201, 162, 39, 0.3));
+          filter: drop-shadow(0 0 10px var(--primary-glow));
       }
       50% {
-          filter: drop-shadow(0 0 25px rgba(201, 162, 39, 0.6));
+          filter: drop-shadow(0 0 25px var(--primary-glow));
       }
   }
 
@@ -3085,7 +3093,7 @@
 
   .permission-card.granted {
       border-color: var(--success);
-      background: rgba(16, 185, 129, 0.1);
+      background: var(--success-bg-subtle);
   }
 
   .permission-card .permission-icon {
@@ -3109,7 +3117,7 @@
   /* Permission Denied State */
   .permission-card.denied {
       border-color: var(--error);
-      background: rgba(220, 38, 38, 0.05);
+      background: var(--error-bg-faint);
   }
 
   .permission-denied-msg {
@@ -3119,7 +3127,7 @@
       gap: 8px;
       margin-top: 12px;
       padding: 12px;
-      background: rgba(220, 38, 38, 0.08);
+      background: var(--error-bg-subtle);
       border-radius: 8px;
       font-size: 0.8rem;
       color: var(--error);
@@ -3166,7 +3174,7 @@
       transition: opacity 0.3s ease, transform 0.3s ease;
       pointer-events: none;
       z-index: 10;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      box-shadow: var(--shadow-lg, 0 10px 15px rgba(0, 0, 0, 0.5));
   }
 
   .settings-guidance-toast.visible {
@@ -3176,13 +3184,14 @@
 
   /* Mic Blocked Banner (shown in Tuner/Practice views) */
   .mic-blocked-banner {
-      background: rgba(220, 38, 38, 0.1);
+      background: var(--bg-surface);
       border: 1px solid var(--error);
-      border-radius: 12px;
-      padding: 20px;
+      border-radius: 16px;
+      padding: 40px 32px;
       text-align: center;
-      margin: 20px auto;
       max-width: 500px;
+      margin: 60px auto;
+      box-shadow: 0 0 40px var(--error-bg-subtle);
   }
 
   .mic-blocked-banner h3 {
@@ -3194,7 +3203,13 @@
   .mic-blocked-banner p {
       color: var(--text-secondary);
       font-size: 0.9rem;
-      margin-bottom: 16px;
+      margin-bottom: 24px;
+  }
+
+  .mic-blocked-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
   }
 
   /* Instrument Selection Step — Carousel */
@@ -3280,10 +3295,10 @@
 
   .carousel-card.active {
       border-color: var(--primary);
-      background: rgba(201, 162, 39, 0.08);
+      background: var(--primary-bg-subtle);
       box-shadow:
           0 0 30px var(--primary-glow),
-          inset 0 0 20px rgba(201, 162, 39, 0.03);
+          inset 0 0 20px var(--primary-bg-faint);
   }
 
   .carousel-card-icon {
@@ -3318,7 +3333,7 @@
       display: inline-block;
       font-size: 0.8rem;
       color: var(--primary);
-      background: rgba(201, 162, 39, 0.1);
+      background: var(--primary-bg-subtle);
       padding: 4px 14px;
       border-radius: 20px;
   }
@@ -3371,15 +3386,15 @@
   .instrument-card:hover {
       border-color: var(--primary);
       transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+      box-shadow: var(--shadow-lg, 0 10px 15px rgba(0, 0, 0, 0.5));
   }
 
   .instrument-card.selected {
       border-color: var(--primary);
-      background: rgba(201, 162, 39, 0.1);
+      background: var(--primary-bg-subtle);
       box-shadow:
-          0 0 20px rgba(201, 162, 39, 0.2),
-          inset 0 0 20px rgba(201, 162, 39, 0.05);
+          0 0 20px var(--primary-glow),
+          inset 0 0 20px var(--primary-bg-faint);
   }
 
   .instrument-card .instrument-icon {
@@ -3405,7 +3420,7 @@
       display: inline-block;
       font-size: 0.8rem;
       color: var(--primary);
-      background: rgba(201, 162, 39, 0.1);
+      background: var(--primary-bg-subtle);
       padding: 4px 12px;
       border-radius: 20px;
   }

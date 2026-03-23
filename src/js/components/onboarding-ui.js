@@ -10,6 +10,8 @@ class OnboardingUI {
         this.container = null;
         this.currentStep = 'welcome';
         this.carouselIndex = 0;
+        this._calibrationTimer = null;
+        this._toastTimer = null;
 
         // Instrument icons (SVG paths)
         this.instrumentIcons = {
@@ -53,6 +55,7 @@ class OnboardingUI {
      * Hide the onboarding modal
      */
     hide() {
+        this._clearTimers();
         if (this.container) {
             this.container.classList.remove('active');
         }
@@ -74,10 +77,27 @@ class OnboardingUI {
     }
 
     /**
+     * Clear any pending timers
+     */
+    _clearTimers() {
+        if (this._calibrationTimer) {
+            clearTimeout(this._calibrationTimer);
+            this._calibrationTimer = null;
+        }
+        if (this._toastTimer) {
+            clearTimeout(this._toastTimer);
+            this._toastTimer = null;
+        }
+    }
+
+    /**
      * Render the current step
      */
     renderCurrentStep() {
         if (!this.container) return;
+
+        // Clear timers from previous step
+        this._clearTimers();
 
         const stepContent = this.container.querySelector('.onboarding-content');
         const progressBar = this.container.querySelector('.onboarding-progress');
@@ -268,10 +288,8 @@ class OnboardingUI {
      * Attempt to open OS-level permission settings
      */
     _openOSSettings() {
-        // On supported platforms, guide the user
-        // Chrome: chrome://settings/content/microphone
-        // Most browsers block navigation to settings URIs, so we show guidance
-        const isMac = navigator.platform?.toUpperCase().indexOf('MAC') >= 0;
+        // Guide the user to their OS/browser settings
+        const isMac = (navigator.userAgentData?.platform || navigator.userAgent || '').toLowerCase().includes('mac');
         const guidance = isMac
             ? 'Open System Settings > Privacy & Security > Microphone, then enable access for your browser.'
             : 'Open your browser settings and allow microphone access for this site.';
@@ -292,7 +310,10 @@ class OnboardingUI {
         }
         toast.textContent = message;
         toast.classList.add('visible');
-        setTimeout(() => toast.classList.remove('visible'), 5000);
+        this._toastTimer = setTimeout(() => {
+            this._toastTimer = null;
+            toast.classList.remove('visible');
+        }, 5000);
     }
 
     /**
@@ -471,9 +492,12 @@ class OnboardingUI {
             </div>
         `;
 
-        // Auto-calibrate after a short delay
-        setTimeout(() => {
-            this.service.completeCalibration();
+        // Auto-calibrate after a short delay (handle stored for cleanup)
+        this._calibrationTimer = setTimeout(() => {
+            this._calibrationTimer = null;
+            if (this.service && !this.service.calibrationComplete) {
+                this.service.completeCalibration();
+            }
         }, 1500);
 
         container.querySelector('#onboarding-finish')?.addEventListener('click', () => {

@@ -17,36 +17,12 @@ class OnboardingService {
         this.onStepChange = null;
         this.onComplete = null;
 
-        // Instrument frequency ranges (Hz)
-        this.instrumentRanges = {
-            violin: {
-                name: 'Violin',
-                minFreq: 196,   // G3
-                maxFreq: 2637,  // E7
-                typicalFreq: 440, // A4 reference
-                description: 'The highest-pitched member of the violin family'
-            },
-            viola: {
-                name: 'Viola',
-                minFreq: 130,   // C3
-                maxFreq: 1760,  // A6
-                typicalFreq: 261, // C4 reference
-                description: 'Larger than a violin, with a richer, deeper tone'
-            },
-            cello: {
-                name: 'Cello',
-                minFreq: 65,    // C2
-                maxFreq: 987,   // B5
-                typicalFreq: 130.81, // C3 reference
-                description: 'Large instrument played seated, with a warm, singing tone'
-            },
-            bass: {
-                name: 'Double Bass',
-                minFreq: 41,    // E1
-                maxFreq: 523,   // C4
-                typicalFreq: 82.41, // E2 reference
-                description: 'The largest and lowest-pitched member of the violin family'
-            }
+        // Delegate to store's canonical instrument ranges
+        this.instrumentRanges = this.store ? this.store.instrumentRanges : {
+            violin: { name: 'Violin', minFreq: 196, maxFreq: 2637, typicalFreq: 440, description: 'The highest-pitched member of the violin family' },
+            viola: { name: 'Viola', minFreq: 130, maxFreq: 1760, typicalFreq: 261, description: 'Larger than a violin, with a richer, deeper tone' },
+            cello: { name: 'Cello', minFreq: 65, maxFreq: 987, typicalFreq: 130.81, description: 'Large instrument played seated, with a warm, singing tone' },
+            bass: { name: 'Double Bass', minFreq: 41, maxFreq: 523, typicalFreq: 82.41, description: 'The largest and lowest-pitched member of the violin family' }
         };
 
         // Check if onboarding has been completed
@@ -197,15 +173,16 @@ class OnboardingService {
     selectInstrument(instrument) {
         if (this.instrumentRanges[instrument]) {
             this.selectedInstrument = instrument;
-            // Save to localStorage
-            try {
-                localStorage.setItem('selected_instrument', instrument);
-            } catch (e) {
-                console.warn('Could not save instrument to localStorage');
-            }
-            // Sync to global store
+            // Delegate persistence to store (single source of truth)
             if (this.store) {
                 this.store.setInstrument(instrument);
+            } else {
+                // Fallback when no store available
+                try {
+                    localStorage.setItem('selected_instrument', instrument);
+                } catch (e) {
+                    console.warn('Could not save instrument to localStorage');
+                }
             }
         }
     }

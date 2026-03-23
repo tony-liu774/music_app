@@ -15,37 +15,41 @@ class InstrumentStore {
         this._listeners = new Map();
         this._listenerIdCounter = 0;
 
-        // Instrument frequency ranges (Hz) — canonical source
-        this.instrumentRanges = {
-            violin: {
+        // Instrument frequency ranges (Hz) — canonical source for all consumers
+        this.instrumentRanges = Object.freeze({
+            violin: Object.freeze({
                 name: 'Violin',
                 minFreq: 196,
                 maxFreq: 2637,
                 typicalFreq: 440,
-                openStrings: ['G3', 'D4', 'A4', 'E5']
-            },
-            viola: {
+                openStrings: ['G3', 'D4', 'A4', 'E5'],
+                description: 'The highest-pitched member of the violin family'
+            }),
+            viola: Object.freeze({
                 name: 'Viola',
                 minFreq: 130,
                 maxFreq: 1760,
                 typicalFreq: 261,
-                openStrings: ['C3', 'G3', 'D4', 'A4']
-            },
-            cello: {
+                openStrings: ['C3', 'G3', 'D4', 'A4'],
+                description: 'Larger than a violin, with a richer, deeper tone'
+            }),
+            cello: Object.freeze({
                 name: 'Cello',
                 minFreq: 65,
                 maxFreq: 987,
                 typicalFreq: 130.81,
-                openStrings: ['C2', 'G2', 'D3', 'A3']
-            },
-            bass: {
+                openStrings: ['C2', 'G2', 'D3', 'A3'],
+                description: 'Large instrument played seated, with a warm, singing tone'
+            }),
+            bass: Object.freeze({
                 name: 'Double Bass',
                 minFreq: 41,
                 maxFreq: 523,
                 typicalFreq: 82.41,
-                openStrings: ['E1', 'A1', 'D2', 'G2']
-            }
-        };
+                openStrings: ['E1', 'A1', 'D2', 'G2'],
+                description: 'The largest and lowest-pitched member of the violin family'
+            })
+        });
 
         this._hydrateFromStorage();
     }
