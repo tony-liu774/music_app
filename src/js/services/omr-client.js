@@ -23,6 +23,24 @@ class OMRClient {
         // Camera stream reference
         this.cameraStream = null;
         this.cameraVideo = null;
+
+        // Configuration - set useSimulation = false to enable real API calls
+        // Set omrApiKey to use a real OMR service
+        this.config = {
+            useSimulation: true,  // When true, uses simulated processing; set to false for real API
+            omrApiKey: null,      // API key for real OMR service (Audiveris/PlayScore)
+            edgeThreshold: 50,    // Threshold for Sobel edge detection
+            contrastFactor: 1.2, // Contrast enhancement factor
+            sharpnessThreshold: 10, // Blur detection threshold
+            contrastThreshold: 100 // Low contrast threshold
+        };
+    }
+
+    /**
+     * Update configuration
+     */
+    configure(options) {
+        this.config = { ...this.config, ...options };
     }
 
     /**
@@ -184,13 +202,20 @@ class OMRClient {
             const preprocessed = await this.preprocessImageFromDataUrl(shadowRemoved);
 
             this.reportProgress(60, 'Analyzing musical notation...');
-            const score = await this._sendToOMRService(preprocessed, imageFile.name);
+            const { score, simulated, error } = await this._sendToOMRService(preprocessed, imageFile.name);
 
             // CRITICAL: Add X/Y coordinate mapping for Follow-the-ball cursor
             this.reportProgress(85, 'Mapping coordinates to musical beats...');
-            this._mapCoordinatesToBeats(score, correctedImageDataUrl);
+            await this._mapCoordinatesToBeats(score, correctedImageDataUrl);
 
-            this.reportProgress(100, 'Complete');
+            this.reportProgress(100, simulated ? 'Complete (simulated)' : 'Complete');
+
+            // If we fell back to simulation, mark the score
+            if (simulated) {
+                score._isSimulated = true;
+                score._simulationNote = 'OMR processing was simulated. Set useSimulation: false and provide an API key for real processing.';
+                console.warn('[OMR] Score created from simulated processing:', error || 'No API available');
+            }
 
             return score;
 
@@ -283,7 +308,7 @@ class OMRClient {
                     }
                 }
                 const magnitude = Math.sqrt(gx * gx + gy * gy);
-                edges[y * width + x] = magnitude > 50 ? 255 : 0;
+                edges[y * width + x] = magnitude > this.config.edgeThreshold ? 255 : 0;
             }
         }
 
@@ -590,8 +615,16 @@ class OMRClient {
 
     /**
      * Send image to OMR service
+     * Returns { score, simulated } where simulated = true indicates fallback to placeholder data
      */
     async _sendToOMRService(imageData, fileName) {
+        // Check if simulation mode is enabled
+        if (this.config.useSimulation) {
+            console.log('[OMR] Simulation mode enabled, skipping real API call');
+            const score = await this._simulateOMRProcessing();
+            return { score, simulated: true };
+        }
+
         this.reportProgress(65, 'Sending to OMR engine...');
 
         const formData = new FormData();
@@ -606,13 +639,16 @@ class OMRClient {
 
             if (response.ok) {
                 const result = await response.json();
-                return this._convertAPIToScore(result);
+                return { score: this._convertAPIToScore(result), simulated: false };
             } else {
-                return await this._simulateOMRProcessing();
+                console.error(`[OMR] API returned error status: ${response.status}`);
+                throw new Error(`OMR API error: HTTP ${response.status}`);
             }
         } catch (error) {
-            console.log('[OMR] Using simulated processing');
-            return await this._simulateOMRProcessing();
+            console.error(`[OMR] API call failed: ${error.message}`);
+            console.log('[OMR] Falling back to simulated processing');
+            const score = await this._simulateOMRProcessing();
+            return { score, simulated: true, error: error.message };
         }
     }
 
@@ -667,12 +703,13 @@ class OMRClient {
      * CRITICAL: Map X/Y pixel coordinates to musical beats for Follow-the-ball cursor
      * This creates the essential coordinate mapping that links visual positions to musical time
      */
-    _mapCoordinatesToBeats(score, imageDataUrl) {
-        // For simulation, we'll create realistic coordinate mappings
-        // In production, this would come from actual OMR analysis of note positions
-
-        const imageDimensions = this._getImageDimensions(imageDataUrl);
-        if (!imageDimensions) return;
+    async _mapCoordinatesToBeats(score, imageDataUrl) {
+        // Await the Promise from _getImageDimensions
+        const imageDimensions = await this._getImageDimensions(imageDataUrl);
+        if (!imageDimensions) {
+            console.warn('[OMR] Could not get image dimensions for coordinate mapping');
+            return;
+        }
 
         const { width, height } = imageDimensions;
         const beatsPerMeasure = 4;
@@ -1067,82 +1104,75 @@ class OMRClient {
                 video.onloadedmetadata = () => {
                     video.play();
 
-                    // Create overlay container
+                    // Create overlay container using CSS class
                     const overlay = document.createElement('div');
                     overlay.id = 'camera-scanner-overlay';
-                    overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center;';
+                    overlay.className = 'camera-guide-overlay';
 
-                    // Create alignment guide frame
+                    // Create alignment guide frame using CSS class
                     const guideFrame = document.createElement('div');
                     guideFrame.id = 'alignment-guide';
-                    guideFrame.style.cssText = `
-                        position: relative;
-                        width: 90%;
-                        max-width: 600px;
-                        aspect-ratio: 8.5 / 11;
-                        border: 3px solid var(--primary);
-                        border-radius: 8px;
-                        overflow: hidden;
-                        box-shadow: 0 0 30px var(--primary-glow);
-                    `;
+                    guideFrame.className = 'camera-guide-frame';
 
-                    // Add corner markers
-                    const cornerPositions = [
-                        { top: '-2px', left: '-2px', borderTop: '4px solid var(--primary)', borderLeft: '4px solid var(--primary)', borderRadius: '8px 0 0 0' },
-                        { top: '-2px', right: '-2px', borderTop: '4px solid var(--primary)', borderRight: '4px solid var(--primary)', borderRadius: '0 8px 0 0' },
-                        { bottom: '-2px', left: '-2px', borderBottom: '4px solid var(--primary)', borderLeft: '4px solid var(--primary)', borderRadius: '0 0 0 8px' },
-                        { bottom: '-2px', right: '-2px', borderBottom: '4px solid var(--primary)', borderRight: '4px solid var(--primary)', borderRadius: '0 0 8px 0' }
-                    ];
-
-                    cornerPositions.forEach(pos => {
+                    // Add corner markers using CSS classes
+                    const cornerClasses = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
+                    cornerClasses.forEach(cornerClass => {
                         const corner = document.createElement('div');
-                        corner.style.cssText = `position: absolute; width: 30px; height: 30px; ${pos.borderTop ? `border-top: ${pos.borderTop};` : ''} ${pos.borderBottom ? `border-bottom: ${pos.borderBottom};` : ''} ${pos.borderLeft ? `border-left: ${pos.borderLeft};` : ''} ${pos.borderRight ? `border-right: ${pos.borderRight};` : ''} ${pos.top ? `top: ${pos.top};` : ''} ${pos.bottom ? `bottom: ${pos.bottom};` : ''} ${pos.left ? `left: ${pos.left};` : ''} ${pos.right ? `right: ${pos.right};` : ''} border-radius: ${pos.borderRadius};`;
+                        corner.className = `camera-guide-corner ${cornerClass}`;
                         guideFrame.appendChild(corner);
                     });
 
-                    // Add alignment grid lines
+                    // Add alignment grid lines using CSS classes
                     const gridContainer = document.createElement('div');
-                    gridContainer.style.cssText = 'position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none;';
+                    gridContainer.className = 'camera-guide-grid';
 
                     // Horizontal center line
-                    const hLine = document.createElement('div');
-                    hLine.style.cssText = 'position: absolute; top: 50%; left: 10%; right: 10%; height: 1px; background: rgba(201, 162, 39, 0.3);';
-                    gridContainer.appendChild(hLine);
+                    const hLineCenter = document.createElement('div');
+                    hLineCenter.className = 'camera-guide-h-line center';
+                    gridContainer.appendChild(hLineCenter);
 
                     // Vertical center line
-                    const vLine = document.createElement('div');
-                    vLine.style.cssText = 'position: absolute; left: 50%; top: 10%; bottom: 10%; width: 1px; background: rgba(201, 162, 39, 0.3);';
-                    gridContainer.appendChild(vLine);
+                    const vLineCenter = document.createElement('div');
+                    vLineCenter.className = 'camera-guide-v-line center';
+                    gridContainer.appendChild(vLineCenter);
 
                     // Add rule of thirds markers
-                    for (let i = 1; i <= 2; i++) {
-                        const hRule = document.createElement('div');
-                        hRule.style.cssText = `position: absolute; top: ${i * 33.33}%; left: 10%; right: 10%; height: 1px; background: rgba(201, 162, 39, 0.15);`;
-                        gridContainer.appendChild(hRule);
-                    }
+                    const hLine1 = document.createElement('div');
+                    hLine1.className = 'camera-guide-h-line third-1';
+                    gridContainer.appendChild(hLine1);
+
+                    const hLine2 = document.createElement('div');
+                    hLine2.className = 'camera-guide-h-line third-2';
+                    gridContainer.appendChild(hLine2);
+
+                    const vLine1 = document.createElement('div');
+                    vLine1.className = 'camera-guide-v-line third-1';
+                    gridContainer.appendChild(vLine1);
+
+                    const vLine2 = document.createElement('div');
+                    vLine2.className = 'camera-guide-v-line third-2';
+                    gridContainer.appendChild(vLine2);
 
                     guideFrame.appendChild(gridContainer);
                     guideFrame.appendChild(video);
 
-                    // Add instruction text
+                    // Add instruction text using CSS class
                     const instruction = document.createElement('div');
-                    instruction.style.cssText = 'position: absolute; bottom: 140px; left: 50%; transform: translateX(-50%); text-align: center; color: var(--text-primary); font-size: 14px; background: rgba(0,0,0,0.6); padding: 12px 20px; border-radius: 8px; max-width: 80%;';
+                    instruction.className = 'camera-guide-instruction';
                     instruction.innerHTML = 'Align sheet music within the frame. The edges should touch the corner markers.';
 
-                    // Create button container
+                    // Create button container using CSS class
                     const buttonContainer = document.createElement('div');
-                    buttonContainer.style.cssText = 'position: fixed; bottom: 40px; left: 0; right: 0; display: flex; justify-content: center; gap: 20px; padding: 0 20px;';
+                    buttonContainer.className = 'camera-guide-buttons';
 
                     // Create capture button
                     const captureBtn = document.createElement('button');
                     captureBtn.className = 'btn btn-primary';
-                    captureBtn.style.cssText = 'padding: 14px 32px; font-size: 16px;';
                     captureBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;margin-right:8px;"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>Capture';
 
                     // Create cancel button
                     const cancelBtn = document.createElement('button');
                     cancelBtn.className = 'btn btn-secondary';
-                    cancelBtn.style.cssText = 'padding: 14px 24px; font-size: 16px;';
                     cancelBtn.textContent = 'Cancel';
 
                     buttonContainer.appendChild(cancelBtn);

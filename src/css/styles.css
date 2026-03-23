@@ -1658,11 +1658,12 @@ a:hover {
     text-align: center;
     color: var(--text-primary);
     font-size: var(--text-sm);
-    background: rgba(10, 10, 18, 0.85);
+    background: var(--bg-deep);
     padding: var(--space-3) var(--space-5);
     border-radius: var(--radius-md);
     max-width: 80%;
     border: 1px solid var(--border);
+    opacity: 0.9;
 }
 
 .camera-guide-instruction svg {
@@ -1695,7 +1696,8 @@ a:hover {
     align-items: center;
     gap: var(--space-3);
     padding: var(--space-3) var(--space-4);
-    background: rgba(220, 38, 38, 0.1);
+    background: var(--error);
+    opacity: 0.15;
     border: 1px solid var(--error);
     border-radius: var(--radius-md);
     margin-bottom: var(--space-4);

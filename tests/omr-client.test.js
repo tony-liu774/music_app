@@ -457,4 +457,18 @@ describe('OMRClient Coordinate Mapping', () => {
             assert.ok(quality.resolution);
         });
     });
+
+    describe('configuration', () => {
+        it('should have default configuration', () => {
+            assert.ok(client.config, 'Should have config object');
+            assert.strictEqual(client.config.useSimulation, true, 'Should use simulation by default');
+            assert.ok(typeof client.config.edgeThreshold === 'number', 'Should have edge threshold');
+            assert.ok(typeof client.config.contrastFactor === 'number', 'Should have contrast factor');
+        });
+
+        it('should allow updating configuration', () => {
+            client.configure({ useSimulation: false });
+            assert.strictEqual(client.config.useSimulation, false, 'Should update config');
+        });
+    });
 });
