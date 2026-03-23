@@ -67,6 +67,13 @@ class ConcertmasterApp {
         this.teacherService = null;
         this.studioDashboard = null;
 
+        // Assignment service (Smart Assignments)
+        this.assignmentService = null;
+        this.assignmentUI = null;
+
+        // Up Next widget (Student view)
+        this.upNextWidget = null;
+
         // SSO / OAuth
         this.authService = null;
         this.oauthService = null;
@@ -113,6 +120,11 @@ class ConcertmasterApp {
 
             // Initialize teacher mode if enabled
             this.initTeacherMode();
+
+            // Initialize student widget when teacher mode is not active
+            if (!this.isTeacherMode) {
+                await this.initStudentWidget();
+            }
 
             // Initialize license service (always needed for feature gating)
             await this.initLicense();
@@ -726,6 +738,35 @@ class ConcertmasterApp {
         }
     }
 
+    /**
+     * Navigate to a view by name (used by widgets)
+     */
+    navigateTo(viewName) {
+        // Map view names to view IDs
+        const viewMap = {
+            'library': 'library-view',
+            'practice': 'practice-view',
+            'metronome': 'metronome-view',
+            'settings': 'settings-view',
+            'tuner': 'tuner-view',
+            'studio': 'studio-dashboard-view'
+        };
+
+        const viewId = viewMap[viewName];
+        if (viewId) {
+            this.showView(viewId);
+        }
+    }
+
+    /**
+     * Load a piece/score by ID (used by widgets)
+     */
+    loadPiece(pieceId) {
+        if (pieceId && this.selectScore) {
+            this.selectScore(pieceId);
+        }
+    }
+
     setupModals() {
         // Close buttons
         document.querySelectorAll('.modal-close, .modal-backdrop').forEach(el => {
@@ -1294,13 +1335,46 @@ class ConcertmasterApp {
             studioView.style.display = enabled ? '' : 'none';
         }
 
+        // Show/hide assignments section
+        const assignmentsSection = document.getElementById('assignments-section');
+        if (assignmentsSection) {
+            assignmentsSection.style.display = enabled ? '' : 'none';
+        }
+
         if (enabled && !this.studioDashboard) {
             // Initialize teacher service and dashboard on first enable
             this.teacherService = new TeacherService();
             this.studioDashboard = new StudioDashboard(this.teacherService);
             await this.studioDashboard.init();
+
+            // Initialize AssignmentService and AssignmentUI for Smart Assignments
+            this.assignmentService = new AssignmentService();
+            this.assignmentUI = new AssignmentUI(this.assignmentService, this.teacherService, this.scoreLibrary);
+            await this.assignmentUI.init();
         } else if (enabled && this.studioDashboard) {
             await this.studioDashboard.refresh();
+        }
+
+        // Initialize Up Next widget for students (when not in teacher mode)
+        if (!enabled) {
+            await this.initStudentWidget();
+        }
+    }
+
+    async initStudentWidget() {
+        // Initialize Up Next widget for student view
+        if (!this.upNextWidget) {
+            this.assignmentService = new AssignmentService();
+            this.upNextWidget = new UpNextWidget(this.assignmentService);
+            await this.upNextWidget.init();
+
+            // Show the widget
+            const widgetContainer = document.getElementById('up-next-widget');
+            if (widgetContainer) {
+                widgetContainer.style.display = '';
+            }
+        } else {
+            await this.upNextWidget.refresh();
         }
     }
 

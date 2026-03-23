@@ -13,6 +13,7 @@ const teacherRoutes = require('./routes/teacher');
 const authRoutes = require('./routes/auth');
 const oauthRoutes = require('./routes/oauth');
 const syncRoutes = require('./routes/sync');
+const assignmentRoutes = require('./routes/assignments');
 const notificationRoutes = require('./routes/notifications');
 const licenseRoutes = require('./routes/license');
 const scheduler = require('./services/scheduler');
@@ -92,6 +93,9 @@ app.use('/api/auth/oauth', oauthRoutes);
 // Cloud sync routes
 app.use('/api/sync', syncRoutes);
 
+// Assignments routes (Smart Assignments & Routine Builder)
+app.use('/api/assignments', assignmentRoutes);
+
 // Push notifications routes
 app.use('/api/notifications', notificationRoutes);
 
@@ -114,6 +118,8 @@ app.use('/api', (req, res) => {
       authLogin: '/api/auth/login',
       sync: '/api/sync',
       syncStatus: '/api/sync/status',
+      assignments: '/api/assignments',
+      assignmentProgress: '/api/assignments/:id/progress',
     },
   });
 });
