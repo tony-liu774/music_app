@@ -1062,7 +1062,8 @@ class ConcertmasterApp {
 
         if (!score && isImslp) {
             // Look up actual IMSLP metadata from cache
-            const imslpResult = this.lastImslpResults.find(r => `imslp-${r.id}` === id);
+            // Note: r.id already has 'imslp-' prefix from searchIMSLPConcurrently
+            const imslpResult = this.lastImslpResults.find(r => r.id === id);
             if (imslpResult) {
                 score = {
                     id: id,
