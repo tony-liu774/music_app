@@ -31,6 +31,12 @@
   --color-card: #1a1a28;
   --color-border-subtle: #2a2a3a;
 
+  /* Brand / OAuth Colors */
+  --color-google-blue: #4285F4;
+  --color-google-green: #34A853;
+  --color-google-yellow: #FBBC05;
+  --color-google-red: #EA4335;
+
   /* Typography */
   --font-heading: 'Playfair Display', Georgia, serif;
   --font-body: 'Source Sans 3', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -54,6 +60,9 @@
   /* Animations for Modal */
   --animate-fade-in: fade-in 200ms ease-out;
   --animate-slide-up: slide-up 200ms ease-out;
+
+  /* Animations for Mic Active State */
+  --animate-amber-pulse: amber-pulse 2s ease-in-out infinite;
 }
 
 @keyframes fade-in {
@@ -74,6 +83,11 @@
     opacity: 1;
     transform: translateY(0) scale(1);
   }
+}
+
+@keyframes amber-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-amber) 40%, transparent); }
+  50% { box-shadow: 0 0 16px 4px color-mix(in srgb, var(--color-amber) 30%, transparent); }
 }
 
 /* ============================================================================
