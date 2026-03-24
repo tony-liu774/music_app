@@ -5,6 +5,7 @@ import { useAudioStore } from '../stores/useAudioStore'
 import { useLibraryStore } from '../stores/useLibraryStore'
 import { Button } from '../components/ui'
 import PracticeControls from '../components/practice/PracticeControls'
+import AudioSuspensionOverlay from '../components/practice/AudioSuspensionOverlay'
 import SheetMusic from '../components/practice/SheetMusic'
 import useScore from '../hooks/useScore'
 
@@ -23,6 +24,9 @@ export default function PracticePage() {
   const { score, isLoading: scoreLoading, error: scoreError } = useScore(
     selectedScore?.xmlUrl || null,
   )
+
+  const resumeAudioContext = useAudioStore((s) => s.resumeAudioContext)
+  const audioContextState = useAudioStore((s) => s.audioContextState)
 
   const [currentMeasure, setCurrentMeasure] = useState(null)
   const [controlsVisible, setControlsVisible] = useState(true)
@@ -210,6 +214,16 @@ export default function PracticePage() {
         onStop={handleStop}
         visible={controlsVisible}
       />
+
+      {/* Audio suspension overlay — shown when browser suspends AudioContext */}
+      {isPracticing && (
+        <AudioSuspensionOverlay
+          onResume={resumeAudioContext}
+          isInitialSuspension={
+            isPracticing && audioContextState === 'suspended'
+          }
+        />
+      )}
     </div>
   )
 }

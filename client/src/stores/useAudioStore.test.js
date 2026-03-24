@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { useAudioStore } from './useAudioStore'
 
 describe('useAudioStore', () => {
@@ -6,6 +6,8 @@ describe('useAudioStore', () => {
     useAudioStore.setState({
       micPermission: 'prompt',
       audioContextState: 'suspended',
+      isSuspendedBySystem: false,
+      resumeFailCount: 0,
       pitchData: { frequency: null, note: null, cents: null, confidence: 0 },
       vibratoData: { rate: null, extent: null, centerFrequency: null },
       isPracticing: false,
@@ -17,6 +19,8 @@ describe('useAudioStore', () => {
     const state = useAudioStore.getState()
     expect(state.micPermission).toBe('prompt')
     expect(state.audioContextState).toBe('suspended')
+    expect(state.isSuspendedBySystem).toBe(false)
+    expect(state.resumeFailCount).toBe(0)
     expect(state.pitchData.frequency).toBeNull()
     expect(state.pitchData.confidence).toBe(0)
     expect(state.vibratoData.rate).toBeNull()
@@ -63,6 +67,36 @@ describe('useAudioStore', () => {
 
     useAudioStore.getState().setSelectedInstrument('double-bass')
     expect(useAudioStore.getState().selectedInstrument).toBe('double-bass')
+  })
+
+  it('sets isSuspendedBySystem', () => {
+    useAudioStore.getState().setIsSuspendedBySystem(true)
+    expect(useAudioStore.getState().isSuspendedBySystem).toBe(true)
+
+    useAudioStore.getState().setIsSuspendedBySystem(false)
+    expect(useAudioStore.getState().isSuspendedBySystem).toBe(false)
+  })
+
+  it('sets resumeFailCount', () => {
+    useAudioStore.getState().setResumeFailCount(3)
+    expect(useAudioStore.getState().resumeFailCount).toBe(3)
+
+    useAudioStore.getState().setResumeFailCount(0)
+    expect(useAudioStore.getState().resumeFailCount).toBe(0)
+  })
+
+  it('has default resumeAudioContext that resolves to true', async () => {
+    const result = await useAudioStore.getState().resumeAudioContext()
+    expect(result).toBe(true)
+  })
+
+  it('sets resumeAudioContext callback', async () => {
+    const customResume = vi.fn().mockResolvedValue(false)
+    useAudioStore.getState().setResumeAudioContext(customResume)
+
+    const result = await useAudioStore.getState().resumeAudioContext()
+    expect(customResume).toHaveBeenCalled()
+    expect(result).toBe(false)
   })
 
   it('has no cross-dependencies with UI store', () => {
