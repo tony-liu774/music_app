@@ -153,22 +153,27 @@ export async function requestAIDebrief(payload) {
       return generateLocalDebrief(payload)
     }
 
-    // The backend returns { success, summary, ... } — parse the summary as
-    // the LLM's JSON output which should contain { debrief, score }.
-    let parsed
-    try {
-      parsed =
-        typeof data.summary === 'string'
-          ? JSON.parse(data.summary)
-          : data.summary
-    } catch {
-      // If the LLM returned plain text instead of JSON, use it directly
-      parsed = { debrief: data.summary || data.overall_assessment }
+    // The backend returns { success, raw, summary, score, ... }.
+    // Try parsing `raw` first (the unmodified LLM JSON string) for
+    // prompt-specific fields like { debrief, score }. Fall back to
+    // the backend's pre-extracted fields.
+    let parsed = {}
+    if (data.raw) {
+      try {
+        parsed = JSON.parse(data.raw)
+      } catch {
+        parsed = {}
+      }
     }
 
     return {
-      debrief: parsed?.debrief || data.overall_assessment || data.summary || '',
-      score: typeof parsed?.score === 'number' ? parsed.score : null,
+      debrief: parsed.debrief || data.summary || data.overall_assessment || '',
+      score:
+        typeof parsed.score === 'number'
+          ? parsed.score
+          : typeof data.score === 'number'
+            ? data.score
+            : null,
       isOfflineFallback: false,
     }
   } catch {

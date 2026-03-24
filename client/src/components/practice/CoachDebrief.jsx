@@ -1,11 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Modal, Button } from '../ui'
-import {
-  buildPayload,
-  requestAIDebrief,
-  generateLocalDebrief,
-} from '../../services/AISummaryService'
+import { buildPayload, requestAIDebrief } from '../../services/AISummaryService'
 
 /**
  * CoachDebrief — modal shown after practice stops.
@@ -24,6 +20,7 @@ export default function CoachDebrief({
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
+  const [accuracyPercent, setAccuracyPercent] = useState(null)
 
   const fetchDebrief = useCallback(async () => {
     if (!sessionLog && !sessionSummary) return
@@ -39,14 +36,11 @@ export default function CoachDebrief({
       instrument,
     })
 
-    try {
-      const debrief = await requestAIDebrief(payload)
-      setResult(debrief)
-    } catch {
-      setResult(generateLocalDebrief(payload))
-    } finally {
-      setLoading(false)
-    }
+    setAccuracyPercent(payload.accuracyPercent)
+
+    const debrief = await requestAIDebrief(payload)
+    setResult(debrief)
+    setLoading(false)
   }, [sessionLog, sessionSummary, worstMeasures, instrument])
 
   useEffect(() => {
@@ -132,16 +126,7 @@ export default function CoachDebrief({
             <div className="flex justify-between font-body text-xs text-ivory-muted border-t border-border pt-3 mb-6">
               <span>Duration: {durationDisplay}</span>
               <span>
-                Accuracy:{' '}
-                {
-                  buildPayload({
-                    sessionLog,
-                    sessionSummary,
-                    worstMeasures,
-                    instrument,
-                  }).accuracyPercent
-                }
-                %
+                Accuracy: {accuracyPercent != null ? accuracyPercent : '—'}%
               </span>
             </div>
 

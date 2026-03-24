@@ -75,14 +75,17 @@ router.post('/ai-summary', async (req, res) => {
             });
         }
 
-        // Return structured response
+        // Return structured response — pass through raw LLM JSON so
+        // the client can parse prompt-specific fields (e.g. {debrief, score}).
         res.json({
             success: true,
-            summary: parsedResponse.overall_assessment || '',
+            raw: responseContent,
+            summary: parsedResponse.debrief || parsedResponse.overall_assessment || '',
             recommendations: parsedResponse.areas_for_improvement || [],
             problem_measures: parsedResponse.recommended_measures || [],
-            overall_assessment: parsedResponse.overall_assessment || '',
+            overall_assessment: parsedResponse.debrief || parsedResponse.overall_assessment || '',
             suggested_tempo: parsedResponse.suggested_tempo || 80,
+            score: parsedResponse.score ?? null,
             strengths: parsedResponse.strengths || [],
             specific_guidance: parsedResponse.specific_guidance || ''
         });

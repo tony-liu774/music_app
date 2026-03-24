@@ -16,11 +16,6 @@ vi.mock('../../../services/AISummaryService', () => ({
     recentDeviations: [],
   })),
   requestAIDebrief: vi.fn(),
-  generateLocalDebrief: vi.fn(() => ({
-    debrief: 'Good effort — keep practicing measure 4.',
-    score: 78,
-    isOfflineFallback: true,
-  })),
 }))
 
 import * as AISummaryService from '../../../services/AISummaryService'
@@ -170,15 +165,6 @@ describe('CoachDebrief', () => {
       expect(screen.getByTestId('offline-indicator')).toBeInTheDocument()
     })
     expect(screen.getByText(/AI coach unavailable/)).toBeInTheDocument()
-  })
-
-  it('falls back to local debrief when requestAIDebrief throws', async () => {
-    AISummaryService.requestAIDebrief.mockRejectedValue(new Error('fail'))
-    renderDebrief()
-    await waitFor(() => {
-      expect(screen.getByTestId('debrief-result')).toBeInTheDocument()
-    })
-    expect(screen.getByTestId('offline-indicator')).toBeInTheDocument()
   })
 
   it('displays session duration', async () => {

@@ -250,13 +250,15 @@ describe('AISummaryService', () => {
       global.fetch = originalFetch
     })
 
-    it('returns AI debrief on successful response', async () => {
+    it('returns AI debrief on successful response with raw field', async () => {
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         json: () =>
           Promise.resolve({
             success: true,
-            summary: JSON.stringify({ debrief: 'Great session!', score: 82 }),
+            raw: JSON.stringify({ debrief: 'Great session!', score: 82 }),
+            summary: 'Great session!',
+            score: 82,
           }),
       })
 
@@ -269,6 +271,29 @@ describe('AISummaryService', () => {
 
       expect(result.debrief).toBe('Great session!')
       expect(result.score).toBe(82)
+      expect(result.isOfflineFallback).toBe(false)
+    })
+
+    it('falls back to summary field when raw is missing', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            success: true,
+            summary: 'Nice work today.',
+            score: 75,
+          }),
+      })
+
+      const payload = buildPayload({
+        sessionLog: makeSessionLog([]),
+        sessionSummary: makeSummary(),
+        worstMeasures: [],
+      })
+      const result = await requestAIDebrief(payload)
+
+      expect(result.debrief).toBe('Nice work today.')
+      expect(result.score).toBe(75)
       expect(result.isOfflineFallback).toBe(false)
     })
 
@@ -321,6 +346,7 @@ describe('AISummaryService', () => {
         json: () =>
           Promise.resolve({
             success: true,
+            raw: 'not valid json',
             summary: 'Your bowing was excellent today.',
             overall_assessment: 'Your bowing was excellent today.',
           }),
@@ -342,7 +368,8 @@ describe('AISummaryService', () => {
         json: () =>
           Promise.resolve({
             success: true,
-            summary: JSON.stringify({ debrief: 'test', score: 50 }),
+            raw: JSON.stringify({ debrief: 'test', score: 50 }),
+            summary: 'test',
           }),
       })
 
