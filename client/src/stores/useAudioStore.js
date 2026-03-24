@@ -24,6 +24,11 @@ export const useAudioStore = create(
       setResumeFailCount: (count) =>
         set({ resumeFailCount: count }, false, 'setResumeFailCount'),
 
+      // Callback to resume a suspended AudioContext (registered by the pipeline owner)
+      resumeAudioContext: async () => true, // no-op default
+      setResumeAudioContext: (fn) =>
+        set({ resumeAudioContext: fn }, false, 'setResumeAudioContext'),
+
       // Current pitch data
       pitchData: {
         frequency: null,

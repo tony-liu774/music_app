@@ -30,6 +30,7 @@ export function useAudioPipeline(options = {}) {
 
   const setPitchData = useAudioStore((s) => s.setPitchData)
   const setAudioContextState = useAudioStore((s) => s.setAudioContextState)
+  const setResumeAudioContext = useAudioStore((s) => s.setResumeAudioContext)
   const selectedInstrument = useAudioStore((s) => s.selectedInstrument)
 
   const workerRef = useRef(null)
@@ -183,6 +184,12 @@ export function useAudioPipeline(options = {}) {
     // Reset pitch data
     setPitchData({ frequency: null, confidence: 0, note: null, cents: null })
   }, [setAudioContextState, setPitchData])
+
+  // Register the resume callback in the store so other components can use it
+  useEffect(() => {
+    setResumeAudioContext(resumeAudioContext)
+    return () => setResumeAudioContext(async () => true)
+  }, [resumeAudioContext, setResumeAudioContext])
 
   // Cleanup on unmount
   useEffect(() => {

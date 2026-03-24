@@ -88,6 +88,7 @@ describe('useAudioPipeline', () => {
       audioContextState: 'suspended',
       isSuspendedBySystem: false,
       resumeFailCount: 0,
+      resumeAudioContext: async () => true,
       selectedInstrument: 'violin',
     })
 
@@ -403,5 +404,23 @@ describe('useAudioPipeline', () => {
     })
 
     expect(result.current.error).toBeNull()
+  })
+
+  it('registers resumeAudioContext in the audio store', async () => {
+    const { result } = renderHook(() => useAudioPipeline())
+
+    // The store should have the resume callback registered
+    const storeResume = useAudioStore.getState().resumeAudioContext
+    expect(storeResume).toBeInstanceOf(Function)
+  })
+
+  it('clears resumeAudioContext from the store on unmount', async () => {
+    const { unmount } = renderHook(() => useAudioPipeline())
+
+    unmount()
+
+    // After unmount, should reset to the default no-op
+    const result = await useAudioStore.getState().resumeAudioContext()
+    expect(result).toBe(true)
   })
 })

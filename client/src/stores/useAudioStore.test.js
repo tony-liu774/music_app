@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { useAudioStore } from './useAudioStore'
 
 describe('useAudioStore', () => {
@@ -83,6 +83,20 @@ describe('useAudioStore', () => {
 
     useAudioStore.getState().setResumeFailCount(0)
     expect(useAudioStore.getState().resumeFailCount).toBe(0)
+  })
+
+  it('has default resumeAudioContext that resolves to true', async () => {
+    const result = await useAudioStore.getState().resumeAudioContext()
+    expect(result).toBe(true)
+  })
+
+  it('sets resumeAudioContext callback', async () => {
+    const customResume = vi.fn().mockResolvedValue(false)
+    useAudioStore.getState().setResumeAudioContext(customResume)
+
+    const result = await useAudioStore.getState().resumeAudioContext()
+    expect(customResume).toHaveBeenCalled()
+    expect(result).toBe(false)
   })
 
   it('has no cross-dependencies with UI store', () => {
