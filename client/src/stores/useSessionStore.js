@@ -28,6 +28,15 @@ export const useSessionStore = create(
         ),
       clearErrorLog: () => set({ errorLog: [] }, false, 'clearErrorLog'),
 
+      // Session log data (from SessionLogger)
+      sessionLog: null,
+      setSessionLog: (log) => set({ sessionLog: log }, false, 'setSessionLog'),
+
+      // Session summary stats (from SessionLogger.getSummaryStats)
+      sessionSummary: null,
+      setSessionSummary: (summary) =>
+        set({ sessionSummary: summary }, false, 'setSessionSummary'),
+
       // Score association
       scoreId: null,
       setScoreId: (id) => set({ scoreId: id }, false, 'setScoreId'),

@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useUIStore } from '../stores/useUIStore'
 import { useAudioStore } from '../stores/useAudioStore'
 import { useLibraryStore } from '../stores/useLibraryStore'
+import { useSessionStore } from '../stores/useSessionStore'
+import { useSessionLogger } from '../hooks/useSessionLogger'
 import { Button } from '../components/ui'
 import PracticeControls from '../components/practice/PracticeControls'
 
@@ -18,6 +20,9 @@ export default function PracticePage() {
   const setIsPracticing = useAudioStore((s) => s.setIsPracticing)
 
   const selectedScore = useLibraryStore((s) => s.selectedScore)
+  const sessionSummary = useSessionStore((s) => s.sessionSummary)
+
+  const { startSession, endSession } = useSessionLogger()
 
   const [controlsVisible, setControlsVisible] = useState(true)
   const hideTimerRef = useRef(null)
@@ -50,21 +55,23 @@ export default function PracticePage() {
       setControlsVisible(true)
       clearTimeout(hideTimerRef.current)
     } else {
-      // Play / Resume — enter ghost mode
+      // Play / Resume — enter ghost mode and start session logging
       setIsPracticing(true)
+      startSession(selectedScore?.id)
       enterGhostMode()
       setControlsVisible(true)
       startAutoHideTimer()
     }
-  }, [isPracticing, setIsPracticing, enterGhostMode, exitGhostMode, startAutoHideTimer])
+  }, [isPracticing, setIsPracticing, enterGhostMode, exitGhostMode, startAutoHideTimer, startSession, selectedScore])
 
-  // Stop handler — exit ghost mode entirely
+  // Stop handler — exit ghost mode and end session logging
   const handleStop = useCallback(() => {
     setIsPracticing(false)
+    endSession()
     exitGhostMode()
     setControlsVisible(true)
     clearTimeout(hideTimerRef.current)
-  }, [setIsPracticing, exitGhostMode])
+  }, [setIsPracticing, exitGhostMode, endSession])
 
   // When practice stops externally, show controls
   useEffect(() => {
@@ -180,6 +187,28 @@ export default function PracticePage() {
           </div>
         </div>
       </div>
+
+      {/* Session summary — shown after practice ends */}
+      {!isPracticing && !ghostMode && sessionSummary && sessionSummary.total_notes_played > 0 && (
+        <div
+          data-testid="session-summary"
+          className="absolute top-4 right-4 w-72 bg-surface border border-border rounded-lg p-4 shadow-lg z-20"
+        >
+          <h3 className="font-heading text-sm text-ivory mb-2">Session Summary</h3>
+          <div className="space-y-1 font-body text-xs text-ivory-muted">
+            <p>Deviations logged: {sessionSummary.total_notes_played}</p>
+            {sessionSummary.pitch_deviation_count > 0 && (
+              <p>Pitch: {sessionSummary.pitch_deviation_count} (avg {sessionSummary.average_pitch_deviation_cents}c)</p>
+            )}
+            {sessionSummary.intonation_deviation_count > 0 && (
+              <p>Intonation: {sessionSummary.intonation_deviation_count}</p>
+            )}
+            {sessionSummary.worst_measure && (
+              <p className="text-amber">Needs work: m.{sessionSummary.worst_measure}</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Tap overlay hint — shows briefly when controls are hidden */}
       {ghostMode && !controlsVisible && (
