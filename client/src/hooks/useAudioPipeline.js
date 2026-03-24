@@ -55,8 +55,9 @@ export function useAudioPipeline(options = {}) {
 
         if (vibrato) {
           setVibratoData({
-            rate: vibrato.vibratoRate,
-            extent: vibrato.vibratoExtent,
+            isVibrato: vibrato.isVibrato,
+            vibratoRate: vibrato.vibratoRate,
+            vibratoWidth: vibrato.vibratoExtent,
             centerFrequency: vibrato.smoothedFrequency,
           })
         }
@@ -186,7 +187,7 @@ export function useAudioPipeline(options = {}) {
 
     // Reset pitch and vibrato data
     setPitchData({ frequency: null, confidence: 0, note: null, cents: null })
-    setVibratoData({ rate: null, extent: null, centerFrequency: null })
+    setVibratoData({ isVibrato: false, vibratoRate: null, vibratoWidth: null, centerFrequency: null })
   }, [setAudioContextState, setPitchData, setVibratoData])
 
   // Cleanup on unmount

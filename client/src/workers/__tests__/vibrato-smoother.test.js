@@ -44,7 +44,7 @@ describe('VibratoSmoother', () => {
     expect(s.minConfidence).toBe(0.5)
     expect(s.minVibratoRate).toBe(4)
     expect(s.maxVibratoRate).toBe(8)
-    expect(s.minVibratoExtent).toBe(20)
+    expect(s.minVibratoExtent).toBe(30)
   })
 
   it('accepts custom options', () => {
@@ -153,7 +153,7 @@ describe('VibratoSmoother — vibrato detection', () => {
     }
 
     expect(result.isVibrato).toBe(true)
-    expect(result.vibratoExtent).toBeGreaterThanOrEqual(20)
+    expect(result.vibratoExtent).toBeGreaterThanOrEqual(30)
     // Rate should be roughly 6 Hz (allow some tolerance)
     expect(result.vibratoRate).toBeGreaterThanOrEqual(3)
     expect(result.vibratoRate).toBeLessThanOrEqual(10)
@@ -183,16 +183,16 @@ describe('VibratoSmoother — vibrato detection', () => {
     expect(result.isVibrato).toBe(false)
   })
 
-  it('does NOT flag vibrato for small extent (< 20 cents)', () => {
+  it('does NOT flag vibrato for small extent (< 30 cents)', () => {
     const s = new VibratoSmoother({ windowMs: 500 })
-    // 6 Hz oscillation but only 10 cents extent
-    const seq = generateVibratoSequence(440, 6, 10, 600, 10)
+    // 6 Hz oscillation but only 20 cents extent — below 30-cent default threshold
+    const seq = generateVibratoSequence(440, 6, 20, 600, 10)
     let result
     for (const { freq, ts } of seq) {
       result = s.process(freq, 0.95, ts)
     }
     expect(result.isVibrato).toBe(false)
-    expect(result.vibratoExtent).toBeLessThan(20)
+    expect(result.vibratoExtent).toBeLessThan(30)
   })
 
   it('smoothed center frequency stable during vibrato', () => {

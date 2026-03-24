@@ -269,14 +269,14 @@ export class VibratoSmoother {
    * @param {number} [opts.minConfidence=0.5]    — ignore samples below this
    * @param {number} [opts.minVibratoRate=4]     — lowest vibrato rate (Hz)
    * @param {number} [opts.maxVibratoRate=8]     — highest vibrato rate (Hz)
-   * @param {number} [opts.minVibratoExtent=20]  — min extent to flag vibrato (cents)
+   * @param {number} [opts.minVibratoExtent=30]  — min extent to flag vibrato (cents)
    */
   constructor(opts = {}) {
     this.windowMs = opts.windowMs ?? 200
     this.minConfidence = opts.minConfidence ?? 0.5
     this.minVibratoRate = opts.minVibratoRate ?? 4
     this.maxVibratoRate = opts.maxVibratoRate ?? 8
-    this.minVibratoExtent = opts.minVibratoExtent ?? 20
+    this.minVibratoExtent = opts.minVibratoExtent ?? 30
 
     /** @type {{ freq: number, confidence: number, ts: number }[]} */
     this.samples = []
