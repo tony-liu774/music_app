@@ -155,7 +155,6 @@ export function useMicrophone() {
     stopStream()
     setStatus('idle')
     setError(null)
-    persistState(null)
     setMicPermission('prompt')
     try {
       localStorage.removeItem(STORAGE_KEY)
@@ -178,7 +177,6 @@ export function useMicrophone() {
     status,
     error,
     isActive,
-    stream: streamRef.current,
     requestAccess,
     stopStream,
     reset,

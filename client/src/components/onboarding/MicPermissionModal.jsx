@@ -243,15 +243,15 @@ function GrantedContent({ onContinue }) {
  * Shows different content based on the current permission state.
  */
 function MicPermissionModal({ isOpen, onClose, onComplete }) {
-  const { status, error, isActive, requestAccess, reset } = useMicrophone()
+  const { status, error, requestAccess, stopStream, reset } = useMicrophone()
 
   const handleAllow = useCallback(async () => {
     const stream = await requestAccess()
     if (stream) {
-      // Stop the stream — we just needed to confirm permission
-      stream.getTracks().forEach((track) => track.stop())
+      // Stop the stream via hook — we just needed to confirm permission
+      stopStream()
     }
-  }, [requestAccess])
+  }, [requestAccess, stopStream])
 
   const handleRetry = useCallback(() => {
     reset()
