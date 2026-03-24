@@ -1,4 +1,10 @@
-import { useState, useEffect, useCallback, createContext, useContext } from 'react'
+import {
+  useState,
+  useEffect,
+  useCallback,
+  createContext,
+  useContext,
+} from 'react'
 
 const variantClasses = {
   success: 'bg-elevated border-emerald text-ivory',
@@ -18,7 +24,13 @@ const iconColors = {
   info: 'text-amber',
 }
 
-function ToastItem({ id, variant = 'info', message, duration = 4000, onDismiss }) {
+function ToastItem({
+  id,
+  variant = 'info',
+  message,
+  duration = 4000,
+  onDismiss,
+}) {
   const [isVisible, setIsVisible] = useState(false)
 
   useEffect(() => {
@@ -101,11 +113,7 @@ export function ToastProvider({ children }) {
       {/* Toast container — bottom-right */}
       <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm">
         {toasts.map((toast) => (
-          <ToastItem
-            key={toast.id}
-            {...toast}
-            onDismiss={removeToast}
-          />
+          <ToastItem key={toast.id} {...toast} onDismiss={removeToast} />
         ))}
       </div>
     </ToastContext.Provider>

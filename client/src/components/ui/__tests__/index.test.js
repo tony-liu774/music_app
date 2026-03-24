@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { Button, Modal, Card, Toast, ToastProvider, useToast, Input, Select } from '../index'
+import {
+  Button,
+  Modal,
+  Card,
+  Toast,
+  ToastProvider,
+  useToast,
+  Input,
+  Select,
+} from '../index'
 
 describe('UI barrel export', () => {
   it('exports Button', () => {

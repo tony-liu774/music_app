@@ -15,7 +15,8 @@ export const useLibraryStore = create(
 
       // Search / filter
       searchQuery: '',
-      setSearchQuery: (query) => set({ searchQuery: query }, false, 'setSearchQuery'),
+      setSearchQuery: (query) =>
+        set({ searchQuery: query }, false, 'setSearchQuery'),
 
       filterInstrument: null,
       setFilterInstrument: (instrument) =>
@@ -27,7 +28,8 @@ export const useLibraryStore = create(
 
       // Loading state
       isLoading: false,
-      setIsLoading: (loading) => set({ isLoading: loading }, false, 'setIsLoading'),
+      setIsLoading: (loading) =>
+        set({ isLoading: loading }, false, 'setIsLoading'),
 
       // Error state
       error: null,

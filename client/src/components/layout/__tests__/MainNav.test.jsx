@@ -6,7 +6,7 @@ function renderNav(initialEntries = ['/']) {
   return render(
     <MemoryRouter initialEntries={initialEntries}>
       <MainNav />
-    </MemoryRouter>
+    </MemoryRouter>,
   )
 }
 

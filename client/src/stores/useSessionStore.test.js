@@ -38,8 +38,12 @@ describe('useSessionStore', () => {
   })
 
   it('adds errors to the log with timestamps', () => {
-    useSessionStore.getState().addError({ measure: 5, type: 'pitch', deviation: 15 })
-    useSessionStore.getState().addError({ measure: 8, type: 'rhythm', deviation: 50 })
+    useSessionStore
+      .getState()
+      .addError({ measure: 5, type: 'pitch', deviation: 15 })
+    useSessionStore
+      .getState()
+      .addError({ measure: 8, type: 'rhythm', deviation: 50 })
 
     const errors = useSessionStore.getState().errorLog
     expect(errors).toHaveLength(2)
@@ -49,13 +53,17 @@ describe('useSessionStore', () => {
   })
 
   it('clears the error log', () => {
-    useSessionStore.getState().addError({ measure: 1, type: 'pitch', deviation: 10 })
+    useSessionStore
+      .getState()
+      .addError({ measure: 1, type: 'pitch', deviation: 10 })
     useSessionStore.getState().clearErrorLog()
     expect(useSessionStore.getState().errorLog).toEqual([])
   })
 
   it('starting a new session resets the error log', () => {
-    useSessionStore.getState().addError({ measure: 1, type: 'pitch', deviation: 10 })
+    useSessionStore
+      .getState()
+      .addError({ measure: 1, type: 'pitch', deviation: 10 })
     useSessionStore.getState().startSession('session-2')
     expect(useSessionStore.getState().errorLog).toEqual([])
   })
@@ -66,7 +74,12 @@ describe('useSessionStore', () => {
   })
 
   it('adds practice records to history', () => {
-    const record = { sessionId: 's1', duration: 300, scoreId: 'score-1', errors: 5 }
+    const record = {
+      sessionId: 's1',
+      duration: 300,
+      scoreId: 'score-1',
+      errors: 5,
+    }
     useSessionStore.getState().addPracticeRecord(record)
     expect(useSessionStore.getState().practiceHistory).toHaveLength(1)
     expect(useSessionStore.getState().practiceHistory[0]).toEqual(record)

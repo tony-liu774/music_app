@@ -1,7 +1,15 @@
 import { forwardRef } from 'react'
 
 const Select = forwardRef(function Select(
-  { label, error, options = [], placeholder, className = '', children, ...props },
+  {
+    label,
+    error,
+    options = [],
+    placeholder,
+    className = '',
+    children,
+    ...props
+  },
   ref,
 ) {
   return (
@@ -42,9 +50,7 @@ const Select = forwardRef(function Select(
           <polyline points="6 9 12 15 18 9" />
         </svg>
       </div>
-      {error && (
-        <span className="font-body text-sm text-crimson">{error}</span>
-      )}
+      {error && <span className="font-body text-sm text-crimson">{error}</span>}
     </div>
   )
 })

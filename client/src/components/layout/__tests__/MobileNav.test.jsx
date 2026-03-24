@@ -6,7 +6,7 @@ function renderNav(initialEntries = ['/']) {
   return render(
     <MemoryRouter initialEntries={initialEntries}>
       <MobileNav />
-    </MemoryRouter>
+    </MemoryRouter>,
   )
 }
 
@@ -41,7 +41,7 @@ describe('MobileNav', () => {
   it('SVG icons have bounded dimensions', () => {
     renderNav()
     const svgs = document.querySelectorAll('nav svg')
-    svgs.forEach(svg => {
+    svgs.forEach((svg) => {
       expect(svg).toHaveClass('max-w-6', 'max-h-6')
     })
   })
