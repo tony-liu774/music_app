@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useUIStore } from '../stores/useUIStore'
 import { useAudioStore } from '../stores/useAudioStore'
+import { useLibraryStore } from '../stores/useLibraryStore'
 import PracticeControls from '../components/practice/PracticeControls'
+import SheetMusic from '../components/practice/SheetMusic'
+import useScore from '../hooks/useScore'
 
 const CONTROLS_AUTO_HIDE_MS = 3000
 
@@ -13,6 +16,12 @@ export default function PracticePage() {
   const isPracticing = useAudioStore((s) => s.isPracticing)
   const setIsPracticing = useAudioStore((s) => s.setIsPracticing)
 
+  const selectedScore = useLibraryStore((s) => s.selectedScore)
+  const { score, isLoading: scoreLoading, error: scoreError } = useScore(
+    selectedScore?.xmlUrl || null,
+  )
+
+  const [currentMeasure, setCurrentMeasure] = useState(null)
   const [controlsVisible, setControlsVisible] = useState(true)
   const hideTimerRef = useRef(null)
   const isPracticingRef = useRef(isPracticing)
@@ -126,32 +135,36 @@ export default function PracticePage() {
       {/* Sheet music area */}
       <div
         data-testid="sheet-music-area"
-        className={`${ghostMode ? 'h-full' : 'h-[80%]'} flex items-center justify-center`}
+        className={`${ghostMode ? 'h-full' : 'h-[80%]'} flex flex-col items-center justify-center`}
       >
-        <div className="text-center">
-          {!isPracticing && !ghostMode && (
-            <>
-              <h1 className="font-heading text-3xl text-ivory mb-4">
-                Practice
-              </h1>
-              <p className="font-body text-ivory-muted mb-8">
-                Press play to start your practice session
-              </p>
-            </>
-          )}
-          <div
-            data-testid="sheet-music-placeholder"
-            className="w-full max-w-4xl mx-auto px-4"
-          >
-            <div className="border border-border-light rounded-lg p-8 min-h-48 flex items-center justify-center">
-              <p className="font-body text-ivory-dim text-sm">
-                {isPracticing
-                  ? 'Sheet music will render here'
-                  : 'Select a piece from your library to begin'}
-              </p>
-            </div>
+        {!isPracticing && !ghostMode && !score && (
+          <div className="text-center mb-4">
+            <h1 className="font-heading text-3xl text-ivory mb-4">
+              Practice
+            </h1>
+            <p className="font-body text-ivory-muted mb-8">
+              Press play to start your practice session
+            </p>
           </div>
-        </div>
+        )}
+
+        {scoreLoading && (
+          <p data-testid="score-loading" className="font-body text-ivory-muted text-sm">
+            Loading score...
+          </p>
+        )}
+
+        {scoreError && (
+          <p data-testid="score-error" className="font-body text-crimson text-sm">
+            {scoreError}
+          </p>
+        )}
+
+        <SheetMusic
+          score={score}
+          currentMeasure={currentMeasure}
+          className="w-full max-w-6xl mx-auto"
+        />
       </div>
 
       {/* Tap overlay hint — shows briefly when controls are hidden */}
