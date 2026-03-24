@@ -25,6 +25,7 @@ const BASE_RETRY_DELAY_MS = 200
  * @param {AudioContext|null} audioContext — the AudioContext to monitor
  * @param {object} [options]
  * @param {boolean} [options.enabled=true] — whether monitoring is active
+ * @returns {{ resume: () => Promise<boolean> }} resume — manually resume a suspended context; resolves true on success
  */
 export function useAudioContextSuspension(audioContext, options = {}) {
   const enabled = options.enabled ?? true
@@ -59,7 +60,11 @@ export function useAudioContextSuspension(audioContext, options = {}) {
         setResumeFailCount(retryCountRef.current)
 
         if (retryCountRef.current < MAX_RESUME_RETRIES) {
-          // Schedule retry with exponential backoff
+          // Schedule retry with exponential backoff.
+          // Note: each retry overwrites retryTimerRef.current. If unmount
+          // occurs between the setTimeout callback and the next scheduled
+          // retry, the in-flight promise chain may complete post-unmount.
+          // This is safe because only Zustand state updates run (no DOM ops).
           const delay =
             BASE_RETRY_DELAY_MS * Math.pow(2, retryCountRef.current - 1)
           return new Promise((resolve) => {

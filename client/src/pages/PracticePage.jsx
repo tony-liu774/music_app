@@ -5,6 +5,8 @@ import { useAudioStore } from '../stores/useAudioStore'
 import { useLibraryStore } from '../stores/useLibraryStore'
 import { Button } from '../components/ui'
 import PracticeControls from '../components/practice/PracticeControls'
+import AudioSuspensionOverlay from '../components/practice/AudioSuspensionOverlay'
+import { useAudioPipeline } from '../hooks/useAudioPipeline'
 
 const CONTROLS_AUTO_HIDE_MS = 3000
 
@@ -18,6 +20,9 @@ export default function PracticePage() {
   const setIsPracticing = useAudioStore((s) => s.setIsPracticing)
 
   const selectedScore = useLibraryStore((s) => s.selectedScore)
+
+  const { resumeAudioContext } = useAudioPipeline()
+  const audioContextState = useAudioStore((s) => s.audioContextState)
 
   const [controlsVisible, setControlsVisible] = useState(true)
   const hideTimerRef = useRef(null)
@@ -200,6 +205,16 @@ export default function PracticePage() {
         onStop={handleStop}
         visible={controlsVisible}
       />
+
+      {/* Audio suspension overlay — shown when browser suspends AudioContext */}
+      {isPracticing && (
+        <AudioSuspensionOverlay
+          onResume={resumeAudioContext}
+          isInitialSuspension={
+            isPracticing && audioContextState === 'suspended'
+          }
+        />
+      )}
     </div>
   )
 }
