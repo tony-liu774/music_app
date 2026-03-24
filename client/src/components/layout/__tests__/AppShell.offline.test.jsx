@@ -26,6 +26,10 @@ vi.mock('../../../stores/useUIStore', () => ({
   useUIStore: vi.fn((selector) => selector({ navVisible: true })),
 }))
 
+vi.mock('../../ui/Toast', () => ({
+  useToast: vi.fn(() => ({ addToast: vi.fn(), removeToast: vi.fn() })),
+}))
+
 import AppShell from '../AppShell'
 import { useOffline } from '../../../hooks/useOffline'
 

@@ -14,16 +14,6 @@ export function useScoreCache() {
   const setError = useLibraryStore((s) => s.setError)
   const hasCachedRef = useRef(false)
 
-  // Cache scores to IndexedDB whenever the library updates (online)
-  useEffect(() => {
-    if (scores.length > 0 && navigator.onLine) {
-      offlineManager.cacheScores(scores).catch(() => {
-        // Silently fail — cache is best-effort
-      })
-      hasCachedRef.current = true
-    }
-  }, [scores])
-
   const loadFromCache = useCallback(async () => {
     setIsLoading(true)
     setError(null)
@@ -38,6 +28,23 @@ export function useScoreCache() {
       setIsLoading(false)
     }
   }, [setScores, setIsLoading, setError])
+
+  // Cache scores to IndexedDB whenever the library updates (online)
+  useEffect(() => {
+    if (scores.length > 0 && navigator.onLine) {
+      offlineManager.cacheScores(scores).catch(() => {
+        // Silently fail — cache is best-effort
+      })
+      hasCachedRef.current = true
+    }
+  }, [scores])
+
+  // Auto-load from cache when offline on mount
+  useEffect(() => {
+    if (!navigator.onLine && scores.length === 0 && !hasCachedRef.current) {
+      loadFromCache()
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const getCachedScore = useCallback(async (id) => {
     return offlineManager.getCachedScore(id)

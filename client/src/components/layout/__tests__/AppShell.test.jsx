@@ -1,5 +1,30 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { vi } from 'vitest'
+
+vi.mock('../../../hooks/useOffline', () => ({
+  useOffline: () => ({
+    isOnline: true,
+    isSyncing: false,
+    pendingCount: 0,
+    queueSessionData: vi.fn(),
+    queueDebriefRequest: vi.fn(),
+    processQueue: vi.fn(),
+    refreshPendingCount: vi.fn(),
+  }),
+}))
+
+vi.mock('../../../hooks/useScoreCache', () => ({
+  useScoreCache: () => ({
+    loadFromCache: vi.fn(),
+    getCachedScore: vi.fn(),
+  }),
+}))
+
+vi.mock('../../ui/Toast', () => ({
+  useToast: () => ({ addToast: vi.fn(), removeToast: vi.fn() }),
+}))
+
 import AppShell from '../AppShell'
 
 function renderShell(initialEntries = ['/']) {

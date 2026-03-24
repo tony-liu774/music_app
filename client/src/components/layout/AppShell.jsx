@@ -4,10 +4,12 @@ import MobileNav from './MobileNav'
 import { useUIStore } from '../../stores/useUIStore'
 import { useOffline } from '../../hooks/useOffline'
 import { useScoreCache } from '../../hooks/useScoreCache'
+import { useToast } from '../ui/Toast'
 
 export default function AppShell() {
   const navVisible = useUIStore((s) => s.navVisible)
-  const { isOnline, pendingCount } = useOffline()
+  const toast = useToast()
+  const { isOnline, pendingCount } = useOffline({ toast })
 
   // Cache scores to IndexedDB for offline access
   useScoreCache()
