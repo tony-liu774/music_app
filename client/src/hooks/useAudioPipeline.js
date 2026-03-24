@@ -1,0 +1,176 @@
+import { useRef, useCallback, useEffect } from 'react'
+import { useAudioStore } from '../stores/useAudioStore'
+
+/**
+ * Default audio pipeline configuration.
+ */
+const DEFAULTS = {
+  bufferSize: 2048,
+  sampleRate: 44100, // fallback; actual rate comes from AudioContext
+}
+
+/**
+ * React hook that wires a microphone MediaStream through an AudioContext
+ * into a Web Worker running pYIN pitch detection.
+ *
+ * Responsibilities:
+ * 1. Creates an AudioContext and connects the MediaStream source.
+ * 2. Uses a ScriptProcessorNode to capture raw audio frames.
+ * 3. Posts Float32Array buffers to the DSP worker (zero-copy via transfer).
+ * 4. Receives pitch results and writes them to useAudioStore.
+ * 5. Terminates the worker and closes the AudioContext on unmount.
+ *
+ * @param {object} [options]
+ * @param {number} [options.bufferSize=2048]
+ * @returns {{ start, stop, isRunning }}
+ */
+export function useAudioPipeline(options = {}) {
+  const bufferSize = options.bufferSize ?? DEFAULTS.bufferSize
+
+  const setPitchData = useAudioStore((s) => s.setPitchData)
+  const setAudioContextState = useAudioStore((s) => s.setAudioContextState)
+  const selectedInstrument = useAudioStore((s) => s.selectedInstrument)
+
+  const workerRef = useRef(null)
+  const audioCtxRef = useRef(null)
+  const sourceRef = useRef(null)
+  const processorRef = useRef(null)
+  const isRunningRef = useRef(false)
+
+  /**
+   * Handle messages from the DSP worker.
+   */
+  const handleWorkerMessage = useCallback(
+    (e) => {
+      const { type } = e.data
+      if (type === 'RESULT') {
+        const { frequency, confidence, note, cents } = e.data
+        setPitchData({ frequency, confidence, note, cents })
+      }
+      // PERF and ERROR messages can be logged or surfaced to devtools
+    },
+    [setPitchData],
+  )
+
+  /**
+   * Start the audio pipeline.
+   * @param {MediaStream} stream — from getUserMedia
+   */
+  const start = useCallback(
+    async (stream) => {
+      if (isRunningRef.current) return
+
+      // 1. Create AudioContext
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+      audioCtxRef.current = audioCtx
+      setAudioContextState(audioCtx.state)
+
+      // Handle AudioContext state changes
+      audioCtx.onstatechange = () => {
+        setAudioContextState(audioCtx.state)
+      }
+
+      // Resume if suspended (browsers require user gesture)
+      if (audioCtx.state === 'suspended') {
+        await audioCtx.resume()
+      }
+
+      const sampleRate = audioCtx.sampleRate
+
+      // 2. Spawn the DSP worker
+      const worker = new Worker(
+        new URL('../workers/dsp-worker.js', import.meta.url),
+        { type: 'module' },
+      )
+      workerRef.current = worker
+      worker.onmessage = handleWorkerMessage
+
+      // 3. Initialise the worker
+      worker.postMessage({
+        type: 'INIT',
+        sampleRate,
+        bufferSize,
+        instrument: selectedInstrument,
+      })
+
+      // 4. Connect MediaStream → ScriptProcessorNode
+      const source = audioCtx.createMediaStreamSource(stream)
+      sourceRef.current = source
+
+      // ScriptProcessorNode: input channels = 1, output channels = 1
+      const processor = audioCtx.createScriptProcessor(bufferSize, 1, 1)
+      processorRef.current = processor
+
+      processor.onaudioprocess = (audioEvent) => {
+        if (!isRunningRef.current) return
+
+        const inputData = audioEvent.inputBuffer.getChannelData(0)
+        // Copy into a new Float32Array so we can transfer the buffer
+        const copy = new Float32Array(inputData.length)
+        copy.set(inputData)
+
+        worker.postMessage(
+          { type: 'PROCESS', buffer: copy },
+          [copy.buffer], // transfer the ArrayBuffer for zero-copy
+        )
+      }
+
+      source.connect(processor)
+      // Connect processor to destination to keep it alive (output is silent)
+      processor.connect(audioCtx.destination)
+
+      isRunningRef.current = true
+    },
+    [bufferSize, selectedInstrument, handleWorkerMessage, setAudioContextState],
+  )
+
+  /**
+   * Stop the audio pipeline and release resources.
+   */
+  const stop = useCallback(() => {
+    isRunningRef.current = false
+
+    if (processorRef.current) {
+      processorRef.current.onaudioprocess = null
+      processorRef.current.disconnect()
+      processorRef.current = null
+    }
+
+    if (sourceRef.current) {
+      sourceRef.current.disconnect()
+      sourceRef.current = null
+    }
+
+    if (workerRef.current) {
+      workerRef.current.terminate()
+      workerRef.current = null
+    }
+
+    if (audioCtxRef.current) {
+      audioCtxRef.current.close()
+      audioCtxRef.current = null
+      setAudioContextState('closed')
+    }
+
+    // Reset pitch data
+    setPitchData({ frequency: null, confidence: 0, note: null, cents: null })
+  }, [setAudioContextState, setPitchData])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      if (isRunningRef.current) {
+        stop()
+      }
+    }
+  }, [stop])
+
+  return {
+    start,
+    stop,
+    get isRunning() {
+      return isRunningRef.current
+    },
+  }
+}
