@@ -6,7 +6,9 @@ import { useLibraryStore } from '../stores/useLibraryStore'
 import { useSessionStore } from '../stores/useSessionStore'
 import { useSessionLogger } from '../hooks/useSessionLogger'
 import { useHeatMapData } from '../hooks/useHeatMapData'
+import { useSmartLoop } from '../hooks/useSmartLoop'
 import { Button } from '../components/ui'
+import { useToast } from '../components/ui/Toast'
 import PracticeControls from '../components/practice/PracticeControls'
 import AudioSuspensionOverlay from '../components/practice/AudioSuspensionOverlay'
 import SheetMusic from '../components/practice/SheetMusic'
@@ -14,6 +16,7 @@ import CoachDebrief from '../components/practice/CoachDebrief'
 import PredictiveCursor from '../components/practice/PredictiveCursor'
 import IntonationNeedle from '../components/practice/IntonationNeedle'
 import HeatMapOverlay from '../components/practice/HeatMapOverlay'
+import SmartLoop from '../components/practice/SmartLoop'
 import useScore from '../hooks/useScore'
 import usePredictiveCursor from '../hooks/usePredictiveCursor'
 
@@ -46,7 +49,6 @@ export default function PracticePage() {
     isPaused: sessionPaused,
   } = useSessionLogger()
 
-  const sessionLog = useSessionStore((s) => s.sessionLog)
   const selectedInstrument = useAudioStore((s) => s.selectedInstrument)
   const [debriefOpen, setDebriefOpen] = useState(false)
   const debriefDataRef = useRef(null)
@@ -56,6 +58,17 @@ export default function PracticePage() {
 
   const resumeAudioContext = useAudioStore((s) => s.resumeAudioContext)
   const audioContextState = useAudioStore((s) => s.audioContextState)
+
+  const { addToast } = useToast()
+
+  const handleSmartLoopAutoExit = useCallback(() => {
+    addToast({
+      variant: 'success',
+      message:
+        'Great work! Your accuracy has reached a consistent level. Keep it up!',
+      duration: 5000,
+    })
+  }, [addToast])
 
   const [controlsVisible, setControlsVisible] = useState(true)
   const [tempo, setTempo] = useState(120)
@@ -72,6 +85,7 @@ export default function PracticePage() {
     currentMeasure,
     isBouncing,
     reset: resetCursor,
+    seekToMeasure,
   } = usePredictiveCursor({
     score,
     partIndex: 0,
@@ -83,6 +97,15 @@ export default function PracticePage() {
 
   // Derive cursor position from the cursorRef for IntonationNeedle
   const cursorPosition = useAudioStore((s) => s.cursorPosition)
+
+  const smartLoop = useSmartLoop({
+    heatMapData,
+    currentTempo: tempo,
+    cursorPosition,
+    onTempoChange: setTempo,
+    onSeekToMeasure: seekToMeasure,
+    onAutoExit: handleSmartLoopAutoExit,
+  })
 
   const startAutoHideTimer = useCallback(() => {
     clearTimeout(hideTimerRef.current)
@@ -151,6 +174,14 @@ export default function PracticePage() {
     debriefDataRef.current = { worstMeasures: worst }
     setDebriefOpen(true)
   }, [setIsPracticing, exitGhostMode, endSession, getWorstMeasures, resetCursor])
+
+  // Start smart loop: extract worst measures and begin loop practice
+  const handleStartSmartLoop = useCallback(() => {
+    const started = smartLoop.startLoop()
+    if (started && !isPracticing) {
+      handlePlayPause()
+    }
+  }, [smartLoop, isPracticing, handlePlayPause])
 
   // When practice stops externally, show controls
   useEffect(() => {
@@ -301,6 +332,15 @@ export default function PracticePage() {
             totalMeasures={score?.parts?.[0]?.measures?.length || 0}
             visible={heatMapVisible}
           />
+          <SmartLoop
+            loopMeasures={smartLoop.loopMeasures}
+            loopCount={smartLoop.loopCount}
+            isImproving={smartLoop.isImproving}
+            isActive={smartLoop.isActive}
+            loopTempo={smartLoop.loopTempo}
+            onExit={smartLoop.exitLoop}
+            totalMeasures={score?.parts?.[0]?.measures?.length || 0}
+          />
         </div>
 
         {/* Breath Intonation Needle — tracks with predictive cursor */}
@@ -341,6 +381,15 @@ export default function PracticePage() {
                 </p>
               )}
             </div>
+            {heatMapData.length > 0 && (
+              <button
+                data-testid="start-smart-loop-button"
+                onClick={handleStartSmartLoop}
+                className="mt-3 w-full font-body text-xs text-amber border border-amber/30 hover:bg-amber/10 rounded px-3 py-1.5 transition-colors"
+              >
+                Smart Loop Weak Measures
+              </button>
+            )}
           </div>
         )}
 

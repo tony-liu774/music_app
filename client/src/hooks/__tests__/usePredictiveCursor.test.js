@@ -341,4 +341,46 @@ describe('usePredictiveCursor — pitch mode', () => {
     })
     expect(result.current.currentBeat).toBe(2)
   })
+
+  it('seekToMeasure repositions cursor to the specified measure', () => {
+    const { result } = renderHook(() =>
+      usePredictiveCursor({
+        score: mockScore,
+        isPracticing: true,
+        tempo: 120,
+        metronomeMode: true,
+      }),
+    )
+
+    expect(result.current.currentMeasure).toBe(1)
+
+    act(() => {
+      result.current.seekToMeasure(3)
+    })
+
+    expect(result.current.currentMeasure).toBe(3)
+    expect(result.current.currentBeat).toBe(1)
+
+    const store = useAudioStore.getState()
+    expect(store.cursorPosition.measure).toBe(3)
+    expect(store.cursorPosition.beat).toBe(1)
+  })
+
+  it('seekToMeasure clamps to valid range', () => {
+    const { result } = renderHook(() =>
+      usePredictiveCursor({
+        score: mockScore,
+        isPracticing: true,
+        tempo: 120,
+        metronomeMode: true,
+      }),
+    )
+
+    act(() => {
+      result.current.seekToMeasure(999)
+    })
+
+    // Should clamp to totalMeasures (3 in mockScore)
+    expect(result.current.currentMeasure).toBe(3)
+  })
 })

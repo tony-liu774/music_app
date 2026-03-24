@@ -17,25 +17,25 @@ function App() {
     <AuthProvider>
       <AuthSyncProvider>
         <ToastProvider>
-        <HashRouter>
-          <Routes>
-            <Route path="login" element={<LoginPage />} />
-            <Route
-              element={
-                <ProtectedRoute>
-                  <AppShell />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<Dashboard />} />
-              <Route path="library" element={<Library />} />
-              <Route path="practice" element={<PracticePage />} />
-              <Route path="tuner" element={<Tuner />} />
-              <Route path="settings" element={<Settings />} />
-              <Route path="studio-dashboard" element={<StudioDashboard />} />
-            </Route>
-          </Routes>
-        </HashRouter>
+          <HashRouter>
+            <Routes>
+              <Route path="login" element={<LoginPage />} />
+              <Route
+                element={
+                  <ProtectedRoute>
+                    <AppShell />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<Dashboard />} />
+                <Route path="library" element={<Library />} />
+                <Route path="practice" element={<PracticePage />} />
+                <Route path="tuner" element={<Tuner />} />
+                <Route path="settings" element={<Settings />} />
+                <Route path="studio-dashboard" element={<StudioDashboard />} />
+              </Route>
+            </Routes>
+          </HashRouter>
         </ToastProvider>
       </AuthSyncProvider>
     </AuthProvider>
