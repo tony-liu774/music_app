@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useAudioStore } from '../stores/useAudioStore'
 import { useSessionStore } from '../stores/useSessionStore'
 import { SessionLogger } from '../lib/SessionLogger.js'
@@ -22,11 +22,12 @@ const MIN_CONFIDENCE = 0.7
  * is active. On session end, persists the session log and summary
  * stats into useSessionStore.
  *
+ * Lifecycle: startSession → pauseSession → resumeSession → endSession
+ *
  * @param {object} [options]
  * @param {number} [options.deviationThreshold=5] — minimum cents deviation to log
  * @param {number} [options.minConfidence=0.7] — minimum pitch confidence to accept
- * @param {string} [options.expectedNote] — optional fixed expected note for tuner-style use
- * @returns {{ startSession, endSession, getSessionLog, getSummaryStats, isActive }}
+ * @returns {{ startSession, pauseSession, resumeSession, endSession, getSessionLog, getSummaryStats, getWorstMeasures, getErrorsByMeasure, setPosition, isActive }}
  */
 export function useSessionLogger(options = {}) {
   const deviationThreshold =
@@ -34,6 +35,8 @@ export function useSessionLogger(options = {}) {
   const minConfidence = options.minConfidence ?? MIN_CONFIDENCE
 
   const loggerRef = useRef(null)
+  const [isActive, setIsActive] = useState(false)
+  const [isPaused, setIsPaused] = useState(false)
   const isActiveRef = useRef(false)
   const previousNoteRef = useRef(null)
   const measureRef = useRef(1)
@@ -64,6 +67,8 @@ export function useSessionLogger(options = {}) {
       const logger = getLogger()
       logger.startSession(sessionScoreId)
       isActiveRef.current = true
+      setIsActive(true)
+      setIsPaused(false)
       previousNoteRef.current = null
       measureRef.current = 1
       beatRef.current = 1
@@ -73,13 +78,41 @@ export function useSessionLogger(options = {}) {
   )
 
   /**
+   * Pause the current session (preserves logged deviations).
+   */
+  const pauseSession = useCallback(() => {
+    if (!isActiveRef.current || !loggerRef.current) return
+    loggerRef.current.pauseSession()
+    isActiveRef.current = false
+    setIsActive(false)
+    setIsPaused(true)
+  }, [])
+
+  /**
+   * Resume a paused session.
+   */
+  const resumeSession = useCallback(() => {
+    if (!loggerRef.current || !loggerRef.current._paused) return
+    loggerRef.current.resumeSession()
+    isActiveRef.current = true
+    setIsActive(true)
+    setIsPaused(false)
+  }, [])
+
+  /**
    * End the current session, persist log + summary to the store.
    * @returns {{ log: object, summary: object } | null}
    */
   const endSession = useCallback(() => {
-    if (!isActiveRef.current || !loggerRef.current) return null
+    if (!loggerRef.current) return null
+    // If paused, resume first so timing is correct
+    if (loggerRef.current._paused) {
+      loggerRef.current.resumeSession()
+    }
 
     isActiveRef.current = false
+    setIsActive(false)
+    setIsPaused(false)
 
     const logger = loggerRef.current
     const log = logger.getSessionLog()
@@ -110,6 +143,21 @@ export function useSessionLogger(options = {}) {
   }, [])
 
   /**
+   * Get errors grouped by measure.
+   */
+  const getErrorsByMeasure = useCallback(() => {
+    return loggerRef.current ? loggerRef.current.getErrorsByMeasure() : {}
+  }, [])
+
+  /**
+   * Get the n measures with highest average deviation.
+   * @param {number} n
+   */
+  const getWorstMeasures = useCallback((n) => {
+    return loggerRef.current ? loggerRef.current.getWorstMeasures(n) : []
+  }, [])
+
+  /**
    * Manually set current measure and beat position (for score-following).
    */
   const setPosition = useCallback((measure, beat) => {
@@ -137,16 +185,22 @@ export function useSessionLogger(options = {}) {
       // Skip low-confidence or null readings
       if (!frequency || !note || confidence < minConfidence) return
 
+      // Read vibrato data for the isVibrato flag
+      const vibratoData = state.vibratoData
+      const isVibrato = !!(vibratoData && vibratoData.rate && vibratoData.rate > 0)
+
       const absCents = Math.abs(cents || 0)
 
       // Log pitch deviation if above threshold
       if (absCents >= deviationThreshold) {
         loggerRef.current.logPitchDeviation({
-          measure: measureRef.current,
+          measureNumber: measureRef.current,
           beat: beatRef.current,
-          expectedPitch: note, // In free-play mode, expected = actual note name
-          actualPitch: note,
-          deviationCents: cents,
+          expectedNote: note, // In free-play mode, expected = detected note name
+          detectedNote: note,
+          centsDeviation: cents,
+          confidence,
+          isVibrato,
           expectedFrequency: null,
           actualFrequency: frequency,
         })
@@ -156,7 +210,7 @@ export function useSessionLogger(options = {}) {
       const prevNote = previousNoteRef.current
       if (prevNote && prevNote !== note) {
         loggerRef.current.logIntonationDeviation({
-          measure: measureRef.current,
+          measureNumber: measureRef.current,
           fromNote: prevNote,
           toNote: note,
           transitionQuality: absCents < 10 ? 90 : absCents < 25 ? 70 : 50,
@@ -173,7 +227,10 @@ export function useSessionLogger(options = {}) {
   // Cleanup on unmount — end session if still active
   useEffect(() => {
     return () => {
-      if (isActiveRef.current && loggerRef.current) {
+      if (loggerRef.current && (isActiveRef.current || loggerRef.current._paused)) {
+        if (loggerRef.current._paused) {
+          loggerRef.current.resumeSession()
+        }
         const logger = loggerRef.current
         const log = logger.getSessionLog()
         const summary = logger.getSummaryStats()
@@ -187,12 +244,15 @@ export function useSessionLogger(options = {}) {
 
   return {
     startSession,
+    pauseSession,
+    resumeSession,
     endSession,
     getSessionLog,
     getSummaryStats,
+    getErrorsByMeasure,
+    getWorstMeasures,
     setPosition,
-    isActive: isActiveRef.current,
-    /** Expose logger ref for advanced usage / testing */
-    _loggerRef: loggerRef,
+    isActive,
+    isPaused,
   }
 }

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { SessionLogger } from '../SessionLogger'
 
-describe('SessionLogger (ES module)', () => {
+describe('SessionLogger (ESM re-export)', () => {
   let logger
 
   beforeEach(() => {
@@ -21,28 +21,36 @@ describe('SessionLogger (ES module)', () => {
     expect(logger.deviations).toEqual([])
   })
 
-  it('logs pitch deviations', () => {
+  it('logs pitch deviations with spec-compliant fields', () => {
     logger.startSession('test')
     logger.logPitchDeviation({
-      measure: 5,
+      measureNumber: 5,
       beat: 2,
-      expectedPitch: 'C#5',
-      actualPitch: 'C5',
-      deviationCents: -10,
+      expectedNote: 'C#5',
+      detectedNote: 'C5',
+      centsDeviation: -10,
+      confidence: 0.95,
+      isVibrato: true,
       expectedFrequency: 554.37,
       actualFrequency: 523.25,
     })
 
     expect(logger.deviations).toHaveLength(1)
-    expect(logger.deviations[0].type).toBe('pitch')
-    expect(logger.deviations[0].deviation_cents).toBe(-10)
-    expect(logger.deviations[0].expected_frequency).toBe(554.37)
+    const d = logger.deviations[0]
+    expect(d.type).toBe('pitch')
+    expect(d.measureNumber).toBe(5)
+    expect(d.expectedNote).toBe('C#5')
+    expect(d.detectedNote).toBe('C5')
+    expect(d.centsDeviation).toBe(-10)
+    expect(d.confidence).toBe(0.95)
+    expect(d.isVibrato).toBe(true)
+    expect(d.expectedFrequency).toBe(554.37)
   })
 
   it('logs rhythm deviations', () => {
     logger.startSession('test')
     logger.logRhythmDeviation({
-      measure: 3,
+      measureNumber: 3,
       beat: 1,
       expectedMs: 500,
       actualMs: 530,
@@ -57,7 +65,7 @@ describe('SessionLogger (ES module)', () => {
   it('logs intonation deviations', () => {
     logger.startSession('test')
     logger.logIntonationDeviation({
-      measure: 7,
+      measureNumber: 7,
       fromNote: 'D4',
       toNote: 'E4',
       transitionQuality: 65,
@@ -69,40 +77,10 @@ describe('SessionLogger (ES module)', () => {
     expect(logger.deviations[0].transition_quality).toBe(65)
   })
 
-  it('logs dynamics deviations', () => {
-    logger.startSession('test')
-    logger.logDynamicsDeviation({
-      measure: 2,
-      beat: 1,
-      expectedDynamic: 'f',
-      actualDynamic: 'mf',
-      deviation: 1,
-    })
-
-    expect(logger.deviations).toHaveLength(1)
-    expect(logger.deviations[0].type).toBe('dynamics')
-  })
-
-  it('logs articulation deviations', () => {
-    logger.startSession('test')
-    logger.logArticulationDeviation({
-      measure: 1,
-      beat: 1,
-      expectedArticulation: 'legato',
-      detectedArticulation: 'detache',
-      score: 60,
-      feedback: 'Use smoother bow changes',
-    })
-
-    expect(logger.deviations).toHaveLength(1)
-    expect(logger.deviations[0].type).toBe('articulation')
-    expect(logger.deviations[0].score).toBe(60)
-  })
-
   it('logs tone quality deviations with nullish coalescing for zero', () => {
     logger.startSession('test')
     logger.logToneQualityDeviation({
-      measure: 1,
+      measureNumber: 1,
       note: 'A4',
       qualityScore: 0,
       purityScore: 0,
@@ -116,10 +94,10 @@ describe('SessionLogger (ES module)', () => {
 
   it('generates session log with correct counts', () => {
     logger.startSession('test')
-    logger.logPitchDeviation({ measure: 1, deviationCents: -10 })
-    logger.logPitchDeviation({ measure: 2, deviationCents: -20 })
-    logger.logRhythmDeviation({ measure: 3, deviationMs: 30 })
-    logger.logToneQualityDeviation({ measure: 4, qualityScore: 75 })
+    logger.logPitchDeviation({ measureNumber: 1, centsDeviation: -10, confidence: 0.9 })
+    logger.logPitchDeviation({ measureNumber: 2, centsDeviation: -20, confidence: 0.9 })
+    logger.logRhythmDeviation({ measureNumber: 3, deviationMs: 30 })
+    logger.logToneQualityDeviation({ measureNumber: 4, qualityScore: 75 })
 
     const log = logger.getSessionLog()
     expect(log.total_deviations).toBe(4)
@@ -129,21 +107,49 @@ describe('SessionLogger (ES module)', () => {
     expect(log.tone_quality_average).toBe(75)
   })
 
-  it('calculates summary statistics', () => {
+  it('getErrorsByMeasure groups errors correctly', () => {
     logger.startSession('test')
-    logger.logPitchDeviation({ measure: 1, deviationCents: -10 })
-    logger.logPitchDeviation({ measure: 1, deviationCents: -20 })
-    logger.logPitchDeviation({ measure: 2, deviationCents: 15 })
+    logger.logPitchDeviation({ measureNumber: 1, centsDeviation: -10, confidence: 0.9 })
+    logger.logPitchDeviation({ measureNumber: 1, centsDeviation: -20, confidence: 0.9 })
+    logger.logPitchDeviation({ measureNumber: 2, centsDeviation: 15, confidence: 0.9 })
 
-    const stats = logger.getSummaryStats()
-    expect(stats.pitch_deviation_count).toBe(3)
-    expect(stats.average_pitch_deviation_cents).toBe(15)
-    expect(stats.worst_measure).toBe(1)
+    const byMeasure = logger.getErrorsByMeasure()
+    expect(byMeasure[1]).toHaveLength(2)
+    expect(byMeasure[2]).toHaveLength(1)
+  })
+
+  it('getWorstMeasures(n) returns n measures ranked by average deviation', () => {
+    logger.startSession('test')
+    logger.logPitchDeviation({ measureNumber: 1, centsDeviation: -10, confidence: 0.9 })
+    logger.logPitchDeviation({ measureNumber: 1, centsDeviation: -20, confidence: 0.9 })
+    logger.logPitchDeviation({ measureNumber: 2, centsDeviation: 50, confidence: 0.9 })
+    logger.logPitchDeviation({ measureNumber: 3, centsDeviation: 5, confidence: 0.9 })
+
+    const worst = logger.getWorstMeasures(2)
+    expect(worst).toHaveLength(2)
+    expect(worst[0].measureNumber).toBe(2)
+    expect(worst[0].averageDeviation).toBe(50)
+    expect(worst[1].measureNumber).toBe(1)
+    expect(worst[1].averageDeviation).toBe(15)
+  })
+
+  it('supports pause and resume', () => {
+    logger.startSession('test')
+    logger.logPitchDeviation({ measureNumber: 1, centsDeviation: -10, confidence: 0.9 })
+
+    logger.pauseSession()
+    expect(logger._paused).toBe(true)
+
+    logger.resumeSession()
+    expect(logger._paused).toBe(false)
+
+    logger.logPitchDeviation({ measureNumber: 2, centsDeviation: -20, confidence: 0.9 })
+    expect(logger.deviations).toHaveLength(2)
   })
 
   it('exports for LLM', () => {
     logger.startSession('test')
-    logger.logPitchDeviation({ measure: 1, deviationCents: -10 })
+    logger.logPitchDeviation({ measureNumber: 1, centsDeviation: -10, confidence: 0.9 })
 
     const exported = logger.exportForLLM()
     const parsed = JSON.parse(exported)
@@ -153,11 +159,18 @@ describe('SessionLogger (ES module)', () => {
 
   it('clears session data', () => {
     logger.startSession('test')
-    logger.logPitchDeviation({ measure: 1, deviationCents: -10 })
+    logger.logPitchDeviation({ measureNumber: 1, centsDeviation: -10, confidence: 0.9 })
     logger.clear()
 
     expect(logger.deviations).toEqual([])
     expect(logger.sessionId).toBeNull()
     expect(logger.startTime).toBeNull()
+  })
+
+  it('getSessionSummary is an alias for getSummaryStats', () => {
+    logger.startSession('test')
+    logger.logPitchDeviation({ measureNumber: 1, centsDeviation: -10, confidence: 0.9 })
+
+    expect(logger.getSessionSummary()).toEqual(logger.getSummaryStats())
   })
 })

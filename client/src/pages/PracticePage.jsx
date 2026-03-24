@@ -22,7 +22,7 @@ export default function PracticePage() {
   const selectedScore = useLibraryStore((s) => s.selectedScore)
   const sessionSummary = useSessionStore((s) => s.sessionSummary)
 
-  const { startSession, endSession } = useSessionLogger()
+  const { startSession, pauseSession, resumeSession, endSession, isPaused: sessionPaused } = useSessionLogger()
 
   const [controlsVisible, setControlsVisible] = useState(true)
   const hideTimerRef = useRef(null)
@@ -49,20 +49,27 @@ export default function PracticePage() {
   // Play/Pause handler
   const handlePlayPause = useCallback(() => {
     if (isPracticing) {
-      // Pause — exit ghost mode so nav reappears
+      // Pause — pause session logging, exit ghost mode so nav reappears
       setIsPracticing(false)
+      pauseSession()
       exitGhostMode()
       setControlsVisible(true)
       clearTimeout(hideTimerRef.current)
     } else {
-      // Play / Resume — enter ghost mode and start session logging
+      // Play / Resume — enter ghost mode
       setIsPracticing(true)
-      startSession(selectedScore?.id)
+      if (sessionPaused) {
+        // Resume an existing paused session
+        resumeSession()
+      } else {
+        // Start a brand-new session
+        startSession(selectedScore?.id)
+      }
       enterGhostMode()
       setControlsVisible(true)
       startAutoHideTimer()
     }
-  }, [isPracticing, setIsPracticing, enterGhostMode, exitGhostMode, startAutoHideTimer, startSession, selectedScore])
+  }, [isPracticing, setIsPracticing, enterGhostMode, exitGhostMode, startAutoHideTimer, startSession, pauseSession, resumeSession, sessionPaused, selectedScore])
 
   // Stop handler — exit ghost mode and end session logging
   const handleStop = useCallback(() => {
@@ -189,14 +196,14 @@ export default function PracticePage() {
       </div>
 
       {/* Session summary — shown after practice ends */}
-      {!isPracticing && !ghostMode && sessionSummary && sessionSummary.total_notes_played > 0 && (
+      {!isPracticing && !ghostMode && sessionSummary && sessionSummary.total_deviations > 0 && (
         <div
           data-testid="session-summary"
           className="absolute top-4 right-4 w-72 bg-surface border border-border rounded-lg p-4 shadow-lg z-20"
         >
           <h3 className="font-heading text-sm text-ivory mb-2">Session Summary</h3>
           <div className="space-y-1 font-body text-xs text-ivory-muted">
-            <p>Deviations logged: {sessionSummary.total_notes_played}</p>
+            <p>Deviations logged: {sessionSummary.total_deviations}</p>
             {sessionSummary.pitch_deviation_count > 0 && (
               <p>Pitch: {sessionSummary.pitch_deviation_count} (avg {sessionSummary.average_pitch_deviation_cents}c)</p>
             )}
