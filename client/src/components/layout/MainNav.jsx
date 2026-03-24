@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import OfflineIndicator from './OfflineIndicator'
 
 const navLinks = [
   { to: '/', label: 'Home' },
@@ -8,7 +9,7 @@ const navLinks = [
   { to: '/settings', label: 'Settings' },
 ]
 
-export default function MainNav() {
+export default function MainNav({ isOnline = true, pendingCount = 0 }) {
   return (
     <nav className="hidden md:flex items-center h-16 px-6 bg-surface border-b border-border">
       <NavLink to="/" className="flex items-center gap-2 mr-8">
@@ -58,6 +59,10 @@ export default function MainNav() {
             {label}
           </NavLink>
         ))}
+      </div>
+
+      <div className="ml-auto">
+        <OfflineIndicator isOnline={isOnline} pendingCount={pendingCount} />
       </div>
     </nav>
   )

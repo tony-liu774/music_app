@@ -1,6 +1,7 @@
 import { HashRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { AuthSyncProvider } from './contexts/AuthSyncProvider'
+import { ToastProvider } from './components/ui/Toast'
 import AppShell from './components/layout/AppShell'
 import LoginPage from './components/auth/LoginPage'
 import ProtectedRoute from './components/auth/ProtectedRoute'
@@ -15,6 +16,7 @@ function App() {
   return (
     <AuthProvider>
       <AuthSyncProvider>
+        <ToastProvider>
         <HashRouter>
           <Routes>
             <Route path="login" element={<LoginPage />} />
@@ -34,6 +36,7 @@ function App() {
             </Route>
           </Routes>
         </HashRouter>
+        </ToastProvider>
       </AuthSyncProvider>
     </AuthProvider>
   )
