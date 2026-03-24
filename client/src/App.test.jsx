@@ -43,7 +43,7 @@ describe('App routing', () => {
     render(<App />)
     const practiceLinks = screen.getAllByRole('link', { name: /practice/i })
     await user.click(practiceLinks[0])
-    expect(screen.getByText(/guided practice/i)).toBeInTheDocument()
+    expect(screen.getByText(/press play to start/i)).toBeInTheDocument()
   })
 
   it('navigates to Tuner page', async () => {
@@ -81,7 +81,7 @@ describe('App routing', () => {
     render(<App />)
     const libraryLinks = screen.getAllByRole('link', { name: /library/i })
     await user.click(libraryLinks[0])
-    libraryLinks.forEach(link => {
+    libraryLinks.forEach((link) => {
       expect(link.className).toContain('text-amber')
     })
   })

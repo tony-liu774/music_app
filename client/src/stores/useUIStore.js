@@ -6,7 +6,8 @@ export const useUIStore = create(
     (set) => ({
       // Current view / route
       currentView: 'home',
-      setCurrentView: (view) => set({ currentView: view }, false, 'setCurrentView'),
+      setCurrentView: (view) =>
+        set({ currentView: view }, false, 'setCurrentView'),
 
       // Modal state
       modalOpen: false,
@@ -20,7 +21,9 @@ export const useUIStore = create(
       toasts: [],
       addToast: (toast) =>
         set(
-          (state) => ({ toasts: [...state.toasts, { id: Date.now(), ...toast }] }),
+          (state) => ({
+            toasts: [...state.toasts, { id: Date.now(), ...toast }],
+          }),
           false,
           'addToast',
         ),
@@ -34,8 +37,13 @@ export const useUIStore = create(
       // Sidebar
       sidebarOpen: true,
       toggleSidebar: () =>
-        set((state) => ({ sidebarOpen: !state.sidebarOpen }), false, 'toggleSidebar'),
-      setSidebarOpen: (open) => set({ sidebarOpen: open }, false, 'setSidebarOpen'),
+        set(
+          (state) => ({ sidebarOpen: !state.sidebarOpen }),
+          false,
+          'toggleSidebar',
+        ),
+      setSidebarOpen: (open) =>
+        set({ sidebarOpen: open }, false, 'setSidebarOpen'),
 
       // Theme preferences
       theme: 'midnight',
@@ -43,7 +51,15 @@ export const useUIStore = create(
 
       // Nav visibility (ghost mode fade)
       navVisible: true,
-      setNavVisible: (visible) => set({ navVisible: visible }, false, 'setNavVisible'),
+      setNavVisible: (visible) =>
+        set({ navVisible: visible }, false, 'setNavVisible'),
+
+      // Ghost mode — activated during practice
+      ghostMode: false,
+      enterGhostMode: () =>
+        set({ ghostMode: true, navVisible: false }, false, 'enterGhostMode'),
+      exitGhostMode: () =>
+        set({ ghostMode: false, navVisible: true }, false, 'exitGhostMode'),
     }),
     { name: 'UIStore' },
   ),
