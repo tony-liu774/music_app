@@ -3,10 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { useUIStore } from '../stores/useUIStore'
 import { useAudioStore } from '../stores/useAudioStore'
 import { useLibraryStore } from '../stores/useLibraryStore'
+import { useSessionStore } from '../stores/useSessionStore'
+import { useSessionLogger } from '../hooks/useSessionLogger'
 import { Button } from '../components/ui'
 import PracticeControls from '../components/practice/PracticeControls'
+import AudioSuspensionOverlay from '../components/practice/AudioSuspensionOverlay'
 import SheetMusic from '../components/practice/SheetMusic'
 import PredictiveCursor from '../components/practice/PredictiveCursor'
+import IntonationNeedle from '../components/practice/IntonationNeedle'
 import useScore from '../hooks/useScore'
 import usePredictiveCursor from '../hooks/usePredictiveCursor'
 
@@ -27,6 +31,12 @@ export default function PracticePage() {
     isLoading: scoreLoading,
     error: scoreError,
   } = useScore(selectedScore?.xmlUrl || null)
+  const sessionSummary = useSessionStore((s) => s.sessionSummary)
+
+  const { startSession, pauseSession, resumeSession, endSession, isPaused: sessionPaused } = useSessionLogger()
+
+  const resumeAudioContext = useAudioStore((s) => s.resumeAudioContext)
+  const audioContextState = useAudioStore((s) => s.audioContextState)
 
   const [controlsVisible, setControlsVisible] = useState(true)
   const [tempo, setTempo] = useState(120)
@@ -36,6 +46,7 @@ export default function PracticePage() {
   isPracticingRef.current = isPracticing
 
   const scrollRef = useRef(null)
+  const sheetMusicAreaRef = useRef(null)
 
   const {
     cursorRef,
@@ -50,6 +61,9 @@ export default function PracticePage() {
     metronomeMode: metronomeOn,
     scrollRef,
   })
+
+  // Derive cursor position from the cursorRef for IntonationNeedle
+  const cursorPosition = useAudioStore((s) => s.cursorPosition)
 
   const startAutoHideTimer = useCallback(() => {
     clearTimeout(hideTimerRef.current)
@@ -71,34 +85,37 @@ export default function PracticePage() {
   // Play/Pause handler
   const handlePlayPause = useCallback(() => {
     if (isPracticing) {
-      // Pause — exit ghost mode so nav reappears
+      // Pause — pause session logging, exit ghost mode so nav reappears
       setIsPracticing(false)
+      pauseSession()
       exitGhostMode()
       setControlsVisible(true)
       clearTimeout(hideTimerRef.current)
     } else {
       // Play / Resume — enter ghost mode
       setIsPracticing(true)
+      if (sessionPaused) {
+        // Resume an existing paused session
+        resumeSession()
+      } else {
+        // Start a brand-new session
+        startSession(selectedScore?.id)
+      }
       enterGhostMode()
       setControlsVisible(true)
       startAutoHideTimer()
     }
-  }, [
-    isPracticing,
-    setIsPracticing,
-    enterGhostMode,
-    exitGhostMode,
-    startAutoHideTimer,
-  ])
+  }, [isPracticing, setIsPracticing, enterGhostMode, exitGhostMode, startAutoHideTimer, startSession, pauseSession, resumeSession, sessionPaused, selectedScore])
 
-  // Stop handler — exit ghost mode entirely
+  // Stop handler — exit ghost mode and end session logging
   const handleStop = useCallback(() => {
     setIsPracticing(false)
+    endSession()
     exitGhostMode()
     setControlsVisible(true)
     clearTimeout(hideTimerRef.current)
     resetCursor()
-  }, [setIsPracticing, exitGhostMode, resetCursor])
+  }, [setIsPracticing, exitGhostMode, endSession, resetCursor])
 
   // When practice stops externally, show controls
   useEffect(() => {
@@ -165,8 +182,9 @@ export default function PracticePage() {
     >
       {/* Sheet music area */}
       <div
+        ref={sheetMusicAreaRef}
         data-testid="sheet-music-area"
-        className={`${ghostMode ? 'h-full' : 'h-[80%]'} flex flex-col items-center justify-center`}
+        className={`${ghostMode ? 'h-full' : 'h-[80%]'} relative flex flex-col items-center justify-center`}
       >
         {!isPracticing && !ghostMode && (
           <div className="text-center mb-4">
@@ -234,7 +252,37 @@ export default function PracticePage() {
             isBouncing={isBouncing}
           />
         </div>
+
+        {/* Breath Intonation Needle — tracks with predictive cursor */}
+        {isPracticing && (
+          <IntonationNeedle
+            cursorX={cursorPosition.progress * 100}
+            cursorY={0}
+          />
+        )}
       </div>
+
+      {/* Session summary — shown after practice ends */}
+      {!isPracticing && !ghostMode && sessionSummary && sessionSummary.total_deviations > 0 && (
+        <div
+          data-testid="session-summary"
+          className="absolute top-4 right-4 w-72 bg-surface border border-border rounded-lg p-4 shadow-lg z-20"
+        >
+          <h3 className="font-heading text-sm text-ivory mb-2">Session Summary</h3>
+          <div className="space-y-1 font-body text-xs text-ivory-muted">
+            <p>Deviations logged: {sessionSummary.total_deviations}</p>
+            {sessionSummary.pitch_deviation_count > 0 && (
+              <p>Pitch: {sessionSummary.pitch_deviation_count} (avg {sessionSummary.average_pitch_deviation_cents}c)</p>
+            )}
+            {sessionSummary.intonation_deviation_count > 0 && (
+              <p>Intonation: {sessionSummary.intonation_deviation_count}</p>
+            )}
+            {sessionSummary.worst_measure && (
+              <p className="text-amber">Needs work: m.{sessionSummary.worst_measure}</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Tap overlay hint — shows briefly when controls are hidden */}
       {ghostMode && !controlsVisible && (
@@ -259,6 +307,16 @@ export default function PracticePage() {
         metronomeOn={metronomeOn}
         onMetronomeToggle={setMetronomeOn}
       />
+
+      {/* Audio suspension overlay — shown when browser suspends AudioContext */}
+      {isPracticing && (
+        <AudioSuspensionOverlay
+          onResume={resumeAudioContext}
+          isInitialSuspension={
+            isPracticing && audioContextState === 'suspended'
+          }
+        />
+      )}
     </div>
   )
 }

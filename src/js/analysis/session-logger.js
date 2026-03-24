@@ -1,6 +1,9 @@
 /**
  * Session Logger - Compiles JSON log of every recorded deviation during live performance
- * Logs pitch, rhythm, and intonation deviations
+ * Logs pitch, rhythm, and intonation deviations with spec-compliant entry format.
+ *
+ * Each pitch entry follows the schema:
+ *   { timestamp, measureNumber, beat, expectedNote, detectedNote, centsDeviation, confidence, isVibrato }
  */
 
 class SessionLogger {
@@ -8,6 +11,9 @@ class SessionLogger {
         this.deviations = [];
         this.sessionId = null;
         this.startTime = null;
+        this._paused = false;
+        this._pauseStart = null;
+        this._totalPausedMs = 0;
     }
 
     /**
@@ -18,31 +24,69 @@ class SessionLogger {
         this.sessionId = scoreId || 'unknown';
         this.startTime = Date.now();
         this.deviations = [];
-        console.log(`SessionLogger: Started session ${this.sessionId}`);
+        this._paused = false;
+        this._pauseStart = null;
+        this._totalPausedMs = 0;
+    }
+
+    /**
+     * Pause the current session (preserves logged deviations).
+     */
+    pauseSession() {
+        if (!this._paused && this.startTime) {
+            this._paused = true;
+            this._pauseStart = Date.now();
+        }
+    }
+
+    /**
+     * Resume a paused session.
+     */
+    resumeSession() {
+        if (this._paused && this._pauseStart) {
+            this._totalPausedMs += Date.now() - this._pauseStart;
+            this._paused = false;
+            this._pauseStart = null;
+        }
+    }
+
+    /**
+     * Get elapsed session time excluding paused periods.
+     * @returns {number} Elapsed ms
+     */
+    _elapsed() {
+        if (!this.startTime) return 0;
+        const now = Date.now();
+        const pausedNow = this._paused && this._pauseStart ? now - this._pauseStart : 0;
+        return now - this.startTime - this._totalPausedMs - pausedNow;
     }
 
     /**
      * Log a pitch deviation
      * @param {Object} params - Deviation parameters
-     * @param {number} params.measure - Measure number
+     * @param {number} params.measureNumber - Measure number
      * @param {number} params.beat - Beat number
-     * @param {string} params.expectedPitch - Expected pitch name (e.g., "C#5")
-     * @param {string} params.actualPitch - Actual pitch name (e.g., "C5")
-     * @param {number} params.deviationCents - Deviation in cents (negative = flat, positive = sharp)
-     * @param {number} params.expectedFrequency - Expected frequency in Hz
-     * @param {number} params.actualFrequency - Actual frequency in Hz
+     * @param {string} params.expectedNote - Expected note name (e.g., "C#5")
+     * @param {string} params.detectedNote - Detected note name (e.g., "C5")
+     * @param {number} params.centsDeviation - Deviation in cents (negative = flat, positive = sharp)
+     * @param {number} params.confidence - Pitch detection confidence 0-1
+     * @param {boolean} params.isVibrato - Whether vibrato was detected
+     * @param {number} [params.expectedFrequency] - Expected frequency in Hz
+     * @param {number} [params.actualFrequency] - Actual frequency in Hz
      */
-    logPitchDeviation({ measure, beat, expectedPitch, actualPitch, deviationCents, expectedFrequency, actualFrequency }) {
+    logPitchDeviation({ measureNumber, beat, expectedNote, detectedNote, centsDeviation, confidence, isVibrato, expectedFrequency, actualFrequency }) {
         const deviation = {
             type: 'pitch',
-            measure: measure || 1,
+            timestamp: this._elapsed(),
+            measureNumber: measureNumber || 1,
             beat: beat || 1,
-            expected_pitch: expectedPitch || '?',
-            actual_pitch: actualPitch || '?',
-            deviation_cents: Math.round(deviationCents || 0),
-            expected_frequency: expectedFrequency ? Math.round(expectedFrequency * 100) / 100 : null,
-            actual_frequency: actualFrequency ? Math.round(actualFrequency * 100) / 100 : null,
-            timestamp: Date.now() - (this.startTime || Date.now())
+            expectedNote: expectedNote || '?',
+            detectedNote: detectedNote || '?',
+            centsDeviation: Math.round(centsDeviation || 0),
+            confidence: Math.round((confidence ?? 0) * 1000) / 1000,
+            isVibrato: isVibrato || false,
+            expectedFrequency: expectedFrequency ? Math.round(expectedFrequency * 100) / 100 : null,
+            actualFrequency: actualFrequency ? Math.round(actualFrequency * 100) / 100 : null
         };
         this.deviations.push(deviation);
     }
@@ -50,21 +94,21 @@ class SessionLogger {
     /**
      * Log a rhythm deviation
      * @param {Object} params - Deviation parameters
-     * @param {number} params.measure - Measure number
+     * @param {number} params.measureNumber - Measure number
      * @param {number} params.beat - Beat number
      * @param {number} params.expectedMs - Expected duration in milliseconds
      * @param {number} params.actualMs - Actual duration in milliseconds
      * @param {number} params.deviationMs - Deviation in milliseconds (negative = early, positive = late)
      */
-    logRhythmDeviation({ measure, beat, expectedMs, actualMs, deviationMs }) {
+    logRhythmDeviation({ measureNumber, beat, expectedMs, actualMs, deviationMs }) {
         const deviation = {
             type: 'rhythm',
-            measure: measure || 1,
+            timestamp: this._elapsed(),
+            measureNumber: measureNumber || 1,
             beat: beat || 1,
             expected_ms: Math.round(expectedMs || 0),
             actual_ms: Math.round(actualMs || 0),
-            deviation_ms: Math.round(deviationMs || 0),
-            timestamp: Date.now() - (this.startTime || Date.now())
+            deviation_ms: Math.round(deviationMs || 0)
         };
         this.deviations.push(deviation);
     }
@@ -72,101 +116,124 @@ class SessionLogger {
     /**
      * Log an intonation/transitional deviation
      * @param {Object} params - Deviation parameters
-     * @param {number} params.measure - Measure number
-     * @param {number} params.fromNote - Starting note
-     * @param {number} params.toNote - Ending note
+     * @param {number} params.measureNumber - Measure number
+     * @param {string} params.fromNote - Starting note
+     * @param {string} params.toNote - Ending note
      * @param {number} params.transitionQuality - Quality score 0-100
      * @param {string} params.issue - Description of the issue (e.g., "position_shift", "string_change")
      */
-    logIntonationDeviation({ measure, fromNote, toNote, transitionQuality, issue }) {
+    logIntonationDeviation({ measureNumber, fromNote, toNote, transitionQuality, issue }) {
         const deviation = {
             type: 'intonation',
-            measure: measure || 1,
+            timestamp: this._elapsed(),
+            measureNumber: measureNumber || 1,
             from_note: fromNote || '?',
             to_note: toNote || '?',
-            // Use nullish coalescing to allow 0 as valid score
             transition_quality: Math.round(transitionQuality ?? 100),
-            issue: issue || 'none',
-            timestamp: Date.now() - (this.startTime || Date.now())
+            issue: issue || 'none'
         };
         this.deviations.push(deviation);
     }
 
     /**
      * Log a dynamics deviation (volume level mismatch with score marking)
-     * @param {Object} params - Deviation parameters
-     * @param {number} params.measure - Measure number
-     * @param {number} params.beat - Beat number
-     * @param {string} params.expectedDynamic - Expected dynamic marking (pp, p, mp, mf, f, ff)
-     * @param {string} params.actualDynamic - Detected dynamic marking
-     * @param {number} params.deviation - Numeric level deviation
-     * @param {string} params.expectedDirection - Expected direction (crescendo/decrescendo/null)
-     * @param {string} params.actualTrend - Detected trend
      */
-    logDynamicsDeviation({ measure, beat, expectedDynamic, actualDynamic, deviation, expectedDirection, actualTrend }) {
+    logDynamicsDeviation({ measureNumber, beat, expectedDynamic, actualDynamic, deviation, expectedDirection, actualTrend }) {
         const dev = {
             type: 'dynamics',
-            measure: measure || 1,
+            timestamp: this._elapsed(),
+            measureNumber: measureNumber || 1,
             beat: beat || 1,
             expected_dynamic: expectedDynamic || 'mf',
             actual_dynamic: actualDynamic || 'mf',
             deviation: deviation || 0,
             expected_direction: expectedDirection || null,
-            actual_trend: actualTrend || 'stable',
-            timestamp: Date.now() - (this.startTime || Date.now())
+            actual_trend: actualTrend || 'stable'
         };
         this.deviations.push(dev);
     }
 
     /**
      * Log an articulation deviation (bow stroke mismatch with score marking)
-     * @param {Object} params - Deviation parameters
-     * @param {number} params.measure - Measure number
-     * @param {number} params.beat - Beat number
-     * @param {string} params.expectedArticulation - Expected articulation from score
-     * @param {string} params.detectedArticulation - Detected articulation from audio
-     * @param {number} params.score - Accuracy score 0-100
-     * @param {string} params.feedback - Human-readable feedback
      */
-    logArticulationDeviation({ measure, beat, expectedArticulation, detectedArticulation, score, feedback }) {
+    logArticulationDeviation({ measureNumber, beat, expectedArticulation, detectedArticulation, score, feedback }) {
         const dev = {
             type: 'articulation',
-            measure: measure || 1,
+            timestamp: this._elapsed(),
+            measureNumber: measureNumber || 1,
             beat: beat || 1,
             expected_articulation: expectedArticulation || '?',
             detected_articulation: detectedArticulation || '?',
             score: Math.round(score || 0),
-            feedback: feedback || '',
-            timestamp: Date.now() - (this.startTime || Date.now())
+            feedback: feedback || ''
         };
         this.deviations.push(dev);
     }
 
     /**
      * Log a tone quality deviation
-     * @param {Object} params - Deviation parameters
-     * @param {number} params.measure - Measure number
-     * @param {string} params.note - Note name
-     * @param {number} params.qualityScore - Overall quality score 0-100
-     * @param {number} params.purityScore - Harmonic purity score 0-100
-     * @param {number} params.harshnessScore - Harshness score 0-100
-     * @param {boolean} params.wolfToneDetected - Whether a wolf tone was detected
-     * @param {number} params.wolfToneFrequency - Wolf tone frequency if detected
      */
-    logToneQualityDeviation({ measure, note, qualityScore, purityScore, harshnessScore, wolfToneDetected, wolfToneFrequency }) {
+    logToneQualityDeviation({ measureNumber, note, qualityScore, purityScore, harshnessScore, wolfToneDetected, wolfToneFrequency }) {
         const deviation = {
             type: 'tone_quality',
-            measure: measure || 1,
+            timestamp: this._elapsed(),
+            measureNumber: measureNumber || 1,
             note: note || '?',
-            // Use nullish coalescing to allow 0 as valid score
             quality_score: Math.round(qualityScore ?? 50),
             purity_score: Math.round(purityScore ?? 50),
             harshness_score: Math.round(harshnessScore ?? 50),
             wolf_tone_detected: wolfToneDetected || false,
-            wolf_tone_frequency: wolfToneFrequency || null,
-            timestamp: Date.now() - (this.startTime || Date.now())
+            wolf_tone_frequency: wolfToneFrequency || null
         };
         this.deviations.push(deviation);
+    }
+
+    /**
+     * Group all errors by measure number.
+     * @returns {Object} Map of measureNumber → array of deviations
+     */
+    getErrorsByMeasure() {
+        const byMeasure = {};
+        this.deviations.forEach(d => {
+            const m = d.measureNumber;
+            if (!byMeasure[m]) byMeasure[m] = [];
+            byMeasure[m].push(d);
+        });
+        return byMeasure;
+    }
+
+    /**
+     * Return the n measures with highest average deviation.
+     * For pitch deviations, uses |centsDeviation|; for rhythm, |deviation_ms|;
+     * for others, counts errors as weight-1 each.
+     * @param {number} n - Number of worst measures to return
+     * @returns {Array<{measureNumber: number, averageDeviation: number, errorCount: number}>}
+     */
+    getWorstMeasures(n) {
+        const byMeasure = this.getErrorsByMeasure();
+
+        const ranked = Object.entries(byMeasure).map(([measure, devs]) => {
+            let totalDeviation = 0;
+            devs.forEach(d => {
+                if (d.type === 'pitch') {
+                    totalDeviation += Math.abs(d.centsDeviation || 0);
+                } else if (d.type === 'rhythm') {
+                    totalDeviation += Math.abs(d.deviation_ms || 0);
+                } else {
+                    // For non-numeric deviation types, count each as 1 unit
+                    totalDeviation += 1;
+                }
+            });
+            return {
+                measureNumber: parseInt(measure),
+                averageDeviation: devs.length > 0 ? Math.round((totalDeviation / devs.length) * 10) / 10 : 0,
+                errorCount: devs.length
+            };
+        });
+
+        return ranked
+            .sort((a, b) => b.averageDeviation - a.averageDeviation)
+            .slice(0, n);
     }
 
     /**
@@ -179,7 +246,8 @@ class SessionLogger {
             session_id: this.sessionId,
             start_time: this.startTime,
             end_time: Date.now(),
-            duration_ms: this.startTime ? Date.now() - this.startTime : 0,
+            duration_ms: this._elapsed(),
+            paused: this._paused,
             total_deviations: this.deviations.length,
             pitch_deviations: this.deviations.filter(d => d.type === 'pitch').length,
             rhythm_deviations: this.deviations.filter(d => d.type === 'rhythm').length,
@@ -195,7 +263,7 @@ class SessionLogger {
     }
 
     /**
-     * Get summary statistics for the session
+     * Get aggregate session summary (alias: getSessionSummary)
      * @returns {Object} Summary statistics
      */
     getSummaryStats() {
@@ -207,7 +275,7 @@ class SessionLogger {
         const toneDevs = this.deviations.filter(d => d.type === 'tone_quality');
 
         const avgPitchDev = pitchDevs.length > 0
-            ? pitchDevs.reduce((sum, d) => sum + Math.abs(d.deviation_cents), 0) / pitchDevs.length
+            ? pitchDevs.reduce((sum, d) => sum + Math.abs(d.centsDeviation), 0) / pitchDevs.length
             : 0;
 
         const avgRhythmDev = rhythmDevs.length > 0
@@ -232,22 +300,10 @@ class SessionLogger {
 
         const wolfToneCount = toneDevs.filter(d => d.wolf_tone_detected).length;
 
-        // Find most problematic measures
-        const measureErrors = {};
-        this.deviations.forEach(d => {
-            if (!measureErrors[d.measure]) {
-                measureErrors[d.measure] = 0;
-            }
-            measureErrors[d.measure]++;
-        });
-
-        const problemMeasures = Object.entries(measureErrors)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 5)
-            .map(([measure, count]) => ({ measure: parseInt(measure), error_count: count }));
+        const worstMeasures = this.getWorstMeasures(5);
 
         return {
-            total_notes_played: this.deviations.length,
+            total_deviations: this.deviations.length,
             pitch_deviation_count: pitchDevs.length,
             rhythm_deviation_count: rhythmDevs.length,
             intonation_deviation_count: intDevs.length,
@@ -261,9 +317,14 @@ class SessionLogger {
             average_tone_quality_score: Math.round(avgToneQuality),
             average_purity_score: Math.round(avgPurity),
             wolf_tone_count: wolfToneCount,
-            problem_measures: problemMeasures,
-            worst_measure: problemMeasures.length > 0 ? problemMeasures[0].measure : null
+            problem_measures: worstMeasures,
+            worst_measure: worstMeasures.length > 0 ? worstMeasures[0].measureNumber : null
         };
+    }
+
+    /** Alias for getSummaryStats */
+    getSessionSummary() {
+        return this.getSummaryStats();
     }
 
     /**
@@ -287,12 +348,16 @@ class SessionLogger {
         this.deviations = [];
         this.sessionId = null;
         this.startTime = null;
+        this._paused = false;
+        this._pauseStart = null;
+        this._totalPausedMs = 0;
     }
 }
 
-if (typeof window !== 'undefined') {
-    window.SessionLogger = SessionLogger;
-}
+// Dual-format export: ESM-compatible named export + CJS + browser global
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { SessionLogger };
+}
+if (typeof window !== 'undefined') {
+    window.SessionLogger = SessionLogger;
 }

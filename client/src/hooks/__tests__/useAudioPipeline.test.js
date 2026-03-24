@@ -40,6 +40,7 @@ function createMockAudioContext() {
     disconnect: vi.fn(),
   }
 
+  const listeners = {}
   const ctx = {
     sampleRate: 44100,
     state: 'running',
@@ -49,8 +50,18 @@ function createMockAudioContext() {
     createMediaStreamSource: vi.fn().mockReturnValue(source),
     createScriptProcessor: vi.fn().mockReturnValue(processor),
     destination: {},
+    addEventListener: vi.fn((event, handler) => {
+      if (!listeners[event]) listeners[event] = []
+      listeners[event].push(handler)
+    }),
+    removeEventListener: vi.fn((event, handler) => {
+      if (listeners[event]) {
+        listeners[event] = listeners[event].filter((h) => h !== handler)
+      }
+    }),
     _source: source,
     _processor: processor,
+    _listeners: listeners,
   }
 
   return ctx
@@ -75,6 +86,9 @@ describe('useAudioPipeline', () => {
     useAudioStore.setState({
       pitchData: { frequency: null, note: null, cents: null, confidence: 0 },
       audioContextState: 'suspended',
+      isSuspendedBySystem: false,
+      resumeFailCount: 0,
+      resumeAudioContext: async () => true,
       selectedInstrument: 'violin',
     })
 
@@ -96,12 +110,13 @@ describe('useAudioPipeline', () => {
     vi.restoreAllMocks()
   })
 
-  it('returns start, stop, isRunning, and error', () => {
+  it('returns start, stop, isRunning, error, and resumeAudioContext', () => {
     const { result } = renderHook(() => useAudioPipeline())
     expect(result.current.start).toBeInstanceOf(Function)
     expect(result.current.stop).toBeInstanceOf(Function)
     expect(typeof result.current.isRunning).toBe('boolean')
     expect(result.current.error).toBeNull()
+    expect(result.current.resumeAudioContext).toBeInstanceOf(Function)
   })
 
   it('is not running initially', () => {
@@ -389,5 +404,23 @@ describe('useAudioPipeline', () => {
     })
 
     expect(result.current.error).toBeNull()
+  })
+
+  it('registers resumeAudioContext in the audio store', async () => {
+    const { result } = renderHook(() => useAudioPipeline())
+
+    // The store should have the resume callback registered
+    const storeResume = useAudioStore.getState().resumeAudioContext
+    expect(storeResume).toBeInstanceOf(Function)
+  })
+
+  it('clears resumeAudioContext from the store on unmount', async () => {
+    const { unmount } = renderHook(() => useAudioPipeline())
+
+    unmount()
+
+    // After unmount, should reset to the default no-op
+    const result = await useAudioStore.getState().resumeAudioContext()
+    expect(result).toBe(true)
   })
 })
