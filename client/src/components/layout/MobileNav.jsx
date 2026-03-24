@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import OfflineIndicator from './OfflineIndicator'
 
 const tabs = [
   {
@@ -98,24 +99,31 @@ const tabs = [
   },
 ]
 
-export default function MobileNav() {
+export default function MobileNav({ isOnline = true, pendingCount = 0 }) {
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around h-18 bg-surface border-t border-border px-2 pb-safe">
-      {tabs.map(({ to, label, icon }) => (
-        <NavLink
-          key={to}
-          to={to}
-          end={to === '/'}
-          className={({ isActive }) =>
-            `flex flex-col items-center gap-1 py-2 px-3 text-xs font-body transition-colors duration-150 ${
-              isActive ? 'text-amber' : 'text-ivory-muted'
-            }`
-          }
-        >
-          {icon}
-          <span>{label}</span>
-        </NavLink>
-      ))}
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex flex-col items-center bg-surface border-t border-border px-2 pb-safe">
+      {!isOnline && (
+        <div className="w-full flex justify-center py-1">
+          <OfflineIndicator isOnline={isOnline} pendingCount={pendingCount} />
+        </div>
+      )}
+      <div className="flex items-center justify-around w-full h-18">
+        {tabs.map(({ to, label, icon }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={to === '/'}
+            className={({ isActive }) =>
+              `flex flex-col items-center gap-1 py-2 px-3 text-xs font-body transition-colors duration-150 ${
+                isActive ? 'text-amber' : 'text-ivory-muted'
+              }`
+            }
+          >
+            {icon}
+            <span>{label}</span>
+          </NavLink>
+        ))}
+      </div>
     </nav>
   )
 }
