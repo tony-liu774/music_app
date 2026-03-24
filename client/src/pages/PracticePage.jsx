@@ -10,6 +10,7 @@ import { Button } from '../components/ui'
 import PracticeControls from '../components/practice/PracticeControls'
 import AudioSuspensionOverlay from '../components/practice/AudioSuspensionOverlay'
 import SheetMusic from '../components/practice/SheetMusic'
+import CoachDebrief from '../components/practice/CoachDebrief'
 import PredictiveCursor from '../components/practice/PredictiveCursor'
 import IntonationNeedle from '../components/practice/IntonationNeedle'
 import HeatMapOverlay from '../components/practice/HeatMapOverlay'
@@ -36,7 +37,19 @@ export default function PracticePage() {
   const sessionSummary = useSessionStore((s) => s.sessionSummary)
   const sessionLog = useSessionStore((s) => s.sessionLog)
 
-  const { startSession, pauseSession, resumeSession, endSession, isPaused: sessionPaused } = useSessionLogger()
+  const {
+    startSession,
+    pauseSession,
+    resumeSession,
+    endSession,
+    getWorstMeasures,
+    isPaused: sessionPaused,
+  } = useSessionLogger()
+
+  const sessionLog = useSessionStore((s) => s.sessionLog)
+  const selectedInstrument = useAudioStore((s) => s.selectedInstrument)
+  const [debriefOpen, setDebriefOpen] = useState(false)
+  const debriefDataRef = useRef(null)
 
   const heatMapData = useHeatMapData(sessionLog)
   const [heatMapVisible, setHeatMapVisible] = useState(false)
@@ -111,17 +124,33 @@ export default function PracticePage() {
       setControlsVisible(true)
       startAutoHideTimer()
     }
-  }, [isPracticing, setIsPracticing, enterGhostMode, exitGhostMode, startAutoHideTimer, startSession, pauseSession, resumeSession, sessionPaused, selectedScore])
+  }, [
+    isPracticing,
+    setIsPracticing,
+    enterGhostMode,
+    exitGhostMode,
+    startAutoHideTimer,
+    startSession,
+    pauseSession,
+    resumeSession,
+    sessionPaused,
+    selectedScore,
+  ])
 
-  // Stop handler — exit ghost mode and end session logging
+  // Stop handler — exit ghost mode, end session logging, show debrief
   const handleStop = useCallback(() => {
+    // Capture worst measures before endSession resets the logger
+    const worst = getWorstMeasures(5)
     setIsPracticing(false)
     endSession()
     exitGhostMode()
     setControlsVisible(true)
     clearTimeout(hideTimerRef.current)
     resetCursor()
-  }, [setIsPracticing, exitGhostMode, endSession, resetCursor])
+
+    debriefDataRef.current = { worstMeasures: worst }
+    setDebriefOpen(true)
+  }, [setIsPracticing, exitGhostMode, endSession, getWorstMeasures, resetCursor])
 
   // When practice stops externally, show controls
   useEffect(() => {
@@ -284,26 +313,36 @@ export default function PracticePage() {
       </div>
 
       {/* Session summary — shown after practice ends */}
-      {!isPracticing && !ghostMode && sessionSummary && sessionSummary.total_deviations > 0 && (
-        <div
-          data-testid="session-summary"
-          className="absolute top-4 right-4 w-72 bg-surface border border-border rounded-lg p-4 shadow-lg z-20"
-        >
-          <h3 className="font-heading text-sm text-ivory mb-2">Session Summary</h3>
-          <div className="space-y-1 font-body text-xs text-ivory-muted">
-            <p>Deviations logged: {sessionSummary.total_deviations}</p>
-            {sessionSummary.pitch_deviation_count > 0 && (
-              <p>Pitch: {sessionSummary.pitch_deviation_count} (avg {sessionSummary.average_pitch_deviation_cents}c)</p>
-            )}
-            {sessionSummary.intonation_deviation_count > 0 && (
-              <p>Intonation: {sessionSummary.intonation_deviation_count}</p>
-            )}
-            {sessionSummary.worst_measure && (
-              <p className="text-amber">Needs work: m.{sessionSummary.worst_measure}</p>
-            )}
+      {!isPracticing &&
+        !ghostMode &&
+        sessionSummary &&
+        sessionSummary.total_deviations > 0 && (
+          <div
+            data-testid="session-summary"
+            className="absolute top-4 right-4 w-72 bg-surface border border-border rounded-lg p-4 shadow-lg z-20"
+          >
+            <h3 className="font-heading text-sm text-ivory mb-2">
+              Session Summary
+            </h3>
+            <div className="space-y-1 font-body text-xs text-ivory-muted">
+              <p>Deviations logged: {sessionSummary.total_deviations}</p>
+              {sessionSummary.pitch_deviation_count > 0 && (
+                <p>
+                  Pitch: {sessionSummary.pitch_deviation_count} (avg{' '}
+                  {sessionSummary.average_pitch_deviation_cents}c)
+                </p>
+              )}
+              {sessionSummary.intonation_deviation_count > 0 && (
+                <p>Intonation: {sessionSummary.intonation_deviation_count}</p>
+              )}
+              {sessionSummary.worst_measure && (
+                <p className="text-amber">
+                  Needs work: m.{sessionSummary.worst_measure}
+                </p>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* Tap overlay hint — shows briefly when controls are hidden */}
       {ghostMode && !controlsVisible && (
@@ -338,6 +377,20 @@ export default function PracticePage() {
           }
         />
       )}
+
+      {/* AI Coach Debrief modal */}
+      <CoachDebrief
+        isOpen={debriefOpen}
+        onClose={() => setDebriefOpen(false)}
+        sessionLog={sessionLog}
+        sessionSummary={sessionSummary}
+        worstMeasures={debriefDataRef.current?.worstMeasures || []}
+        instrument={selectedInstrument || 'violin'}
+        onPracticeAgain={() => {
+          setDebriefOpen(false)
+          handlePlayPause()
+        }}
+      />
     </div>
   )
 }

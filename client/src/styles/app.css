@@ -64,6 +64,9 @@
   /* Animations for Mic Active State */
   --animate-amber-pulse: amber-pulse 2s ease-in-out infinite;
 
+  /* Amber spinner for loading states */
+  --animate-amber-spin: amber-spin 0.8s linear infinite;
+
   /* Animations for Predictive Cursor (Follow the Ball) */
   --animate-ball-pulse: ball-pulse 2s ease-in-out infinite;
   --animate-ball-bounce: ball-bounce 0.3s ease-out;
@@ -156,6 +159,11 @@
   100% {
     transform: translate(-50%, -50%) scale(1);
   }
+}
+
+@keyframes amber-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 /* ============================================================================
