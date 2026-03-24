@@ -1,104 +1,11 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 /**
- * Tests for the DSP worker message handler.
+ * Tests for the actual DSP worker module.
  *
- * We simulate the worker environment by setting up `self.postMessage`
- * as a mock, then loading the worker module which sets `self.onmessage`.
+ * We mock `self.postMessage` then dynamically import the worker module,
+ * which assigns `self.onmessage`. This tests the real file, not a copy.
  */
-
-// We need to mock `self` in the worker context.
-// The worker file assigns to `self.onmessage`, so we simulate that.
-// Instead of loading the actual worker, we test the core logic
-// and the worker integration pattern separately.
-
-import {
-  PYINPitchDetector,
-  SympatheticResonanceFilter,
-  PerformanceMonitor,
-  frequencyToNote,
-} from '../dsp-core'
-
-/**
- * Simulates the worker's onmessage handler logic (mirrors dsp-worker.js).
- */
-function createWorkerHandler() {
-  let detector = null
-  let resonanceFilter = null
-  const perfMonitor = new PerformanceMonitor(30)
-  const posted = []
-
-  function postMessage(msg) {
-    posted.push(msg)
-  }
-
-  function onmessage(e) {
-    const { type } = e.data
-
-    if (type === 'INIT') {
-      try {
-        const { sampleRate, bufferSize, instrument } = e.data
-        detector = new PYINPitchDetector(sampleRate, bufferSize)
-        resonanceFilter = new SympatheticResonanceFilter(instrument || 'violin')
-        postMessage({ type: 'INIT', success: true })
-      } catch (err) {
-        postMessage({ type: 'ERROR', error: err.message })
-      }
-      return
-    }
-
-    if (type === 'PROCESS') {
-      if (!detector) {
-        postMessage({
-          type: 'ERROR',
-          error: 'Worker not initialized. Send INIT first.',
-        })
-        return
-      }
-
-      const startTime = perfMonitor.start()
-
-      try {
-        const buffer = e.data.buffer
-        const { frequency, confidence: rawConfidence } = detector.detect(buffer)
-
-        let confidence = rawConfidence
-        let note = null
-        let cents = null
-
-        if (frequency !== null) {
-          confidence = resonanceFilter.filter(frequency, rawConfidence)
-          const info = frequencyToNote(frequency)
-          note = info.note ? `${info.note}${info.octave}` : null
-          cents = info.cents
-        }
-
-        const perf = perfMonitor.end(startTime)
-
-        postMessage({
-          type: 'RESULT',
-          frequency,
-          confidence: Math.round(confidence * 1000) / 1000,
-          note,
-          cents,
-        })
-
-        if (perf.exceeded || perfMonitor.frameCount % 100 === 0) {
-          postMessage({
-            type: 'PERF',
-            processingTimeMs: perf.processingTimeMs,
-            exceeded: perf.exceeded,
-          })
-        }
-      } catch (err) {
-        perfMonitor.end(startTime)
-        postMessage({ type: 'ERROR', error: err.message })
-      }
-    }
-  }
-
-  return { onmessage, posted }
-}
 
 function generateSineWave(frequency, sampleRate, length) {
   const buffer = new Float32Array(length)
@@ -108,18 +15,30 @@ function generateSineWave(frequency, sampleRate, length) {
   return buffer
 }
 
-describe('DSP Worker message handler', () => {
-  let handler
+describe('DSP Worker (actual module)', () => {
   let posted
 
-  beforeEach(() => {
-    const h = createWorkerHandler()
-    handler = h.onmessage
-    posted = h.posted
+  beforeEach(async () => {
+    posted = []
+
+    // Mock self.postMessage so the worker can post to our array
+    vi.stubGlobal(
+      'postMessage',
+      vi.fn((msg) => posted.push(msg)),
+    )
+    // Also set it on self for the worker's self.postMessage calls
+    globalThis.self = globalThis
+    globalThis.self.postMessage = globalThis.postMessage
+
+    // Clear the module cache so each test gets a fresh worker
+    vi.resetModules()
+
+    // Import the actual worker module — this sets self.onmessage
+    await import('../dsp-worker.js')
   })
 
   it('responds to INIT with success', () => {
-    handler({
+    self.onmessage({
       data: {
         type: 'INIT',
         sampleRate: 44100,
@@ -131,16 +50,22 @@ describe('DSP Worker message handler', () => {
     expect(posted[0]).toEqual({ type: 'INIT', success: true })
   })
 
-  it('returns ERROR when PROCESS is sent before INIT', () => {
+  it('returns ERROR when PROCESS is sent before INIT', async () => {
+    // Fresh import without INIT
+    vi.resetModules()
+    posted = []
+    globalThis.self.postMessage = vi.fn((msg) => posted.push(msg))
+    await import('../dsp-worker.js')
+
     const buffer = new Float32Array(2048)
-    handler({ data: { type: 'PROCESS', buffer } })
+    self.onmessage({ data: { type: 'PROCESS', buffer } })
     expect(posted).toHaveLength(1)
     expect(posted[0].type).toBe('ERROR')
     expect(posted[0].error).toContain('not initialized')
   })
 
   it('processes a 440 Hz sine and returns RESULT with correct note', () => {
-    handler({
+    self.onmessage({
       data: {
         type: 'INIT',
         sampleRate: 44100,
@@ -151,9 +76,8 @@ describe('DSP Worker message handler', () => {
     posted.length = 0
 
     const buffer = generateSineWave(440, 44100, 2048)
-    handler({ data: { type: 'PROCESS', buffer } })
+    self.onmessage({ data: { type: 'PROCESS', buffer } })
 
-    // Should have at least a RESULT message
     const result = posted.find((m) => m.type === 'RESULT')
     expect(result).toBeDefined()
     expect(result.note).toBe('A4')
@@ -164,7 +88,7 @@ describe('DSP Worker message handler', () => {
   })
 
   it('returns null frequency for silence', () => {
-    handler({
+    self.onmessage({
       data: {
         type: 'INIT',
         sampleRate: 44100,
@@ -175,7 +99,7 @@ describe('DSP Worker message handler', () => {
     posted.length = 0
 
     const buffer = new Float32Array(2048)
-    handler({ data: { type: 'PROCESS', buffer } })
+    self.onmessage({ data: { type: 'PROCESS', buffer } })
 
     const result = posted.find((m) => m.type === 'RESULT')
     expect(result).toBeDefined()
@@ -184,8 +108,8 @@ describe('DSP Worker message handler', () => {
     expect(result.note).toBeNull()
   })
 
-  it('uses transferable objects — buffer is a Float32Array', () => {
-    handler({
+  it('uses protocol message types in responses', () => {
+    self.onmessage({
       data: {
         type: 'INIT',
         sampleRate: 44100,
@@ -196,16 +120,19 @@ describe('DSP Worker message handler', () => {
     posted.length = 0
 
     const buffer = generateSineWave(440, 44100, 2048)
-    // Verify the buffer is a Float32Array (transferable)
-    expect(buffer).toBeInstanceOf(Float32Array)
-    expect(buffer.buffer).toBeInstanceOf(ArrayBuffer)
+    self.onmessage({ data: { type: 'PROCESS', buffer } })
 
-    handler({ data: { type: 'PROCESS', buffer } })
-    expect(posted.find((m) => m.type === 'RESULT')).toBeDefined()
+    // RESULT message should have the protocol shape
+    const result = posted.find((m) => m.type === 'RESULT')
+    expect(result).toHaveProperty('type', 'RESULT')
+    expect(result).toHaveProperty('frequency')
+    expect(result).toHaveProperty('confidence')
+    expect(result).toHaveProperty('note')
+    expect(result).toHaveProperty('cents')
   })
 
   it('handles different instruments', () => {
-    handler({
+    self.onmessage({
       data: {
         type: 'INIT',
         sampleRate: 44100,
@@ -217,7 +144,7 @@ describe('DSP Worker message handler', () => {
   })
 
   it('defaults to violin when instrument is not specified', () => {
-    handler({
+    self.onmessage({
       data: {
         type: 'INIT',
         sampleRate: 44100,
@@ -225,5 +152,24 @@ describe('DSP Worker message handler', () => {
       },
     })
     expect(posted[0]).toEqual({ type: 'INIT', success: true })
+  })
+
+  it('uses transferable objects — buffer is a Float32Array', () => {
+    self.onmessage({
+      data: {
+        type: 'INIT',
+        sampleRate: 44100,
+        bufferSize: 2048,
+        instrument: 'violin',
+      },
+    })
+    posted.length = 0
+
+    const buffer = generateSineWave(440, 44100, 2048)
+    expect(buffer).toBeInstanceOf(Float32Array)
+    expect(buffer.buffer).toBeInstanceOf(ArrayBuffer)
+
+    self.onmessage({ data: { type: 'PROCESS', buffer } })
+    expect(posted.find((m) => m.type === 'RESULT')).toBeDefined()
   })
 })

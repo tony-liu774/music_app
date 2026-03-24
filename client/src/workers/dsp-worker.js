@@ -10,6 +10,11 @@ import {
   PerformanceMonitor,
   frequencyToNote,
 } from './dsp-core.js'
+import {
+  createResultMessage,
+  createErrorMessage,
+  createPerfMessage,
+} from './dsp-worker-protocol.js'
 
 let detector = null
 let resonanceFilter = null
@@ -25,17 +30,16 @@ self.onmessage = function (e) {
       resonanceFilter = new SympatheticResonanceFilter(instrument || 'violin')
       self.postMessage({ type: 'INIT', success: true })
     } catch (err) {
-      self.postMessage({ type: 'ERROR', error: err.message })
+      self.postMessage(createErrorMessage(err.message))
     }
     return
   }
 
   if (type === 'PROCESS') {
     if (!detector) {
-      self.postMessage({
-        type: 'ERROR',
-        error: 'Worker not initialized. Send INIT first.',
-      })
+      self.postMessage(
+        createErrorMessage('Worker not initialized. Send INIT first.'),
+      )
       return
     }
 
@@ -59,25 +63,24 @@ self.onmessage = function (e) {
 
       const perf = perfMonitor.end(startTime)
 
-      self.postMessage({
-        type: 'RESULT',
-        frequency,
-        confidence: Math.round(confidence * 1000) / 1000,
-        note,
-        cents,
-      })
+      self.postMessage(
+        createResultMessage(
+          frequency,
+          Math.round(confidence * 1000) / 1000,
+          note,
+          cents,
+        ),
+      )
 
       // Report perf metrics periodically or when budget is exceeded
       if (perf.exceeded || perfMonitor.frameCount % 100 === 0) {
-        self.postMessage({
-          type: 'PERF',
-          processingTimeMs: perf.processingTimeMs,
-          exceeded: perf.exceeded,
-        })
+        self.postMessage(
+          createPerfMessage(perf.processingTimeMs, perf.exceeded),
+        )
       }
     } catch (err) {
       perfMonitor.end(startTime)
-      self.postMessage({ type: 'ERROR', error: err.message })
+      self.postMessage(createErrorMessage(err.message))
     }
     return
   }

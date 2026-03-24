@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useAudioStore } from '../stores/useAudioStore'
 
 /**
@@ -22,7 +22,7 @@ const DEFAULTS = {
  *
  * @param {object} [options]
  * @param {number} [options.bufferSize=2048]
- * @returns {{ start, stop, isRunning }}
+ * @returns {{ start, stop, isRunning, error }}
  */
 export function useAudioPipeline(options = {}) {
   const bufferSize = options.bufferSize ?? DEFAULTS.bufferSize
@@ -35,7 +35,12 @@ export function useAudioPipeline(options = {}) {
   const audioCtxRef = useRef(null)
   const sourceRef = useRef(null)
   const processorRef = useRef(null)
+  // Ref for the onaudioprocess callback (avoids stale closure)
   const isRunningRef = useRef(false)
+
+  // Reactive state so consuming components re-render on start/stop
+  const [isRunning, setIsRunning] = useState(false)
+  const [error, setError] = useState(null)
 
   /**
    * Handle messages from the DSP worker.
@@ -47,10 +52,17 @@ export function useAudioPipeline(options = {}) {
         const { frequency, confidence, note, cents } = e.data
         setPitchData({ frequency, confidence, note, cents })
       }
-      // PERF and ERROR messages can be logged or surfaced to devtools
     },
     [setPitchData],
   )
+
+  /**
+   * Handle worker errors (syntax errors, import failures, etc.).
+   */
+  const handleWorkerError = useCallback((e) => {
+    const message = e.message || 'Worker encountered an error'
+    setError(new Error(message))
+  }, [])
 
   /**
    * Start the audio pipeline.
@@ -59,6 +71,8 @@ export function useAudioPipeline(options = {}) {
   const start = useCallback(
     async (stream) => {
       if (isRunningRef.current) return
+
+      setError(null)
 
       // 1. Create AudioContext
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
@@ -84,6 +98,7 @@ export function useAudioPipeline(options = {}) {
       )
       workerRef.current = worker
       worker.onmessage = handleWorkerMessage
+      worker.onerror = handleWorkerError
 
       // 3. Initialise the worker
       worker.postMessage({
@@ -120,8 +135,15 @@ export function useAudioPipeline(options = {}) {
       processor.connect(audioCtx.destination)
 
       isRunningRef.current = true
+      setIsRunning(true)
     },
-    [bufferSize, selectedInstrument, handleWorkerMessage, setAudioContextState],
+    [
+      bufferSize,
+      selectedInstrument,
+      handleWorkerMessage,
+      handleWorkerError,
+      setAudioContextState,
+    ],
   )
 
   /**
@@ -129,6 +151,7 @@ export function useAudioPipeline(options = {}) {
    */
   const stop = useCallback(() => {
     isRunningRef.current = false
+    setIsRunning(false)
 
     if (processorRef.current) {
       processorRef.current.onaudioprocess = null
@@ -159,18 +182,11 @@ export function useAudioPipeline(options = {}) {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      // eslint-disable-next-line react-hooks/exhaustive-deps
       if (isRunningRef.current) {
         stop()
       }
     }
   }, [stop])
 
-  return {
-    start,
-    stop,
-    get isRunning() {
-      return isRunningRef.current
-    },
-  }
+  return { start, stop, isRunning, error }
 }

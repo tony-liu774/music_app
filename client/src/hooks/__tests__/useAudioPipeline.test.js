@@ -7,6 +7,7 @@ import { useAudioStore } from '../../stores/useAudioStore'
 class MockWorker {
   constructor() {
     this.onmessage = null
+    this.onerror = null
     this.postMessage = vi.fn()
     this.terminate = vi.fn()
     MockWorker.instances.push(this)
@@ -15,6 +16,12 @@ class MockWorker {
   simulateMessage(data) {
     if (this.onmessage) {
       this.onmessage({ data })
+    }
+  }
+
+  simulateError(message) {
+    if (this.onerror) {
+      this.onerror({ message })
     }
   }
 }
@@ -89,11 +96,12 @@ describe('useAudioPipeline', () => {
     vi.restoreAllMocks()
   })
 
-  it('returns start, stop, and isRunning', () => {
+  it('returns start, stop, isRunning, and error', () => {
     const { result } = renderHook(() => useAudioPipeline())
     expect(result.current.start).toBeInstanceOf(Function)
     expect(result.current.stop).toBeInstanceOf(Function)
     expect(typeof result.current.isRunning).toBe('boolean')
+    expect(result.current.error).toBeNull()
   })
 
   it('is not running initially', () => {
@@ -304,5 +312,82 @@ describe('useAudioPipeline', () => {
 
     const state = useAudioStore.getState()
     expect(state.audioContextState).toBe('running')
+  })
+
+  it('isRunning is reactive — triggers re-render on start/stop', async () => {
+    const { result } = renderHook(() => useAudioPipeline())
+    const stream = createMockStream()
+
+    expect(result.current.isRunning).toBe(false)
+
+    await act(async () => {
+      await result.current.start(stream)
+    })
+
+    // isRunning should now be true (reactive via useState)
+    expect(result.current.isRunning).toBe(true)
+
+    act(() => {
+      result.current.stop()
+    })
+
+    // isRunning should be false again after stop
+    expect(result.current.isRunning).toBe(false)
+  })
+
+  it('sets worker.onerror handler', async () => {
+    const { result } = renderHook(() => useAudioPipeline())
+    const stream = createMockStream()
+
+    await act(async () => {
+      await result.current.start(stream)
+    })
+
+    const worker = MockWorker.instances[0]
+    expect(worker.onerror).toBeInstanceOf(Function)
+  })
+
+  it('surfaces worker errors via error state', async () => {
+    const { result } = renderHook(() => useAudioPipeline())
+    const stream = createMockStream()
+
+    await act(async () => {
+      await result.current.start(stream)
+    })
+
+    const worker = MockWorker.instances[0]
+
+    await act(async () => {
+      worker.simulateError('Worker script failed to load')
+    })
+
+    expect(result.current.error).toBeInstanceOf(Error)
+    expect(result.current.error.message).toBe('Worker script failed to load')
+  })
+
+  it('clears error on new start', async () => {
+    const { result } = renderHook(() => useAudioPipeline())
+    const stream = createMockStream()
+
+    await act(async () => {
+      await result.current.start(stream)
+    })
+
+    const worker = MockWorker.instances[0]
+    await act(async () => {
+      worker.simulateError('some error')
+    })
+    expect(result.current.error).not.toBeNull()
+
+    // Stop and start again
+    act(() => {
+      result.current.stop()
+    })
+
+    await act(async () => {
+      await result.current.start(stream)
+    })
+
+    expect(result.current.error).toBeNull()
   })
 })
