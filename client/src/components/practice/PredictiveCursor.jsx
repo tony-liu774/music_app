@@ -1,25 +1,26 @@
+import { forwardRef } from 'react'
+
 /**
  * PredictiveCursor — glowing amber ball that overlays the VexFlow score
  * and tracks the current beat position during practice.
  *
- * Dynamic positioning requires inline styles for left/top (computed at
- * runtime from the score layout). Gradient backgrounds are defined in
- * app.css as .cursor-ball-gradient, .cursor-glow-gradient, and
- * .cursor-highlight-gradient to avoid inline styles and hardcoded hex codes.
+ * Position is updated directly via the forwarded ref (style.left/top)
+ * from the animation loop for 60fps performance — no React re-renders
+ * per frame. Only `isBouncing` triggers re-renders (on beat boundaries).
  */
-export default function PredictiveCursor({ x, y, visible, isBouncing }) {
+const PredictiveCursor = forwardRef(function PredictiveCursor(
+  { visible, isBouncing },
+  ref,
+) {
   if (!visible) return null
 
   return (
     <div
+      ref={ref}
       data-testid="predictive-cursor"
       className="absolute pointer-events-none z-10"
-      // eslint-disable-next-line no-restricted-syntax -- dynamic x,y requires inline style
-      style={{
-        left: `${x}px`,
-        top: `${y}px`,
-        transform: 'translate(-50%, -50%)',
-      }}
+      // eslint-disable-next-line no-restricted-syntax -- position updated by ref in animation loop
+      style={{ left: '0px', top: '0px', transform: 'translate(-50%, -50%)' }}
     >
       {/* Glow layer */}
       <div
@@ -41,4 +42,6 @@ export default function PredictiveCursor({ x, y, visible, isBouncing }) {
       </div>
     </div>
   )
-}
+})
+
+export default PredictiveCursor

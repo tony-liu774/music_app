@@ -3,13 +3,9 @@ import { renderHook, act } from '@testing-library/react'
 import usePredictiveCursor, { getBeatPosition } from '../usePredictiveCursor'
 import { useAudioStore } from '../../stores/useAudioStore'
 
-// We use fake timers throughout to control both setTimeout and RAF.
-// vitest's fake timers include requestAnimationFrame support.
-
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: false })
 
-  // Reset audio store
   useAudioStore.setState({
     pitchData: { frequency: null, note: null, cents: null, confidence: 0 },
     cursorPosition: { measure: null, beat: null, progress: 0 },
@@ -21,10 +17,6 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-/**
- * Advance fake timers by ms and flush pending RAF / timer callbacks.
- * This works because vitest fake timers control requestAnimationFrame.
- */
 function advanceTime(ms) {
   act(() => {
     vi.advanceTimersByTime(ms)
@@ -121,6 +113,7 @@ describe('usePredictiveCursor', () => {
     expect(result.current.currentBeat).toBe(1)
     expect(result.current.isBouncing).toBe(false)
     expect(typeof result.current.reset).toBe('function')
+    expect(result.current.cursorRef).toBeDefined()
   })
 
   it('starts animation loop when practicing begins', () => {
@@ -151,7 +144,7 @@ describe('usePredictiveCursor', () => {
     expect(rafSpy).not.toHaveBeenCalled()
   })
 
-  it('cancels animation frame on cleanup', () => {
+  it('cancels animation frame and bounce timer on cleanup', () => {
     const cafSpy = vi.spyOn(window, 'cancelAnimationFrame')
     const { unmount } = renderHook(() =>
       usePredictiveCursor({
@@ -171,16 +164,13 @@ describe('usePredictiveCursor', () => {
       usePredictiveCursor({
         score: mockScore,
         isPracticing: true,
-        tempo: 120, // 500ms per beat
+        tempo: 120,
         metronomeMode: true,
       }),
     )
 
     expect(result.current.currentBeat).toBe(1)
-
-    // Advance 500ms (one beat at 120 BPM)
     advanceTime(550)
-
     expect(result.current.currentBeat).toBe(2)
   })
 
@@ -194,14 +184,12 @@ describe('usePredictiveCursor', () => {
       }),
     )
 
-    // Advance through 4 beats (4/4 time) — 2100ms > 4 * 500ms
     advanceTime(2100)
-
     expect(result.current.currentMeasure).toBe(2)
     expect(result.current.currentBeat).toBe(1)
   })
 
-  it('triggers bounce on beat advance', () => {
+  it('triggers bounce on beat advance and cleans up timer', () => {
     const { result } = renderHook(() =>
       usePredictiveCursor({
         score: mockScore,
@@ -214,7 +202,6 @@ describe('usePredictiveCursor', () => {
     advanceTime(550)
     expect(result.current.isBouncing).toBe(true)
 
-    // Bounce resets after 300ms
     advanceTime(300)
     expect(result.current.isBouncing).toBe(false)
   })
@@ -270,13 +257,11 @@ describe('usePredictiveCursor', () => {
       }),
     )
 
-    // 3 measures * 4 beats = 12 beats, need 12 * 500ms = 6000ms, go way past
     advanceTime(8000)
-
     expect(result.current.currentMeasure).toBeLessThanOrEqual(3)
   })
 
-  it('provides x,y coordinates', () => {
+  it('returns a cursorRef for direct DOM position updates', () => {
     const { result } = renderHook(() =>
       usePredictiveCursor({
         score: mockScore,
@@ -286,8 +271,8 @@ describe('usePredictiveCursor', () => {
       }),
     )
 
-    expect(typeof result.current.cursorX).toBe('number')
-    expect(typeof result.current.cursorY).toBe('number')
+    expect(result.current.cursorRef).toBeDefined()
+    expect(result.current.cursorRef.current).toBeNull() // no DOM in hook test
   })
 })
 

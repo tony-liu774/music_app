@@ -1,15 +1,12 @@
 import { useRef, useCallback, useEffect, useState } from 'react'
 import { useAudioStore } from '../stores/useAudioStore'
-
-/**
- * Layout constants — must match SheetMusic.jsx rendering geometry.
- */
-const MEASURE_WIDTH = 300
-const SYSTEM_HEIGHT = 140
-const FIRST_MEASURE_INDENT = 40
-const MEASURES_PER_SYSTEM = 4
-/** Vertical center of a stave within a system. */
-const STAVE_CENTER_Y = 20 + 60 // top offset + half stave height
+import {
+  MEASURE_WIDTH,
+  SYSTEM_HEIGHT,
+  FIRST_MEASURE_INDENT,
+  MEASURES_PER_SYSTEM,
+  STAVE_CENTER_Y,
+} from '../constants/scoreLayout'
 
 /**
  * Calculate the (x, y) pixel position of a given beat within the rendered score.
@@ -25,7 +22,6 @@ export function getBeatPosition(measure, beat, beatsPerMeasure) {
   const posInSystem = mIdx % MEASURES_PER_SYSTEM
   const isFirstInSystem = posInSystem === 0
 
-  // X: measure start + fractional beat offset within measure
   const measureX = isFirstInSystem
     ? 10
     : 10 + FIRST_MEASURE_INDENT + posInSystem * MEASURE_WIDTH
@@ -33,11 +29,8 @@ export function getBeatPosition(measure, beat, beatsPerMeasure) {
     ? MEASURE_WIDTH + FIRST_MEASURE_INDENT
     : MEASURE_WIDTH
 
-  // Beat fraction (0-based within measure, leave padding at edges)
   const beatFraction = (beat - 0.5) / beatsPerMeasure
   const x = measureX + width * beatFraction
-
-  // Y: system top + stave center
   const y = systemIndex * SYSTEM_HEIGHT + STAVE_CENTER_Y
 
   return { x, y }
@@ -46,8 +39,11 @@ export function getBeatPosition(measure, beat, beatsPerMeasure) {
 /**
  * usePredictiveCursor — drives the predictive cursor animation.
  *
- * Uses refs for the hot animation path to avoid re-render loops.
- * Only triggers React state updates on beat changes (not every frame).
+ * Position is updated via direct DOM manipulation (cursorRef.style.left/top)
+ * for 60fps performance. React state is only updated on beat boundaries
+ * (currentMeasure, currentBeat, isBouncing).
+ *
+ * @returns {{ cursorRef, currentMeasure, currentBeat, isBouncing, reset }}
  */
 export default function usePredictiveCursor({
   score,
@@ -57,13 +53,14 @@ export default function usePredictiveCursor({
   metronomeMode = true,
   scrollRef = null,
 }) {
-  const [cursorX, setCursorX] = useState(0)
-  const [cursorY, setCursorY] = useState(0)
   const [currentMeasure, setCurrentMeasure] = useState(1)
   const [currentBeat, setCurrentBeat] = useState(1)
   const [isBouncing, setIsBouncing] = useState(false)
 
-  // Refs for hot animation path (no re-renders)
+  // Ref to the PredictiveCursor DOM element — updated directly each frame
+  const cursorRef = useRef(null)
+
+  // Animation path refs (no re-renders)
   const targetRef = useRef({ x: 0, y: 0 })
   const posRef = useRef({ x: 0, y: 0 })
   const animFrameRef = useRef(null)
@@ -71,7 +68,7 @@ export default function usePredictiveCursor({
   const beatRef = useRef({ measure: 1, beat: 1 })
   const bounceTimerRef = useRef(null)
 
-  // Store references that stay current without re-renders
+  // Current values via refs for the animation loop
   const tempoRef = useRef(tempo)
   tempoRef.current = tempo
   const metronomeRef = useRef(metronomeMode)
@@ -82,11 +79,56 @@ export default function usePredictiveCursor({
   const timeSignature = part?.measures?.[0]?.timeSignature || '4/4'
   const beatsPerMeasure = parseInt(timeSignature.split('/')[0], 10) || 4
 
-  // Store these in refs for the animation loop
   const totalMeasuresRef = useRef(totalMeasures)
   totalMeasuresRef.current = totalMeasures
   const beatsPerMeasureRef = useRef(beatsPerMeasure)
   beatsPerMeasureRef.current = beatsPerMeasure
+
+  // Keep scrollRef accessible in the animation loop
+  const scrollRefCurrent = useRef(scrollRef)
+  scrollRefCurrent.current = scrollRef
+
+  /**
+   * Update the cursor DOM element position directly (no React re-render).
+   */
+  const updateCursorDOM = useCallback((x, y) => {
+    const el = cursorRef.current
+    if (el) {
+      el.style.left = `${x}px`
+      el.style.top = `${y}px`
+    }
+  }, [])
+
+  /**
+   * Check if scroll is needed and apply it.
+   */
+  const checkScroll = useCallback((x, y) => {
+    const container = scrollRefCurrent.current?.current
+    if (!container) return
+
+    const containerRect = container.getBoundingClientRect()
+
+    const relativeX = x - container.scrollLeft
+    if (relativeX > containerRect.width - 100) {
+      container.scrollTo({
+        left: container.scrollLeft + MEASURE_WIDTH,
+        behavior: 'smooth',
+      })
+    }
+
+    const relativeY = y - container.scrollTop
+    if (relativeY > containerRect.height - 60) {
+      container.scrollTo({
+        top: container.scrollTop + SYSTEM_HEIGHT,
+        behavior: 'smooth',
+      })
+    } else if (relativeY < 20) {
+      container.scrollTo({
+        top: Math.max(0, container.scrollTop - SYSTEM_HEIGHT),
+        behavior: 'smooth',
+      })
+    }
+  }, [])
 
   const triggerBounce = useCallback(() => {
     setIsBouncing(true)
@@ -94,9 +136,6 @@ export default function usePredictiveCursor({
     bounceTimerRef.current = setTimeout(() => setIsBouncing(false), 300)
   }, [])
 
-  /**
-   * Advance to the next beat. Returns the new { measure, beat }.
-   */
   const advanceBeat = useCallback(() => {
     const bpm = beatsPerMeasureRef.current
     const total = totalMeasuresRef.current
@@ -121,8 +160,8 @@ export default function usePredictiveCursor({
   }, [])
 
   /**
-   * The core animation loop. Runs via requestAnimationFrame.
-   * Uses only refs in the hot path — no dependency on React state.
+   * Core 60fps animation loop. Updates DOM position directly via ref.
+   * Only triggers React state updates on beat changes.
    */
   const animationLoop = useCallback(
     (timestamp) => {
@@ -140,10 +179,10 @@ export default function usePredictiveCursor({
         pos.y = target.y
       }
 
-      setCursorX(pos.x)
-      setCursorY(pos.y)
+      // Direct DOM update — no React re-render
+      updateCursorDOM(pos.x, pos.y)
 
-      // Metronome advance
+      // Metronome advance on beat boundary
       const msPerBeat = (60 / tempoRef.current) * 1000
       if (
         metronomeRef.current &&
@@ -155,6 +194,7 @@ export default function usePredictiveCursor({
         const nextPos = getBeatPosition(next.measure, next.beat, bpm)
         targetRef.current = nextPos
         triggerBounce()
+        checkScroll(nextPos.x, nextPos.y)
 
         const total = totalMeasuresRef.current
         const progress =
@@ -170,12 +210,11 @@ export default function usePredictiveCursor({
 
       animFrameRef.current = requestAnimationFrame(animationLoop)
     },
-    [advanceBeat, triggerBounce],
+    [advanceBeat, triggerBounce, updateCursorDOM, checkScroll],
   )
 
   /**
-   * Pitch-based advance: when a new note is detected with enough
-   * confidence, advance to the next beat.
+   * Pitch-based advance: on new note detection, advance to next beat.
    */
   const prevNoteRef = useRef(null)
   const pitchNote = useAudioStore((s) => s.pitchData.note)
@@ -192,6 +231,7 @@ export default function usePredictiveCursor({
       const nextPos = getBeatPosition(next.measure, next.beat, bpm)
       targetRef.current = nextPos
       triggerBounce()
+      checkScroll(nextPos.x, nextPos.y)
 
       const total = totalMeasuresRef.current
       const progress =
@@ -211,52 +251,19 @@ export default function usePredictiveCursor({
     metronomeMode,
     advanceBeat,
     triggerBounce,
+    checkScroll,
   ])
 
   /**
-   * Predictive scrolling: when the cursor approaches the edge
-   * of the visible area, smooth-scroll to keep it visible.
-   */
-  useEffect(() => {
-    if (!scrollRef?.current) return
-
-    const container = scrollRef.current
-    const containerRect = container.getBoundingClientRect()
-
-    const relativeX = cursorX - container.scrollLeft
-    if (relativeX > containerRect.width - 100) {
-      container.scrollTo({
-        left: container.scrollLeft + MEASURE_WIDTH,
-        behavior: 'smooth',
-      })
-    }
-
-    const relativeY = cursorY - container.scrollTop
-    if (relativeY > containerRect.height - 60) {
-      container.scrollTo({
-        top: container.scrollTop + SYSTEM_HEIGHT,
-        behavior: 'smooth',
-      })
-    } else if (relativeY < 20) {
-      container.scrollTo({
-        top: Math.max(0, container.scrollTop - SYSTEM_HEIGHT),
-        behavior: 'smooth',
-      })
-    }
-  }, [cursorX, cursorY, scrollRef])
-
-  /**
    * Start/stop the animation loop when practice state changes.
-   * This effect has a stable dependency list — animationLoop only
-   * depends on advanceBeat and triggerBounce which are both stable.
+   * Cleanup clears both animation frame AND bounce timer.
    */
   useEffect(() => {
     if (isPracticing && totalMeasures > 0) {
       const startPos = getBeatPosition(1, 1, beatsPerMeasure)
       posRef.current = { ...startPos }
       targetRef.current = { ...startPos }
-      setCursorX(startPos.x)
-      setCursorY(startPos.y)
+      updateCursorDOM(startPos.x, startPos.y)
       lastTickRef.current = performance.now()
 
       animFrameRef.current = requestAnimationFrame(animationLoop)
@@ -267,8 +274,15 @@ export default function usePredictiveCursor({
         cancelAnimationFrame(animFrameRef.current)
         animFrameRef.current = null
       }
+      clearTimeout(bounceTimerRef.current)
     }
-  }, [isPracticing, totalMeasures, beatsPerMeasure, animationLoop])
+  }, [
+    isPracticing,
+    totalMeasures,
+    beatsPerMeasure,
+    animationLoop,
+    updateCursorDOM,
+  ])
 
   const reset = useCallback(() => {
     beatRef.current = { measure: 1, beat: 1 }
@@ -277,18 +291,16 @@ export default function usePredictiveCursor({
     const startPos = getBeatPosition(1, 1, beatsPerMeasureRef.current)
     posRef.current = { ...startPos }
     targetRef.current = { ...startPos }
-    setCursorX(startPos.x)
-    setCursorY(startPos.y)
+    updateCursorDOM(startPos.x, startPos.y)
     useAudioStore.getState().setCursorPosition({
       measure: 1,
       beat: 1,
       progress: 0,
     })
-  }, [])
+  }, [updateCursorDOM])
 
   return {
-    cursorX,
-    cursorY,
+    cursorRef,
     currentMeasure,
     currentBeat,
     isBouncing,

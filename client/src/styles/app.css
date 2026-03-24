@@ -263,20 +263,24 @@
       var(--color-amber-dark)
     );
     box-shadow:
-      0 4px 8px rgba(0, 0, 0, 0.4),
-      inset 0 2px 4px rgba(255, 255, 255, 0.4);
+      0 4px 8px color-mix(in srgb, black 40%, transparent),
+      inset 0 2px 4px color-mix(in srgb, white 40%, transparent);
   }
 
   .cursor-glow-gradient {
     background: radial-gradient(
       circle,
       var(--color-amber-glow) 0%,
-      rgba(201, 162, 39, 0.15) 40%,
+      color-mix(in srgb, var(--color-amber) 15%, transparent) 40%,
       transparent 70%
     );
   }
 
   .cursor-highlight-gradient {
-    background: radial-gradient(circle, rgba(255, 255, 255, 0.6), transparent);
+    background: radial-gradient(
+      circle,
+      color-mix(in srgb, white 60%, transparent),
+      transparent
+    );
   }
 }

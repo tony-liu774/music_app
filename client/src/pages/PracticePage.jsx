@@ -38,8 +38,7 @@ export default function PracticePage() {
   const scrollRef = useRef(null)
 
   const {
-    cursorX,
-    cursorY,
+    cursorRef,
     currentMeasure,
     isBouncing,
     reset: resetCursor,
@@ -230,8 +229,7 @@ export default function PracticePage() {
             scrollRef={scrollRef}
           />
           <PredictiveCursor
-            x={cursorX}
-            y={cursorY}
+            ref={cursorRef}
             visible={isPracticing && !!score}
             isBouncing={isBouncing}
           />

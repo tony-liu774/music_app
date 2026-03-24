@@ -42,14 +42,12 @@ function getThemeColors() {
   }
 }
 
-/** Stave width in pixels (per measure). */
-const MEASURE_WIDTH = 300
-/** Vertical space for one system (stave + padding). */
-const SYSTEM_HEIGHT = 140
-/** Left indent for the first measure on each system. */
-const FIRST_MEASURE_INDENT = 40
-/** Max measures per system before wrapping. */
-const MEASURES_PER_SYSTEM = 4
+import {
+  MEASURE_WIDTH,
+  SYSTEM_HEIGHT,
+  FIRST_MEASURE_INDENT,
+  MEASURES_PER_SYSTEM,
+} from '../../constants/scoreLayout'
 
 /**
  * SheetMusic — renders a parsed VexFlow-compatible score onto an SVG element.
