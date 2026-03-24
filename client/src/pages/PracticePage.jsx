@@ -6,6 +6,7 @@ import { useLibraryStore } from '../stores/useLibraryStore'
 import { Button } from '../components/ui'
 import PracticeControls from '../components/practice/PracticeControls'
 import SheetMusic from '../components/practice/SheetMusic'
+import IntonationNeedle from '../components/practice/IntonationNeedle'
 import useScore from '../hooks/useScore'
 
 const CONTROLS_AUTO_HIDE_MS = 3000
@@ -24,8 +25,13 @@ export default function PracticePage() {
     selectedScore?.xmlUrl || null,
   )
 
+  // eslint-disable-next-line no-unused-vars -- will be wired to predictive cursor
   const [currentMeasure, setCurrentMeasure] = useState(null)
   const [controlsVisible, setControlsVisible] = useState(true)
+  // Cursor position for IntonationNeedle tracking (will be driven by predictive cursor)
+  // eslint-disable-next-line no-unused-vars -- setter wired when predictive cursor is built
+  const [cursorPosition, setCursorPosition] = useState({ x: 0, y: 0 })
+  const sheetMusicAreaRef = useRef(null)
   const hideTimerRef = useRef(null)
   const isPracticingRef = useRef(isPracticing)
   isPracticingRef.current = isPracticing
@@ -137,8 +143,9 @@ export default function PracticePage() {
     >
       {/* Sheet music area */}
       <div
+        ref={sheetMusicAreaRef}
         data-testid="sheet-music-area"
-        className={`${ghostMode ? 'h-full' : 'h-[80%]'} flex flex-col items-center justify-center`}
+        className={`${ghostMode ? 'h-full' : 'h-[80%]'} relative flex flex-col items-center justify-center`}
       >
         {!isPracticing && !ghostMode && (
           <div className="text-center mb-4">
@@ -189,6 +196,14 @@ export default function PracticePage() {
           currentMeasure={currentMeasure}
           className="w-full max-w-6xl mx-auto"
         />
+
+        {/* Breath Intonation Needle — tracks with predictive cursor */}
+        {isPracticing && (
+          <IntonationNeedle
+            cursorX={cursorPosition.x}
+            cursorY={cursorPosition.y}
+          />
+        )}
       </div>
 
       {/* Tap overlay hint — shows briefly when controls are hidden */}
