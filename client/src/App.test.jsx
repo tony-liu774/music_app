@@ -10,7 +10,9 @@ describe('App', () => {
 
   it('renders the subtitle', () => {
     render(<App />)
-    expect(screen.getByText('AI-Powered Practice Companion for String Players')).toBeInTheDocument()
+    expect(
+      screen.getByText('AI-Powered Practice Companion for String Players'),
+    ).toBeInTheDocument()
   })
 
   it('applies Midnight Conservatory background class', () => {

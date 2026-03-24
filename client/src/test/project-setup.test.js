@@ -7,7 +7,9 @@ const clientRoot = resolve(import.meta.dirname, '..', '..')
 describe('Project setup', () => {
   it('has no tailwind.config.js file', () => {
     expect(existsSync(resolve(clientRoot, 'tailwind.config.js'))).toBe(false)
-    expect(existsSync(resolve(clientRoot, '..', 'tailwind.config.js'))).toBe(false)
+    expect(existsSync(resolve(clientRoot, '..', 'tailwind.config.js'))).toBe(
+      false,
+    )
   })
 
   it('app.css contains @theme block', () => {
@@ -64,12 +66,14 @@ describe('Project setup', () => {
 
   it('vite.config.js uses @tailwindcss/vite plugin', () => {
     const config = readFileSync(resolve(clientRoot, 'vite.config.js'), 'utf-8')
-    expect(config).toContain("@tailwindcss/vite")
+    expect(config).toContain('@tailwindcss/vite')
     expect(config).toContain('tailwindcss()')
   })
 
   it('package.json has required dependencies', () => {
-    const pkg = JSON.parse(readFileSync(resolve(clientRoot, 'package.json'), 'utf-8'))
+    const pkg = JSON.parse(
+      readFileSync(resolve(clientRoot, 'package.json'), 'utf-8'),
+    )
     expect(pkg.dependencies).toHaveProperty('react')
     expect(pkg.dependencies).toHaveProperty('react-dom')
     expect(pkg.dependencies).toHaveProperty('react-router-dom')
@@ -78,7 +82,9 @@ describe('Project setup', () => {
   })
 
   it('package.json has dev, build, and preview scripts', () => {
-    const pkg = JSON.parse(readFileSync(resolve(clientRoot, 'package.json'), 'utf-8'))
+    const pkg = JSON.parse(
+      readFileSync(resolve(clientRoot, 'package.json'), 'utf-8'),
+    )
     expect(pkg.scripts.dev).toBe('vite')
     expect(pkg.scripts.build).toBe('vite build')
     expect(pkg.scripts.preview).toBe('vite preview')
