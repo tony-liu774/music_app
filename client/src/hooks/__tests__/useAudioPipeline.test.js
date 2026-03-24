@@ -40,6 +40,7 @@ function createMockAudioContext() {
     disconnect: vi.fn(),
   }
 
+  const listeners = {}
   const ctx = {
     sampleRate: 44100,
     state: 'running',
@@ -49,8 +50,18 @@ function createMockAudioContext() {
     createMediaStreamSource: vi.fn().mockReturnValue(source),
     createScriptProcessor: vi.fn().mockReturnValue(processor),
     destination: {},
+    addEventListener: vi.fn((event, handler) => {
+      if (!listeners[event]) listeners[event] = []
+      listeners[event].push(handler)
+    }),
+    removeEventListener: vi.fn((event, handler) => {
+      if (listeners[event]) {
+        listeners[event] = listeners[event].filter((h) => h !== handler)
+      }
+    }),
     _source: source,
     _processor: processor,
+    _listeners: listeners,
   }
 
   return ctx
@@ -75,6 +86,8 @@ describe('useAudioPipeline', () => {
     useAudioStore.setState({
       pitchData: { frequency: null, note: null, cents: null, confidence: 0 },
       audioContextState: 'suspended',
+      isSuspendedBySystem: false,
+      resumeFailCount: 0,
       selectedInstrument: 'violin',
     })
 
@@ -96,12 +109,13 @@ describe('useAudioPipeline', () => {
     vi.restoreAllMocks()
   })
 
-  it('returns start, stop, isRunning, and error', () => {
+  it('returns start, stop, isRunning, error, and resumeAudioContext', () => {
     const { result } = renderHook(() => useAudioPipeline())
     expect(result.current.start).toBeInstanceOf(Function)
     expect(result.current.stop).toBeInstanceOf(Function)
     expect(typeof result.current.isRunning).toBe('boolean')
     expect(result.current.error).toBeNull()
+    expect(result.current.resumeAudioContext).toBeInstanceOf(Function)
   })
 
   it('is not running initially', () => {
