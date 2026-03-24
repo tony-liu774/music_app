@@ -98,7 +98,7 @@ describe('TunerDisplay', () => {
 
   it('highlights matching open string when detected note matches', () => {
     render(<TunerDisplay note="A4" frequency={440} cents={0} isActive={true} />)
-    const a4Button = screen.getByText('A4').closest('button')
+    const a4Button = screen.getByText('A4').closest('div')
     expect(a4Button.className).toContain('border-amber')
   })
 

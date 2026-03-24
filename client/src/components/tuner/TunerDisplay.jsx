@@ -30,7 +30,6 @@ const NOTE_FREQUENCIES = {
  * - note: string|null — detected note name (e.g. 'A4')
  * - frequency: number|null — detected frequency in Hz
  * - cents: number|null — cents deviation from nearest note
- * - confidence: number — detection confidence (0-1)
  * - isActive: boolean — whether the tuner is listening
  */
 export default function TunerDisplay({
@@ -96,13 +95,12 @@ export default function TunerDisplay({
               const isMatch = note === stringNote
               const freq = NOTE_FREQUENCIES[stringNote]
               return (
-                <button
+                <div
                   key={stringNote}
-                  type="button"
                   className={`flex flex-col items-center rounded-lg border px-3 py-2 transition-colors ${
                     isMatch
                       ? 'border-amber bg-amber/10 text-amber'
-                      : 'border-border text-ivory-muted hover:border-border-light'
+                      : 'border-border text-ivory-muted'
                   }`}
                 >
                   <span className="font-heading text-lg">{stringNote}</span>
@@ -111,7 +109,7 @@ export default function TunerDisplay({
                       {freq.toFixed(0)} Hz
                     </span>
                   )}
-                </button>
+                </div>
               )
             })}
           </div>

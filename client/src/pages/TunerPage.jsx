@@ -22,16 +22,21 @@ export default function TunerPage() {
   const [smoothedCents, setSmoothedCents] = useState(0)
   const animFrameRef = useRef(null)
 
-  // Smoothing loop: blend raw cents toward smoothed value
+  // Store rapidly-changing values in refs so the RAF callback stays stable
+  const rawCentsRef = useRef(0)
+  const sensitivityRef = useRef(needleSensitivity)
+
+  useEffect(() => { rawCentsRef.current = pitchData.cents ?? 0 }, [pitchData.cents])
+  useEffect(() => { sensitivityRef.current = needleSensitivity }, [needleSensitivity])
+
+  // Stable smoothing loop — reads from refs, never recreated
   const updateSmoothing = useCallback(() => {
-    const rawCents = pitchData.cents ?? 0
-    // Sensitivity controls how quickly the needle responds (0.1 = sluggish, 1.0 = instant)
-    const alpha = 0.2 + needleSensitivity * 0.6
+    const alpha = 0.2 + sensitivityRef.current * 0.6
     smoothedCentsRef.current =
-      smoothedCentsRef.current * (1 - alpha) + rawCents * alpha
+      smoothedCentsRef.current * (1 - alpha) + rawCentsRef.current * alpha
     setSmoothedCents(smoothedCentsRef.current)
     animFrameRef.current = requestAnimationFrame(updateSmoothing)
-  }, [pitchData.cents, needleSensitivity])
+  }, [])
 
   useEffect(() => {
     if (isRunning) {

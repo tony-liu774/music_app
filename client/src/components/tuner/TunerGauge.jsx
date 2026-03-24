@@ -22,32 +22,31 @@ export default function TunerGauge({ cents = 0, isActive = false }) {
   // Map -50..+50 to -90..+90 degrees
   const needleAngle = (clampedCents / 50) * 90
 
-  // Determine color state based on cents deviation
+  // Needle is always amber per spec; arc zones communicate deviation state
+  const needleColor = 'var(--color-primary)'
+
+  // Status text and color based on cents deviation
   const absCents = Math.abs(clampedCents)
-  const { needleColor, statusText, statusColor } = useMemo(() => {
+  const { statusText, statusColor } = useMemo(() => {
     if (!isActive) {
       return {
-        needleColor: 'var(--color-primary)',
         statusText: '--',
         statusColor: 'var(--color-text-secondary)',
       }
     }
     if (absCents <= 5) {
       return {
-        needleColor: 'var(--color-success)',
         statusText: 'IN TUNE',
         statusColor: 'var(--color-success)',
       }
     }
     if (clampedCents < 0) {
       return {
-        needleColor: 'var(--color-error)',
         statusText: 'FLAT',
         statusColor: 'var(--color-error)',
       }
     }
     return {
-      needleColor: 'var(--color-error)',
       statusText: 'SHARP',
       statusColor: 'var(--color-error)',
     }
