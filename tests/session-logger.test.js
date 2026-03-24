@@ -45,31 +45,35 @@ describe('SessionLogger', () => {
         assert.strictEqual(logger.deviations.length, 0);
     });
 
-    it('should log pitch deviations correctly', () => {
+    it('should log pitch deviations with spec-compliant fields', () => {
         logger.startSession('test-score');
         logger.logPitchDeviation({
-            measure: 5,
+            measureNumber: 5,
             beat: 2,
-            expectedPitch: 'C#5',
-            actualPitch: 'C5',
-            deviationCents: -10,
+            expectedNote: 'C#5',
+            detectedNote: 'C5',
+            centsDeviation: -10,
+            confidence: 0.95,
+            isVibrato: true,
             expectedFrequency: 554.37,
             actualFrequency: 523.25
         });
 
         assert.strictEqual(logger.deviations.length, 1);
         assert.strictEqual(logger.deviations[0].type, 'pitch');
-        assert.strictEqual(logger.deviations[0].measure, 5);
+        assert.strictEqual(logger.deviations[0].measureNumber, 5);
         assert.strictEqual(logger.deviations[0].beat, 2);
-        assert.strictEqual(logger.deviations[0].expected_pitch, 'C#5');
-        assert.strictEqual(logger.deviations[0].actual_pitch, 'C5');
-        assert.strictEqual(logger.deviations[0].deviation_cents, -10);
+        assert.strictEqual(logger.deviations[0].expectedNote, 'C#5');
+        assert.strictEqual(logger.deviations[0].detectedNote, 'C5');
+        assert.strictEqual(logger.deviations[0].centsDeviation, -10);
+        assert.strictEqual(logger.deviations[0].confidence, 0.95);
+        assert.strictEqual(logger.deviations[0].isVibrato, true);
     });
 
     it('should log rhythm deviations correctly', () => {
         logger.startSession('test-score');
         logger.logRhythmDeviation({
-            measure: 3,
+            measureNumber: 3,
             beat: 1,
             expectedMs: 500,
             actualMs: 530,
@@ -78,14 +82,14 @@ describe('SessionLogger', () => {
 
         assert.strictEqual(logger.deviations.length, 1);
         assert.strictEqual(logger.deviations[0].type, 'rhythm');
-        assert.strictEqual(logger.deviations[0].measure, 3);
+        assert.strictEqual(logger.deviations[0].measureNumber, 3);
         assert.strictEqual(logger.deviations[0].deviation_ms, 30);
     });
 
     it('should log intonation deviations correctly', () => {
         logger.startSession('test-score');
         logger.logIntonationDeviation({
-            measure: 7,
+            measureNumber: 7,
             fromNote: 'D4',
             toNote: 'E4',
             transitionQuality: 65,
@@ -94,7 +98,7 @@ describe('SessionLogger', () => {
 
         assert.strictEqual(logger.deviations.length, 1);
         assert.strictEqual(logger.deviations[0].type, 'intonation');
-        assert.strictEqual(logger.deviations[0].measure, 7);
+        assert.strictEqual(logger.deviations[0].measureNumber, 7);
         assert.strictEqual(logger.deviations[0].transition_quality, 65);
         assert.strictEqual(logger.deviations[0].issue, 'position_shift');
     });
@@ -102,7 +106,7 @@ describe('SessionLogger', () => {
     it('should log tone quality deviations correctly', () => {
         logger.startSession('test-score');
         logger.logToneQualityDeviation({
-            measure: 1,
+            measureNumber: 1,
             note: 'A4',
             qualityScore: 75,
             purityScore: 80,
@@ -111,7 +115,7 @@ describe('SessionLogger', () => {
             wolfToneFrequency: null
         });
         logger.logToneQualityDeviation({
-            measure: 2,
+            measureNumber: 2,
             note: 'E5',
             qualityScore: 45,
             purityScore: 50,
@@ -132,13 +136,12 @@ describe('SessionLogger', () => {
     it('should store zero score correctly (not overwrite with default)', () => {
         logger.startSession('test-score');
         logger.logToneQualityDeviation({
-            measure: 1,
+            measureNumber: 1,
             qualityScore: 0,
             purityScore: 0,
             harshnessScore: 0
         });
 
-        // Verify 0 is stored as 0, not overwritten to 50
         assert.strictEqual(logger.deviations[0].quality_score, 0);
         assert.strictEqual(logger.deviations[0].purity_score, 0);
         assert.strictEqual(logger.deviations[0].harshness_score, 0);
@@ -146,10 +149,10 @@ describe('SessionLogger', () => {
 
     it('should generate correct session log', () => {
         logger.startSession('test-score');
-        logger.logPitchDeviation({ measure: 1, deviationCents: -10 });
-        logger.logPitchDeviation({ measure: 2, deviationCents: -20 });
-        logger.logRhythmDeviation({ measure: 3, deviationMs: 30 });
-        logger.logToneQualityDeviation({ measure: 4, qualityScore: 75 });
+        logger.logPitchDeviation({ measureNumber: 1, centsDeviation: -10, confidence: 0.9 });
+        logger.logPitchDeviation({ measureNumber: 2, centsDeviation: -20, confidence: 0.8 });
+        logger.logRhythmDeviation({ measureNumber: 3, deviationMs: 30 });
+        logger.logToneQualityDeviation({ measureNumber: 4, qualityScore: 75 });
 
         const log = logger.getSessionLog();
 
@@ -165,20 +168,20 @@ describe('SessionLogger', () => {
     it('should calculate summary statistics correctly', () => {
         logger.startSession('test-score');
 
-        logger.logPitchDeviation({ measure: 1, deviationCents: -10 });
-        logger.logPitchDeviation({ measure: 1, deviationCents: -20 });
-        logger.logPitchDeviation({ measure: 2, deviationCents: 15 });
+        logger.logPitchDeviation({ measureNumber: 1, centsDeviation: -10, confidence: 0.9 });
+        logger.logPitchDeviation({ measureNumber: 1, centsDeviation: -20, confidence: 0.9 });
+        logger.logPitchDeviation({ measureNumber: 2, centsDeviation: 15, confidence: 0.9 });
 
-        logger.logRhythmDeviation({ measure: 1, deviationMs: 25 });
-        logger.logRhythmDeviation({ measure: 2, deviationMs: -35 });
+        logger.logRhythmDeviation({ measureNumber: 1, deviationMs: 25 });
+        logger.logRhythmDeviation({ measureNumber: 2, deviationMs: -35 });
 
-        logger.logToneQualityDeviation({ measure: 1, qualityScore: 80 });
-        logger.logToneQualityDeviation({ measure: 2, qualityScore: 60 });
-        logger.logToneQualityDeviation({ measure: 3, qualityScore: 40, wolfToneDetected: true });
+        logger.logToneQualityDeviation({ measureNumber: 1, qualityScore: 80 });
+        logger.logToneQualityDeviation({ measureNumber: 2, qualityScore: 60 });
+        logger.logToneQualityDeviation({ measureNumber: 3, qualityScore: 40, wolfToneDetected: true });
 
         const stats = logger.getSummaryStats();
 
-        assert.strictEqual(stats.total_notes_played, 8);
+        assert.strictEqual(stats.total_deviations, 8);
         assert.strictEqual(stats.pitch_deviation_count, 3);
         assert.strictEqual(stats.rhythm_deviation_count, 2);
         assert.strictEqual(stats.tone_quality_deviation_count, 3);
@@ -192,39 +195,104 @@ describe('SessionLogger', () => {
         assert.ok(stats.problem_measures.length > 0);
     });
 
-    it('should identify problem measures', () => {
+    it('should identify problem measures by average deviation', () => {
         logger.startSession('test-score');
 
-        logger.logPitchDeviation({ measure: 1, deviationCents: -10 });
-        logger.logPitchDeviation({ measure: 1, deviationCents: -20 });
-        logger.logPitchDeviation({ measure: 1, deviationCents: 15 });
-        logger.logPitchDeviation({ measure: 2, deviationCents: 5 });
+        // Measure 1: three pitch deviations, avg |cents| = (10+20+15)/3 = 15
+        logger.logPitchDeviation({ measureNumber: 1, centsDeviation: -10, confidence: 0.9 });
+        logger.logPitchDeviation({ measureNumber: 1, centsDeviation: -20, confidence: 0.9 });
+        logger.logPitchDeviation({ measureNumber: 1, centsDeviation: 15, confidence: 0.9 });
+        // Measure 2: one large deviation, avg = 50
+        logger.logPitchDeviation({ measureNumber: 2, centsDeviation: 50, confidence: 0.9 });
 
         const stats = logger.getSummaryStats();
-
-        assert.strictEqual(stats.worst_measure, 1);
+        // Measure 2 should be worst (avg 50 > avg 15)
+        assert.strictEqual(stats.worst_measure, 2);
     });
 
     it('should export data for LLM correctly', () => {
         logger.startSession('test-score');
-        logger.logPitchDeviation({ measure: 1, deviationCents: -10 });
-        logger.logPitchDeviation({ measure: 2, deviationCents: -20 });
-        logger.logPitchDeviation({ measure: 3, deviationCents: -30 });
+        logger.logPitchDeviation({ measureNumber: 1, centsDeviation: -10, confidence: 0.9 });
+        logger.logPitchDeviation({ measureNumber: 2, centsDeviation: -20, confidence: 0.9 });
+        logger.logPitchDeviation({ measureNumber: 3, centsDeviation: -30, confidence: 0.9 });
 
         const exportData = logger.exportForLLM();
 
-        assert.ok(exportData.includes('"total_notes_played": 3'));
+        assert.ok(exportData.includes('"total_deviations": 3'));
         assert.ok(exportData.includes('"pitch_deviation_count": 3'));
     });
 
     it('should clear session data', () => {
         logger.startSession('test-score');
-        logger.logPitchDeviation({ measure: 1, deviationCents: -10 });
+        logger.logPitchDeviation({ measureNumber: 1, centsDeviation: -10, confidence: 0.9 });
 
         logger.clear();
 
         assert.strictEqual(logger.deviations.length, 0);
         assert.strictEqual(logger.sessionId, null);
         assert.strictEqual(logger.startTime, null);
+    });
+
+    it('should support pause and resume', () => {
+        logger.startSession('test-score');
+        assert.strictEqual(logger._paused, false);
+
+        logger.pauseSession();
+        assert.strictEqual(logger._paused, true);
+
+        logger.resumeSession();
+        assert.strictEqual(logger._paused, false);
+    });
+
+    it('should preserve deviations across pause/resume', () => {
+        logger.startSession('test-score');
+        logger.logPitchDeviation({ measureNumber: 1, centsDeviation: -10, confidence: 0.9 });
+
+        logger.pauseSession();
+        // Deviations should still be there
+        assert.strictEqual(logger.deviations.length, 1);
+
+        logger.resumeSession();
+        logger.logPitchDeviation({ measureNumber: 2, centsDeviation: -20, confidence: 0.9 });
+
+        assert.strictEqual(logger.deviations.length, 2);
+    });
+
+    it('getErrorsByMeasure should group errors correctly', () => {
+        logger.startSession('test-score');
+        logger.logPitchDeviation({ measureNumber: 1, centsDeviation: -10, confidence: 0.9 });
+        logger.logPitchDeviation({ measureNumber: 1, centsDeviation: -20, confidence: 0.9 });
+        logger.logPitchDeviation({ measureNumber: 2, centsDeviation: 15, confidence: 0.9 });
+
+        const byMeasure = logger.getErrorsByMeasure();
+        assert.strictEqual(byMeasure[1].length, 2);
+        assert.strictEqual(byMeasure[2].length, 1);
+    });
+
+    it('getWorstMeasures(n) should return n measures ranked by average deviation', () => {
+        logger.startSession('test-score');
+        // Measure 1: avg |cents| = 15
+        logger.logPitchDeviation({ measureNumber: 1, centsDeviation: -10, confidence: 0.9 });
+        logger.logPitchDeviation({ measureNumber: 1, centsDeviation: -20, confidence: 0.9 });
+        // Measure 2: avg |cents| = 50
+        logger.logPitchDeviation({ measureNumber: 2, centsDeviation: 50, confidence: 0.9 });
+        // Measure 3: avg |cents| = 5
+        logger.logPitchDeviation({ measureNumber: 3, centsDeviation: 5, confidence: 0.9 });
+
+        const worst = logger.getWorstMeasures(2);
+        assert.strictEqual(worst.length, 2);
+        assert.strictEqual(worst[0].measureNumber, 2); // highest avg deviation
+        assert.strictEqual(worst[0].averageDeviation, 50);
+        assert.strictEqual(worst[1].measureNumber, 1);
+        assert.strictEqual(worst[1].averageDeviation, 15);
+    });
+
+    it('getSessionSummary should be an alias for getSummaryStats', () => {
+        logger.startSession('test-score');
+        logger.logPitchDeviation({ measureNumber: 1, centsDeviation: -10, confidence: 0.9 });
+
+        const stats = logger.getSummaryStats();
+        const summary = logger.getSessionSummary();
+        assert.deepStrictEqual(stats, summary);
     });
 });
