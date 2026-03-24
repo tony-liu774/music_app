@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useUIStore } from '../stores/useUIStore'
 import { useAudioStore } from '../stores/useAudioStore'
 import { useLibraryStore } from '../stores/useLibraryStore'
+import { Button } from '../components/ui'
 import PracticeControls from '../components/practice/PracticeControls'
 import SheetMusic from '../components/practice/SheetMusic'
 import useScore from '../hooks/useScore'
@@ -9,6 +11,7 @@ import useScore from '../hooks/useScore'
 const CONTROLS_AUTO_HIDE_MS = 3000
 
 export default function PracticePage() {
+  const navigate = useNavigate()
   const ghostMode = useUIStore((s) => s.ghostMode)
   const enterGhostMode = useUIStore((s) => s.enterGhostMode)
   const exitGhostMode = useUIStore((s) => s.exitGhostMode)
@@ -137,14 +140,35 @@ export default function PracticePage() {
         data-testid="sheet-music-area"
         className={`${ghostMode ? 'h-full' : 'h-[80%]'} flex flex-col items-center justify-center`}
       >
-        {!isPracticing && !ghostMode && !score && (
+        {!isPracticing && !ghostMode && (
           <div className="text-center mb-4">
             <h1 className="font-heading text-3xl text-ivory mb-4">
               Practice
             </h1>
-            <p className="font-body text-ivory-muted mb-8">
-              Press play to start your practice session
-            </p>
+            {selectedScore ? (
+              <div className="mb-8" data-testid="practice-score-info">
+                <h2 className="font-heading text-xl text-ivory">
+                  {selectedScore.title}
+                </h2>
+                <p className="font-body text-ivory-muted">
+                  {selectedScore.composer || 'Unknown Composer'}
+                </p>
+                {selectedScore.instrument && (
+                  <span className="inline-block font-body text-xs text-amber bg-amber/10 px-2 py-0.5 rounded-full mt-2">
+                    {selectedScore.instrument}
+                  </span>
+                )}
+              </div>
+            ) : !score && (
+              <div className="mb-8" data-testid="practice-no-score">
+                <p className="font-body text-ivory-muted mb-4">
+                  No score selected. Choose a piece from the library to start.
+                </p>
+                <Button variant="secondary" onClick={() => navigate('/library')}>
+                  Browse Library
+                </Button>
+              </div>
+            )}
           </div>
         )}
 
