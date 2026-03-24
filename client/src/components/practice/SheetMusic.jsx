@@ -9,21 +9,37 @@ import {
   Articulation,
   Dot,
   Beam,
-  KeySignature,
-  TimeSignature,
 } from 'vexflow'
 
-/**
- * Midnight Conservatory color tokens (pulled from CSS custom properties at
- * render time so they stay in sync with the theme).
- */
-const THEME = {
+/** Fallback values used only when CSS custom properties are unavailable (e.g. tests). */
+const FALLBACKS = {
   background: '#0a0a12',
   staffLine: '#3a3a4a',
-  noteHead: '#f3f4f6', // ivory
+  noteHead: '#f3f4f6',
   amber: '#c9a227',
   ivoryMuted: '#a0a0b0',
-  ivoryDim: '#6a6a7a',
+}
+
+/**
+ * Read Midnight Conservatory color tokens from CSS custom properties at render
+ * time so they stay in sync with the theme.
+ */
+function getThemeColors() {
+  const root =
+    typeof document !== 'undefined'
+      ? getComputedStyle(document.documentElement)
+      : null
+
+  const get = (prop, fallback) =>
+    root?.getPropertyValue(prop)?.trim() || fallback
+
+  return {
+    background: get('--color-oxford-blue', FALLBACKS.background),
+    staffLine: get('--color-border-light', FALLBACKS.staffLine),
+    noteHead: get('--color-ivory', FALLBACKS.noteHead),
+    amber: get('--color-amber', FALLBACKS.amber),
+    ivoryMuted: get('--color-ivory-muted', FALLBACKS.ivoryMuted),
+  }
 }
 
 /** Stave width in pixels (per measure). */
@@ -60,6 +76,9 @@ export default function SheetMusic({
     // Clear previous render
     container.innerHTML = ''
 
+    // Read theme colors from CSS custom properties at render time
+    const theme = getThemeColors()
+
     const part = score.parts?.[partIndex]
     if (!part || !part.measures?.length) return
 
@@ -77,7 +96,7 @@ export default function SheetMusic({
     // Style the SVG background
     const svgEl = container.querySelector('svg')
     if (svgEl) {
-      svgEl.style.background = THEME.background
+      svgEl.style.background = theme.background
     }
 
     // Track running attributes across measures
@@ -121,14 +140,14 @@ export default function SheetMusic({
       }
 
       // Style stave lines
-      stave.setStyle({ strokeStyle: THEME.staffLine, lineWidth: 1 })
+      stave.setStyle({ strokeStyle: theme.staffLine, lineWidth: 1 })
       stave.setContext(context).draw()
 
       // Style stave modifiers (clef, key sig, time sig) to ivory
-      styleStaveModifiers(stave)
+      styleStaveModifiers(stave, theme)
 
       // Build VexFlow notes
-      const vexNotes = buildVexNotes(measure, runningClef)
+      const vexNotes = buildVexNotes(measure, runningClef, theme)
 
       if (vexNotes.length === 0) return
 
@@ -167,11 +186,8 @@ export default function SheetMusic({
 
       // Highlight current measure
       if (currentMeasure !== null && measure.number === currentMeasure) {
-        highlightMeasure(context, x, y, width)
+        highlightMeasure(context, x, y, width, theme)
       }
-
-      // Style note heads to ivory (override VexFlow default black)
-      styleNotes(container, mIdx, currentMeasure, measure.number)
     })
   }, [score, partIndex, currentMeasure])
 
@@ -225,7 +241,7 @@ export default function SheetMusic({
 // Helpers
 // ---------------------------------------------------------------------------
 
-function buildVexNotes(measure, clef) {
+function buildVexNotes(measure, clef, theme) {
   return measure.notes.map((n) => {
     if (n.isRest) {
       const note = new StaveNote({
@@ -233,7 +249,7 @@ function buildVexNotes(measure, clef) {
         keys: ['b/4'],
         duration: n.duration,
       })
-      note.setStyle({ fillStyle: THEME.ivoryMuted, strokeStyle: THEME.ivoryMuted })
+      note.setStyle({ fillStyle: theme.ivoryMuted, strokeStyle: theme.ivoryMuted })
       return note
     }
 
@@ -264,47 +280,29 @@ function buildVexNotes(measure, clef) {
 
     // Style note heads ivory
     note.setStyle({
-      fillStyle: THEME.noteHead,
-      strokeStyle: THEME.noteHead,
+      fillStyle: theme.noteHead,
+      strokeStyle: theme.noteHead,
     })
-    note.setStemStyle({ fillStyle: THEME.noteHead, strokeStyle: THEME.noteHead })
+    note.setStemStyle({ fillStyle: theme.noteHead, strokeStyle: theme.noteHead })
 
     return note
   })
 }
 
-function highlightMeasure(context, x, y, width) {
+function highlightMeasure(context, x, y, width, theme) {
   context.save()
   context.setFillStyle('rgba(201, 162, 39, 0.08)')
-  context.setStrokeStyle(THEME.amber)
+  context.setStrokeStyle(theme.amber)
   context.setLineWidth(2)
-  const svgCtx = context
-  // Use rect to draw highlight behind the stave
-  svgCtx.fillRect(x, y, width, SYSTEM_HEIGHT - 40)
+  context.fillRect(x, y, width, SYSTEM_HEIGHT - 40)
   context.restore()
 }
 
-function styleStaveModifiers(stave) {
-  // VexFlow draws modifier glyphs inline — we style the stave's modifiers
+function styleStaveModifiers(stave, theme) {
   const modifiers = stave.getModifiers?.() || []
   modifiers.forEach((mod) => {
     if (mod.setStyle) {
-      mod.setStyle({ fillStyle: THEME.noteHead, strokeStyle: THEME.noteHead })
+      mod.setStyle({ fillStyle: theme.noteHead, strokeStyle: theme.noteHead })
     }
   })
-}
-
-function styleNotes(container, measureIndex, currentMeasure, measureNumber) {
-  // Post-render SVG styling: find note elements and tint them
-  // This is a lightweight pass to enforce Midnight Conservatory colors
-  // on any elements VexFlow rendered with its default palette.
-  if (!container) return
-  const svgEl = container.querySelector('svg')
-  if (!svgEl) return
-
-  // Highlight current measure's notes in amber
-  if (currentMeasure !== null && measureNumber === currentMeasure) {
-    // We rely on the highlight rect + setStyle above; additional DOM
-    // mutation is avoided for performance.
-  }
 }

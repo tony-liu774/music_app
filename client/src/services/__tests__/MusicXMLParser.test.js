@@ -286,7 +286,7 @@ describe('MusicXMLParser', () => {
       const result = parseMusicXML(SIMPLE_SCORE)
       expect(result.parts).toHaveLength(1)
       expect(result.parts[0].id).toBe('P1')
-      expect(result.parts[0].name).toBe('Part 1')
+      expect(result.parts[0].name).toBe('Violin')
       expect(result.parts[0].measures).toHaveLength(1)
     })
 

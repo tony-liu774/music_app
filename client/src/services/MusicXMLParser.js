@@ -101,7 +101,7 @@ function parseDocument(doc) {
 
   const parts = []
   partElements.forEach((partEl, idx) => {
-    const result = parsePart(partEl, idx, divisions)
+    const result = parsePart(doc, partEl, idx, divisions)
     parts.push(result.part)
     divisions = result.divisions
   })
@@ -109,10 +109,14 @@ function parseDocument(doc) {
   return { title, composer, parts }
 }
 
-function parsePart(partEl, index, divisions) {
+function parsePart(doc, partEl, index, divisions) {
   const id = partEl.getAttribute('id') || `part-${index}`
+  // part-name lives in <part-list><score-part>, not in <part>
+  const scorePartEl = id
+    ? doc.querySelector(`score-part[id="${id}"]`)
+    : null
   const name =
-    partEl.querySelector('part-name')?.textContent || `Part ${index + 1}`
+    scorePartEl?.querySelector('part-name')?.textContent || `Part ${index + 1}`
 
   const measures = []
   const measureEls = partEl.querySelectorAll('measure')
