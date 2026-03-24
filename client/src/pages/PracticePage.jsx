@@ -5,12 +5,17 @@ import { useAudioStore } from '../stores/useAudioStore'
 import { useLibraryStore } from '../stores/useLibraryStore'
 import { useSessionStore } from '../stores/useSessionStore'
 import { useSessionLogger } from '../hooks/useSessionLogger'
+import { useHeatMapData } from '../hooks/useHeatMapData'
 import { Button } from '../components/ui'
 import PracticeControls from '../components/practice/PracticeControls'
 import AudioSuspensionOverlay from '../components/practice/AudioSuspensionOverlay'
 import SheetMusic from '../components/practice/SheetMusic'
 import CoachDebrief from '../components/practice/CoachDebrief'
+import PredictiveCursor from '../components/practice/PredictiveCursor'
+import IntonationNeedle from '../components/practice/IntonationNeedle'
+import HeatMapOverlay from '../components/practice/HeatMapOverlay'
 import useScore from '../hooks/useScore'
+import usePredictiveCursor from '../hooks/usePredictiveCursor'
 
 const CONTROLS_AUTO_HIDE_MS = 3000
 
@@ -30,6 +35,7 @@ export default function PracticePage() {
     error: scoreError,
   } = useScore(selectedScore?.xmlUrl || null)
   const sessionSummary = useSessionStore((s) => s.sessionSummary)
+  const sessionLog = useSessionStore((s) => s.sessionLog)
 
   const {
     startSession,
@@ -45,14 +51,38 @@ export default function PracticePage() {
   const [debriefOpen, setDebriefOpen] = useState(false)
   const debriefDataRef = useRef(null)
 
+  const heatMapData = useHeatMapData(sessionLog)
+  const [heatMapVisible, setHeatMapVisible] = useState(false)
+
   const resumeAudioContext = useAudioStore((s) => s.resumeAudioContext)
   const audioContextState = useAudioStore((s) => s.audioContextState)
 
-  const [currentMeasure, setCurrentMeasure] = useState(null)
   const [controlsVisible, setControlsVisible] = useState(true)
+  const [tempo, setTempo] = useState(120)
+  const [metronomeOn, setMetronomeOn] = useState(true)
   const hideTimerRef = useRef(null)
   const isPracticingRef = useRef(isPracticing)
   isPracticingRef.current = isPracticing
+
+  const scrollRef = useRef(null)
+  const sheetMusicAreaRef = useRef(null)
+
+  const {
+    cursorRef,
+    currentMeasure,
+    isBouncing,
+    reset: resetCursor,
+  } = usePredictiveCursor({
+    score,
+    partIndex: 0,
+    isPracticing,
+    tempo,
+    metronomeMode: metronomeOn,
+    scrollRef,
+  })
+
+  // Derive cursor position from the cursorRef for IntonationNeedle
+  const cursorPosition = useAudioStore((s) => s.cursorPosition)
 
   const startAutoHideTimer = useCallback(() => {
     clearTimeout(hideTimerRef.current)
@@ -116,10 +146,11 @@ export default function PracticePage() {
     exitGhostMode()
     setControlsVisible(true)
     clearTimeout(hideTimerRef.current)
+    resetCursor()
 
     debriefDataRef.current = { worstMeasures: worst }
     setDebriefOpen(true)
-  }, [setIsPracticing, exitGhostMode, endSession, getWorstMeasures])
+  }, [setIsPracticing, exitGhostMode, endSession, getWorstMeasures, resetCursor])
 
   // When practice stops externally, show controls
   useEffect(() => {
@@ -164,6 +195,16 @@ export default function PracticePage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handlePlayPause, handleStop])
 
+  // Show heat map after practice ends and session data is available
+  useEffect(() => {
+    if (!isPracticing && sessionLog && heatMapData.length > 0) {
+      setHeatMapVisible(true)
+    }
+    if (isPracticing) {
+      setHeatMapVisible(false)
+    }
+  }, [isPracticing, sessionLog, heatMapData.length])
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -186,8 +227,9 @@ export default function PracticePage() {
     >
       {/* Sheet music area */}
       <div
+        ref={sheetMusicAreaRef}
         data-testid="sheet-music-area"
-        className={`${ghostMode ? 'h-full' : 'h-[80%]'} flex flex-col items-center justify-center`}
+        className={`${ghostMode ? 'h-full' : 'h-[80%]'} relative flex flex-col items-center justify-center`}
       >
         {!isPracticing && !ghostMode && (
           <div className="text-center mb-4">
@@ -242,11 +284,32 @@ export default function PracticePage() {
           </p>
         )}
 
-        <SheetMusic
-          score={score}
-          currentMeasure={currentMeasure}
-          className="w-full max-w-6xl mx-auto"
-        />
+        <div className="relative w-full max-w-6xl mx-auto">
+          <SheetMusic
+            score={score}
+            currentMeasure={currentMeasure}
+            className="w-full"
+            scrollRef={scrollRef}
+          />
+          <PredictiveCursor
+            ref={cursorRef}
+            visible={isPracticing && !!score}
+            isBouncing={isBouncing}
+          />
+          <HeatMapOverlay
+            heatMapData={heatMapData}
+            totalMeasures={score?.parts?.[0]?.measures?.length || 0}
+            visible={heatMapVisible}
+          />
+        </div>
+
+        {/* Breath Intonation Needle — tracks with predictive cursor */}
+        {isPracticing && (
+          <IntonationNeedle
+            cursorX={cursorPosition.progress * 100}
+            cursorY={0}
+          />
+        )}
       </div>
 
       {/* Session summary — shown after practice ends */}
@@ -299,6 +362,10 @@ export default function PracticePage() {
         onPlayPause={handlePlayPause}
         onStop={handleStop}
         visible={controlsVisible}
+        tempo={tempo}
+        onTempoChange={setTempo}
+        metronomeOn={metronomeOn}
+        onMetronomeToggle={setMetronomeOn}
       />
 
       {/* Audio suspension overlay — shown when browser suspends AudioContext */}
