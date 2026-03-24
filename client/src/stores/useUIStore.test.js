@@ -11,6 +11,7 @@ describe('useUIStore', () => {
       sidebarOpen: true,
       theme: 'midnight',
       navVisible: true,
+      ghostMode: false,
     })
   })
 
@@ -73,5 +74,24 @@ describe('useUIStore', () => {
   it('sets nav visibility for ghost mode', () => {
     useUIStore.getState().setNavVisible(false)
     expect(useUIStore.getState().navVisible).toBe(false)
+  })
+
+  it('has correct initial ghost mode state', () => {
+    expect(useUIStore.getState().ghostMode).toBe(false)
+  })
+
+  it('enterGhostMode sets ghostMode true and navVisible false', () => {
+    useUIStore.getState().enterGhostMode()
+    const state = useUIStore.getState()
+    expect(state.ghostMode).toBe(true)
+    expect(state.navVisible).toBe(false)
+  })
+
+  it('exitGhostMode sets ghostMode false and navVisible true', () => {
+    useUIStore.getState().enterGhostMode()
+    useUIStore.getState().exitGhostMode()
+    const state = useUIStore.getState()
+    expect(state.ghostMode).toBe(false)
+    expect(state.navVisible).toBe(true)
   })
 })

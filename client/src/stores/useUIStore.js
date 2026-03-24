@@ -53,6 +53,13 @@ export const useUIStore = create(
       navVisible: true,
       setNavVisible: (visible) =>
         set({ navVisible: visible }, false, 'setNavVisible'),
+
+      // Ghost mode — activated during practice
+      ghostMode: false,
+      enterGhostMode: () =>
+        set({ ghostMode: true, navVisible: false }, false, 'enterGhostMode'),
+      exitGhostMode: () =>
+        set({ ghostMode: false, navVisible: true }, false, 'exitGhostMode'),
     }),
     { name: 'UIStore' },
   ),
