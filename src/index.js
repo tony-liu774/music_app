@@ -16,6 +16,7 @@ const syncRoutes = require('./routes/sync');
 const assignmentRoutes = require('./routes/assignments');
 const notificationRoutes = require('./routes/notifications');
 const licenseRoutes = require('./routes/license');
+const aiRoutes = require('./routes/ai');
 const scheduler = require('./services/scheduler');
 
 const app = express();
@@ -101,6 +102,9 @@ app.use('/api/notifications', notificationRoutes);
 
 // License and subscription routes
 app.use('/api/licenses', licenseRoutes);
+
+// AI summary routes
+app.use('/api', aiRoutes);
 
 // API routes (placeholder for future routes)
 app.use('/api', (req, res) => {

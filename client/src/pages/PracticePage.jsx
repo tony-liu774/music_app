@@ -12,6 +12,7 @@ import { useToast } from '../components/ui/Toast'
 import PracticeControls from '../components/practice/PracticeControls'
 import AudioSuspensionOverlay from '../components/practice/AudioSuspensionOverlay'
 import SheetMusic from '../components/practice/SheetMusic'
+import CoachDebrief from '../components/practice/CoachDebrief'
 import PredictiveCursor from '../components/practice/PredictiveCursor'
 import IntonationNeedle from '../components/practice/IntonationNeedle'
 import HeatMapOverlay from '../components/practice/HeatMapOverlay'
@@ -44,8 +45,13 @@ export default function PracticePage() {
     pauseSession,
     resumeSession,
     endSession,
+    getWorstMeasures,
     isPaused: sessionPaused,
   } = useSessionLogger()
+
+  const selectedInstrument = useAudioStore((s) => s.selectedInstrument)
+  const [debriefOpen, setDebriefOpen] = useState(false)
+  const debriefDataRef = useRef(null)
 
   const heatMapData = useHeatMapData(sessionLog)
   const [heatMapVisible, setHeatMapVisible] = useState(false)
@@ -154,15 +160,20 @@ export default function PracticePage() {
     selectedScore,
   ])
 
-  // Stop handler — exit ghost mode and end session logging
+  // Stop handler — exit ghost mode, end session logging, show debrief
   const handleStop = useCallback(() => {
+    // Capture worst measures before endSession resets the logger
+    const worst = getWorstMeasures(5)
     setIsPracticing(false)
     endSession()
     exitGhostMode()
     setControlsVisible(true)
     clearTimeout(hideTimerRef.current)
     resetCursor()
-  }, [setIsPracticing, exitGhostMode, endSession, resetCursor])
+
+    debriefDataRef.current = { worstMeasures: worst }
+    setDebriefOpen(true)
+  }, [setIsPracticing, exitGhostMode, endSession, getWorstMeasures, resetCursor])
 
   // Start smart loop: extract worst measures and begin loop practice
   const handleStartSmartLoop = useCallback(() => {
@@ -415,6 +426,20 @@ export default function PracticePage() {
           }
         />
       )}
+
+      {/* AI Coach Debrief modal */}
+      <CoachDebrief
+        isOpen={debriefOpen}
+        onClose={() => setDebriefOpen(false)}
+        sessionLog={sessionLog}
+        sessionSummary={sessionSummary}
+        worstMeasures={debriefDataRef.current?.worstMeasures || []}
+        instrument={selectedInstrument || 'violin'}
+        onPracticeAgain={() => {
+          setDebriefOpen(false)
+          handlePlayPause()
+        }}
+      />
     </div>
   )
 }
