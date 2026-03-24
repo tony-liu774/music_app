@@ -81,7 +81,7 @@ describe('App routing', () => {
     render(<App />)
     const libraryLinks = screen.getAllByRole('link', { name: /library/i })
     await user.click(libraryLinks[0])
-    libraryLinks.forEach(link => {
+    libraryLinks.forEach((link) => {
       expect(link.className).toContain('text-amber')
     })
   })

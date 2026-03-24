@@ -23,7 +23,13 @@ describe('Select', () => {
   })
 
   it('renders a placeholder option', () => {
-    render(<Select placeholder="Choose one" options={instruments} data-testid="select" />)
+    render(
+      <Select
+        placeholder="Choose one"
+        options={instruments}
+        data-testid="select"
+      />,
+    )
     expect(screen.getByText('Choose one')).toBeInTheDocument()
   })
 
@@ -36,7 +42,9 @@ describe('Select', () => {
   })
 
   it('shows error message and error styling', () => {
-    render(<Select options={instruments} data-testid="select" error="Required" />)
+    render(
+      <Select options={instruments} data-testid="select" error="Required" />,
+    )
     expect(screen.getByText('Required')).toBeInTheDocument()
     expect(screen.getByTestId('select').className).toContain('border-crimson')
   })
@@ -48,14 +56,18 @@ describe('Select', () => {
 
   it('handles selection change', async () => {
     const onChange = vi.fn()
-    render(<Select options={instruments} data-testid="select" onChange={onChange} />)
+    render(
+      <Select options={instruments} data-testid="select" onChange={onChange} />,
+    )
     await userEvent.selectOptions(screen.getByTestId('select'), 'viola')
     expect(onChange).toHaveBeenCalled()
   })
 
   it('contains no hardcoded hex codes', () => {
     render(<Select options={instruments} data-testid="select" />)
-    expect(screen.getByTestId('select').className).not.toMatch(/#[0-9a-fA-F]{3,8}/)
+    expect(screen.getByTestId('select').className).not.toMatch(
+      /#[0-9a-fA-F]{3,8}/,
+    )
   })
 
   it('SVG chevron has bounded dimensions', () => {

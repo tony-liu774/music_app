@@ -11,7 +11,7 @@ function renderShell(initialEntries = ['/']) {
           <Route path="library" element={<div>Library Page</div>} />
         </Route>
       </Routes>
-    </MemoryRouter>
+    </MemoryRouter>,
   )
 }
 

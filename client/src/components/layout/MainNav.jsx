@@ -19,7 +19,14 @@ export default function MainNav() {
           xmlns="http://www.w3.org/2000/svg"
           aria-hidden="true"
         >
-          <circle cx="16" cy="16" r="14" stroke="currentColor" strokeWidth="2" className="text-amber" />
+          <circle
+            cx="16"
+            cy="16"
+            r="14"
+            stroke="currentColor"
+            strokeWidth="2"
+            className="text-amber"
+          />
           <path
             d="M12 10v12l4-2v-8l-4-2z"
             fill="currentColor"

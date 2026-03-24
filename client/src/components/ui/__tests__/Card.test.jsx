@@ -23,17 +23,27 @@ describe('Card', () => {
   })
 
   it('merges custom className', () => {
-    render(<Card data-testid="card" className="my-class">Content</Card>)
+    render(
+      <Card data-testid="card" className="my-class">
+        Content
+      </Card>,
+    )
     expect(screen.getByTestId('card').className).toContain('my-class')
   })
 
   it('contains no hardcoded hex codes', () => {
     render(<Card data-testid="card">Content</Card>)
-    expect(screen.getByTestId('card').className).not.toMatch(/#[0-9a-fA-F]{3,8}/)
+    expect(screen.getByTestId('card').className).not.toMatch(
+      /#[0-9a-fA-F]{3,8}/,
+    )
   })
 
   it('passes through extra props', () => {
-    render(<Card data-testid="card" id="my-card">Content</Card>)
+    render(
+      <Card data-testid="card" id="my-card">
+        Content
+      </Card>,
+    )
     expect(screen.getByTestId('card')).toHaveAttribute('id', 'my-card')
   })
 })

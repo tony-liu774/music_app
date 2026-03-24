@@ -5,8 +5,7 @@ const variantClasses = {
     'bg-amber text-oxford-blue hover:bg-amber-light hover:shadow-amber-glow focus:shadow-amber-glow',
   secondary:
     'bg-surface text-ivory border border-border hover:bg-hover hover:border-border-light focus:shadow-amber-glow',
-  ghost:
-    'bg-transparent text-ivory hover:bg-hover focus:shadow-amber-glow',
+  ghost: 'bg-transparent text-ivory hover:bg-hover focus:shadow-amber-glow',
   danger:
     'bg-crimson text-ivory hover:bg-crimson-light hover:shadow-crimson-glow focus:shadow-crimson-glow',
 }
