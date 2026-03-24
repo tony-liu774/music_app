@@ -250,6 +250,199 @@ export class SympatheticResonanceFilter {
 }
 
 /* ------------------------------------------------------------------ */
+/*  VIBRATO SMOOTHER                                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Smooths raw pitch data with a ~200 ms moving-average window and
+ * detects vibrato characteristics (rate and extent).
+ *
+ * Design goals:
+ *  - Stabilise the displayed intonation so vibrato does not cause flicker.
+ *  - Output a smoothed center frequency stable to ≤ 5 cents during vibrato.
+ *  - Detect vibrato rate (4–8 Hz) and extent (≥ 20 cents peak-to-peak).
+ */
+export class VibratoSmoother {
+  /**
+   * @param {object} [opts]
+   * @param {number} [opts.windowMs=200]        — smoothing window in ms
+   * @param {number} [opts.minConfidence=0.5]    — ignore samples below this
+   * @param {number} [opts.minVibratoRate=4]     — lowest vibrato rate (Hz)
+   * @param {number} [opts.maxVibratoRate=8]     — highest vibrato rate (Hz)
+   * @param {number} [opts.minVibratoExtent=30]  — min extent to flag vibrato (cents)
+   */
+  constructor(opts = {}) {
+    this.windowMs = opts.windowMs ?? 200
+    this.minConfidence = opts.minConfidence ?? 0.5
+    this.minVibratoRate = opts.minVibratoRate ?? 4
+    this.maxVibratoRate = opts.maxVibratoRate ?? 8
+    this.minVibratoExtent = opts.minVibratoExtent ?? 30
+
+    /** @type {{ freq: number, confidence: number, ts: number }[]} */
+    this.samples = []
+  }
+
+  /**
+   * Feed a new pitch sample and get back smoothed + vibrato data.
+   *
+   * @param {number|null} frequency  — raw detected frequency (Hz), or null
+   * @param {number}      confidence — 0–1
+   * @param {number}      [timestamp=Date.now()] — ms timestamp
+   * @returns {{
+   *   smoothedFrequency: number|null,
+   *   smoothedCents: number|null,
+   *   smoothedNote: string|null,
+   *   vibratoRate: number|null,
+   *   vibratoExtent: number|null,
+   *   isVibrato: boolean
+   * }}
+   */
+  process(frequency, confidence, timestamp) {
+    const ts = timestamp ?? Date.now()
+
+    // Store valid samples only
+    if (frequency !== null && confidence >= this.minConfidence) {
+      this.samples.push({ freq: frequency, confidence, ts })
+    }
+
+    // Prune samples outside the window
+    const cutoff = ts - this.windowMs
+    while (this.samples.length > 0 && this.samples[0].ts < cutoff) {
+      this.samples.shift()
+    }
+
+    if (this.samples.length === 0) {
+      return {
+        smoothedFrequency: null,
+        smoothedCents: null,
+        smoothedNote: null,
+        vibratoRate: null,
+        vibratoExtent: null,
+        isVibrato: false,
+      }
+    }
+
+    // --- Smoothed center frequency (recency-weighted average) ---
+    const smoothedFrequency = this._weightedAverage()
+
+    // --- Note / cents from smoothed frequency ---
+    const noteInfo = frequencyToNote(smoothedFrequency)
+    const smoothedNote = noteInfo.note
+      ? `${noteInfo.note}${noteInfo.octave}`
+      : null
+    const smoothedCents = noteInfo.cents
+
+    // --- Vibrato detection ---
+    const { rate, extent, isVibrato } = this._detectVibrato()
+
+    return {
+      smoothedFrequency,
+      smoothedCents,
+      smoothedNote,
+      vibratoRate: rate,
+      vibratoExtent: extent,
+      isVibrato,
+    }
+  }
+
+  /**
+   * Recency-weighted moving average. More recent samples get higher weight.
+   * Weight = normalised position in the window (0 → oldest, 1 → newest).
+   */
+  _weightedAverage() {
+    const n = this.samples.length
+    if (n === 0) return null
+    if (n === 1) return this.samples[0].freq
+
+    const oldest = this.samples[0].ts
+    const newest = this.samples[n - 1].ts
+    const span = newest - oldest
+
+    let weightedSum = 0
+    let weightSum = 0
+
+    for (const s of this.samples) {
+      // Linear ramp: oldest → 0.5, newest → 1.0
+      const t = span > 0 ? (s.ts - oldest) / span : 1
+      const w = 0.5 + 0.5 * t
+      weightedSum += s.freq * w
+      weightSum += w
+    }
+
+    return weightedSum / weightSum
+  }
+
+  /**
+   * Detect vibrato by analysing frequency deviations from the mean.
+   *
+   * Rate  — estimated via zero-crossing count on the deviation signal.
+   * Extent — peak-to-peak deviation in cents.
+   *
+   * @returns {{ rate: number|null, extent: number|null, isVibrato: boolean }}
+   */
+  _detectVibrato() {
+    const n = this.samples.length
+    if (n < 3) {
+      return { rate: null, extent: null, isVibrato: false }
+    }
+
+    // Compute mean frequency
+    let sum = 0
+    for (const s of this.samples) sum += s.freq
+    const mean = sum / n
+
+    if (mean <= 0) {
+      return { rate: null, extent: null, isVibrato: false }
+    }
+
+    // Deviation from mean in cents
+    const deviations = this.samples.map((s) => 1200 * Math.log2(s.freq / mean))
+
+    // Peak-to-peak extent in cents
+    let minDev = Infinity
+    let maxDev = -Infinity
+    for (const d of deviations) {
+      if (d < minDev) minDev = d
+      if (d > maxDev) maxDev = d
+    }
+    const extent = Math.round((maxDev - minDev) * 10) / 10
+
+    // Zero-crossing count on deviations for rate estimation
+    let crossings = 0
+    for (let i = 1; i < deviations.length; i++) {
+      if (
+        (deviations[i - 1] >= 0 && deviations[i] < 0) ||
+        (deviations[i - 1] < 0 && deviations[i] >= 0)
+      ) {
+        crossings++
+      }
+    }
+
+    // Time span in seconds
+    const spanSec =
+      (this.samples[n - 1].ts - this.samples[0].ts) / 1000
+    if (spanSec <= 0) {
+      return { rate: null, extent, isVibrato: false }
+    }
+
+    // Rate ≈ crossings / (2 × spanSec)  (each full cycle has 2 crossings)
+    const rate = Math.round((crossings / (2 * spanSec)) * 10) / 10
+
+    const isVibrato =
+      extent >= this.minVibratoExtent &&
+      rate >= this.minVibratoRate &&
+      rate <= this.maxVibratoRate
+
+    return { rate, extent, isVibrato }
+  }
+
+  /** Clear all history (e.g. when stopping practice). */
+  reset() {
+    this.samples = []
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /*  PERFORMANCE MONITOR                                               */
 /* ------------------------------------------------------------------ */
 

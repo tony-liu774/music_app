@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useAudioStore } from '../stores/useAudioStore'
+import { useAudioContextSuspension } from './useAudioContextSuspension'
 
 /**
  * Default audio pipeline configuration.
@@ -28,7 +29,9 @@ export function useAudioPipeline(options = {}) {
   const bufferSize = options.bufferSize ?? DEFAULTS.bufferSize
 
   const setPitchData = useAudioStore((s) => s.setPitchData)
+  const setVibratoData = useAudioStore((s) => s.setVibratoData)
   const setAudioContextState = useAudioStore((s) => s.setAudioContextState)
+  const setResumeAudioContext = useAudioStore((s) => s.setResumeAudioContext)
   const selectedInstrument = useAudioStore((s) => s.selectedInstrument)
 
   const workerRef = useRef(null)
@@ -41,6 +44,13 @@ export function useAudioPipeline(options = {}) {
   // Reactive state so consuming components re-render on start/stop
   const [isRunning, setIsRunning] = useState(false)
   const [error, setError] = useState(null)
+  // Reactive AudioContext reference for the suspension hook
+  const [audioCtx, setAudioCtx] = useState(null)
+
+  // Monitor AudioContext for browser-initiated suspension and auto-resume
+  const { resume: resumeAudioContext } = useAudioContextSuspension(audioCtx, {
+    enabled: isRunning,
+  })
 
   /**
    * Handle messages from the DSP worker.
@@ -49,11 +59,20 @@ export function useAudioPipeline(options = {}) {
     (e) => {
       const { type } = e.data
       if (type === 'RESULT') {
-        const { frequency, confidence, note, cents } = e.data
+        const { frequency, confidence, note, cents, vibrato } = e.data
         setPitchData({ frequency, confidence, note, cents })
+
+        if (vibrato) {
+          setVibratoData({
+            isVibrato: vibrato.isVibrato,
+            vibratoRate: vibrato.vibratoRate,
+            vibratoWidth: vibrato.vibratoExtent,
+            centerFrequency: vibrato.smoothedFrequency,
+          })
+        }
       }
     },
-    [setPitchData],
+    [setPitchData, setVibratoData],
   )
 
   /**
@@ -75,21 +94,17 @@ export function useAudioPipeline(options = {}) {
       setError(null)
 
       // 1. Create AudioContext
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
-      audioCtxRef.current = audioCtx
-      setAudioContextState(audioCtx.state)
-
-      // Handle AudioContext state changes
-      audioCtx.onstatechange = () => {
-        setAudioContextState(audioCtx.state)
-      }
+      const ctx = new (window.AudioContext || window.webkitAudioContext)()
+      audioCtxRef.current = ctx
+      setAudioCtx(ctx)
+      setAudioContextState(ctx.state)
 
       // Resume if suspended (browsers require user gesture)
-      if (audioCtx.state === 'suspended') {
-        await audioCtx.resume()
+      if (ctx.state === 'suspended') {
+        await ctx.resume()
       }
 
-      const sampleRate = audioCtx.sampleRate
+      const sampleRate = ctx.sampleRate
 
       // 2. Spawn the DSP worker
       const worker = new Worker(
@@ -109,11 +124,11 @@ export function useAudioPipeline(options = {}) {
       })
 
       // 4. Connect MediaStream → ScriptProcessorNode
-      const source = audioCtx.createMediaStreamSource(stream)
+      const source = ctx.createMediaStreamSource(stream)
       sourceRef.current = source
 
       // ScriptProcessorNode: input channels = 1, output channels = 1
-      const processor = audioCtx.createScriptProcessor(bufferSize, 1, 1)
+      const processor = ctx.createScriptProcessor(bufferSize, 1, 1)
       processorRef.current = processor
 
       processor.onaudioprocess = (audioEvent) => {
@@ -132,7 +147,7 @@ export function useAudioPipeline(options = {}) {
 
       source.connect(processor)
       // Connect processor to destination to keep it alive (output is silent)
-      processor.connect(audioCtx.destination)
+      processor.connect(ctx.destination)
 
       isRunningRef.current = true
       setIsRunning(true)
@@ -172,12 +187,20 @@ export function useAudioPipeline(options = {}) {
     if (audioCtxRef.current) {
       audioCtxRef.current.close()
       audioCtxRef.current = null
+      setAudioCtx(null)
       setAudioContextState('closed')
     }
 
-    // Reset pitch data
+    // Reset pitch and vibrato data
     setPitchData({ frequency: null, confidence: 0, note: null, cents: null })
-  }, [setAudioContextState, setPitchData])
+    setVibratoData({ isVibrato: false, vibratoRate: null, vibratoWidth: null, centerFrequency: null })
+  }, [setAudioContextState, setPitchData, setVibratoData])
+
+  // Register the resume callback in the store so other components can use it
+  useEffect(() => {
+    setResumeAudioContext(resumeAudioContext)
+    return () => setResumeAudioContext(async () => true)
+  }, [resumeAudioContext, setResumeAudioContext])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -188,5 +211,5 @@ export function useAudioPipeline(options = {}) {
     }
   }, [stop])
 
-  return { start, stop, isRunning, error }
+  return { start, stop, isRunning, error, resumeAudioContext }
 }

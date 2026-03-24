@@ -14,6 +14,21 @@ export const useAudioStore = create(
       setAudioContextState: (state) =>
         set({ audioContextState: state }, false, 'setAudioContextState'),
 
+      // Whether the AudioContext is suspended and being auto-resumed
+      isSuspendedBySystem: false,
+      setIsSuspendedBySystem: (suspended) =>
+        set({ isSuspendedBySystem: suspended }, false, 'setIsSuspendedBySystem'),
+
+      // Count of consecutive resume failures (resets on success)
+      resumeFailCount: 0,
+      setResumeFailCount: (count) =>
+        set({ resumeFailCount: count }, false, 'setResumeFailCount'),
+
+      // Callback to resume a suspended AudioContext (registered by the pipeline owner)
+      resumeAudioContext: async () => true, // no-op default
+      setResumeAudioContext: (fn) =>
+        set({ resumeAudioContext: fn }, false, 'setResumeAudioContext'),
+
       // Current pitch data
       pitchData: {
         frequency: null,
@@ -25,8 +40,9 @@ export const useAudioStore = create(
 
       // Vibrato data
       vibratoData: {
-        rate: null,
-        extent: null,
+        isVibrato: false,
+        vibratoRate: null,
+        vibratoWidth: null,
         centerFrequency: null,
       },
       setVibratoData: (data) =>
