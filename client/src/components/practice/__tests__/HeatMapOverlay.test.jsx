@@ -263,6 +263,32 @@ describe('HeatMapOverlay', () => {
     expect(rect.style.pointerEvents).toBe('all')
   })
 
+  it('hides worst note line in tooltip when worstNote is null', () => {
+    const data = [{
+      measureNumber: 1,
+      errorCount: 3,
+      avgDeviation: 40,
+      maxDeviation: 50,
+      worstNote: null,
+      opacity: 0.3,
+    }]
+
+    render(
+      <HeatMapOverlay
+        heatMapData={data}
+        totalMeasures={4}
+        visible={true}
+      />,
+    )
+
+    const rect = screen.getByTestId('heat-rect-1')
+    fireEvent.mouseEnter(rect)
+
+    const tooltip = screen.getByTestId('heat-tooltip-1')
+    const texts = Array.from(tooltip.querySelectorAll('text')).map((t) => t.textContent)
+    expect(texts.some((t) => t.includes('Worst note'))).toBe(false)
+  })
+
   it('sets max-w and max-h classes on SVG', () => {
     render(
       <HeatMapOverlay

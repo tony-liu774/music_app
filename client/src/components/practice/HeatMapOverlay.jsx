@@ -66,6 +66,11 @@ export default function HeatMapOverlay({
     return map
   }, [heatMapData])
 
+  // Memoize theme colors — getComputedStyle is expensive and theme
+  // doesn't change during a session. Avoids reflows on hover re-renders.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const theme = useMemo(() => getThemeColors(), [])
+
   if (!visible || heatMapData.length === 0 || totalMeasures === 0) {
     return null
   }
@@ -74,8 +79,6 @@ export default function HeatMapOverlay({
   const totalWidth =
     MEASURES_PER_SYSTEM * MEASURE_WIDTH + FIRST_MEASURE_INDENT + 40
   const totalHeight = systemCount * SYSTEM_HEIGHT + 40
-
-  const theme = getThemeColors()
 
   return (
     <svg
@@ -142,7 +145,7 @@ HeatMapOverlay.propTypes = {
       errorCount: PropTypes.number.isRequired,
       avgDeviation: PropTypes.number.isRequired,
       maxDeviation: PropTypes.number.isRequired,
-      worstNote: PropTypes.string.isRequired,
+      worstNote: PropTypes.string,
       opacity: PropTypes.number.isRequired,
     }),
   ),
@@ -203,15 +206,17 @@ function HeatMapTooltip({ x, y, data, theme }) {
       >
         Max deviation: {data.maxDeviation}¢
       </text>
-      <text
-        x={tx - tooltipWidth / 2 + padding}
-        y={ty + 64}
-        fill={theme.crimson}
-        fontSize={10}
-        fontFamily="'Source Sans 3', sans-serif"
-      >
-        Worst note: {data.worstNote}
-      </text>
+      {data.worstNote && (
+        <text
+          x={tx - tooltipWidth / 2 + padding}
+          y={ty + 64}
+          fill={theme.crimson}
+          fontSize={10}
+          fontFamily="'Source Sans 3', sans-serif"
+        >
+          Worst note: {data.worstNote}
+        </text>
+      )}
     </g>
   )
 }
@@ -224,7 +229,7 @@ HeatMapTooltip.propTypes = {
     errorCount: PropTypes.number.isRequired,
     avgDeviation: PropTypes.number.isRequired,
     maxDeviation: PropTypes.number.isRequired,
-    worstNote: PropTypes.string.isRequired,
+    worstNote: PropTypes.string,
   }).isRequired,
   theme: PropTypes.shape({
     crimson: PropTypes.string.isRequired,

@@ -45,7 +45,7 @@ export function calculateHeatMapData(deviations) {
   const measures = Object.entries(byMeasure).map(([measure, devs]) => {
     let totalDeviation = 0
     let maxDeviation = 0
-    let worstNote = '?'
+    let worstNote = null
     let worstDeviationValue = 0
 
     for (const d of devs) {
@@ -54,7 +54,7 @@ export function calculateHeatMapData(deviations) {
         dev = Math.abs(d.centsDeviation || 0)
         if (dev > worstDeviationValue) {
           worstDeviationValue = dev
-          worstNote = d.detectedNote || d.expectedNote || '?'
+          worstNote = d.detectedNote || d.expectedNote || null
         }
       } else if (d.type === 'rhythm') {
         dev = Math.abs(d.deviation_ms || 0)

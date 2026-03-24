@@ -90,6 +90,8 @@ describe('calculateHeatMapData', () => {
     expect(result[0].errorCount).toBe(2)
     // avg of |50| and |-30| = 40
     expect(result[0].avgDeviation).toBe(40)
+    // Rhythm-only measures should have null worstNote
+    expect(result[0].worstNote).toBeNull()
   })
 
   it('handles non-numeric deviation types as weight-1', () => {
