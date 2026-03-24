@@ -4,11 +4,14 @@ import { MemoryRouter } from 'react-router-dom'
 import PracticePage from '../PracticePage'
 import { useUIStore } from '../../stores/useUIStore'
 import { useAudioStore } from '../../stores/useAudioStore'
+import { ToastProvider } from '../../components/ui/Toast'
 
 function renderPracticePage() {
   return render(
     <MemoryRouter>
-      <PracticePage />
+      <ToastProvider>
+        <PracticePage />
+      </ToastProvider>
     </MemoryRouter>,
   )
 }

@@ -6,13 +6,16 @@ import { useLibraryStore } from '../stores/useLibraryStore'
 import { useSessionStore } from '../stores/useSessionStore'
 import { useSessionLogger } from '../hooks/useSessionLogger'
 import { useHeatMapData } from '../hooks/useHeatMapData'
+import { useSmartLoop } from '../hooks/useSmartLoop'
 import { Button } from '../components/ui'
+import { useToast } from '../components/ui/Toast'
 import PracticeControls from '../components/practice/PracticeControls'
 import AudioSuspensionOverlay from '../components/practice/AudioSuspensionOverlay'
 import SheetMusic from '../components/practice/SheetMusic'
 import PredictiveCursor from '../components/practice/PredictiveCursor'
 import IntonationNeedle from '../components/practice/IntonationNeedle'
 import HeatMapOverlay from '../components/practice/HeatMapOverlay'
+import SmartLoop from '../components/practice/SmartLoop'
 import useScore from '../hooks/useScore'
 import usePredictiveCursor from '../hooks/usePredictiveCursor'
 
@@ -36,13 +39,30 @@ export default function PracticePage() {
   const sessionSummary = useSessionStore((s) => s.sessionSummary)
   const sessionLog = useSessionStore((s) => s.sessionLog)
 
-  const { startSession, pauseSession, resumeSession, endSession, isPaused: sessionPaused } = useSessionLogger()
+  const {
+    startSession,
+    pauseSession,
+    resumeSession,
+    endSession,
+    isPaused: sessionPaused,
+  } = useSessionLogger()
 
   const heatMapData = useHeatMapData(sessionLog)
   const [heatMapVisible, setHeatMapVisible] = useState(false)
 
   const resumeAudioContext = useAudioStore((s) => s.resumeAudioContext)
   const audioContextState = useAudioStore((s) => s.audioContextState)
+
+  const { addToast } = useToast()
+
+  const handleSmartLoopAutoExit = useCallback(() => {
+    addToast({
+      variant: 'success',
+      message:
+        'Great work! Your accuracy has reached a consistent level. Keep it up!',
+      duration: 5000,
+    })
+  }, [addToast])
 
   const [controlsVisible, setControlsVisible] = useState(true)
   const [tempo, setTempo] = useState(120)
@@ -70,6 +90,14 @@ export default function PracticePage() {
 
   // Derive cursor position from the cursorRef for IntonationNeedle
   const cursorPosition = useAudioStore((s) => s.cursorPosition)
+
+  const smartLoop = useSmartLoop({
+    heatMapData,
+    currentTempo: tempo,
+    cursorPosition,
+    onTempoChange: setTempo,
+    onAutoExit: handleSmartLoopAutoExit,
+  })
 
   const startAutoHideTimer = useCallback(() => {
     clearTimeout(hideTimerRef.current)
@@ -111,7 +139,18 @@ export default function PracticePage() {
       setControlsVisible(true)
       startAutoHideTimer()
     }
-  }, [isPracticing, setIsPracticing, enterGhostMode, exitGhostMode, startAutoHideTimer, startSession, pauseSession, resumeSession, sessionPaused, selectedScore])
+  }, [
+    isPracticing,
+    setIsPracticing,
+    enterGhostMode,
+    exitGhostMode,
+    startAutoHideTimer,
+    startSession,
+    pauseSession,
+    resumeSession,
+    sessionPaused,
+    selectedScore,
+  ])
 
   // Stop handler — exit ghost mode and end session logging
   const handleStop = useCallback(() => {
@@ -122,6 +161,14 @@ export default function PracticePage() {
     clearTimeout(hideTimerRef.current)
     resetCursor()
   }, [setIsPracticing, exitGhostMode, endSession, resetCursor])
+
+  // Start smart loop: extract worst measures and begin loop practice
+  const handleStartSmartLoop = useCallback(() => {
+    const started = smartLoop.startLoop()
+    if (started && !isPracticing) {
+      handlePlayPause()
+    }
+  }, [smartLoop, isPracticing, handlePlayPause])
 
   // When practice stops externally, show controls
   useEffect(() => {
@@ -272,6 +319,15 @@ export default function PracticePage() {
             totalMeasures={score?.parts?.[0]?.measures?.length || 0}
             visible={heatMapVisible}
           />
+          <SmartLoop
+            loopMeasures={smartLoop.loopMeasures}
+            loopCount={smartLoop.loopCount}
+            isImproving={smartLoop.isImproving}
+            isActive={smartLoop.isActive}
+            loopTempo={smartLoop.loopTempo}
+            onExit={smartLoop.exitLoop}
+            totalMeasures={score?.parts?.[0]?.measures?.length || 0}
+          />
         </div>
 
         {/* Breath Intonation Needle — tracks with predictive cursor */}
@@ -284,26 +340,45 @@ export default function PracticePage() {
       </div>
 
       {/* Session summary — shown after practice ends */}
-      {!isPracticing && !ghostMode && sessionSummary && sessionSummary.total_deviations > 0 && (
-        <div
-          data-testid="session-summary"
-          className="absolute top-4 right-4 w-72 bg-surface border border-border rounded-lg p-4 shadow-lg z-20"
-        >
-          <h3 className="font-heading text-sm text-ivory mb-2">Session Summary</h3>
-          <div className="space-y-1 font-body text-xs text-ivory-muted">
-            <p>Deviations logged: {sessionSummary.total_deviations}</p>
-            {sessionSummary.pitch_deviation_count > 0 && (
-              <p>Pitch: {sessionSummary.pitch_deviation_count} (avg {sessionSummary.average_pitch_deviation_cents}c)</p>
-            )}
-            {sessionSummary.intonation_deviation_count > 0 && (
-              <p>Intonation: {sessionSummary.intonation_deviation_count}</p>
-            )}
-            {sessionSummary.worst_measure && (
-              <p className="text-amber">Needs work: m.{sessionSummary.worst_measure}</p>
+      {!isPracticing &&
+        !ghostMode &&
+        sessionSummary &&
+        sessionSummary.total_deviations > 0 && (
+          <div
+            data-testid="session-summary"
+            className="absolute top-4 right-4 w-72 bg-surface border border-border rounded-lg p-4 shadow-lg z-20"
+          >
+            <h3 className="font-heading text-sm text-ivory mb-2">
+              Session Summary
+            </h3>
+            <div className="space-y-1 font-body text-xs text-ivory-muted">
+              <p>Deviations logged: {sessionSummary.total_deviations}</p>
+              {sessionSummary.pitch_deviation_count > 0 && (
+                <p>
+                  Pitch: {sessionSummary.pitch_deviation_count} (avg{' '}
+                  {sessionSummary.average_pitch_deviation_cents}c)
+                </p>
+              )}
+              {sessionSummary.intonation_deviation_count > 0 && (
+                <p>Intonation: {sessionSummary.intonation_deviation_count}</p>
+              )}
+              {sessionSummary.worst_measure && (
+                <p className="text-amber">
+                  Needs work: m.{sessionSummary.worst_measure}
+                </p>
+              )}
+            </div>
+            {heatMapData.length > 0 && (
+              <button
+                data-testid="start-smart-loop-button"
+                onClick={handleStartSmartLoop}
+                className="mt-3 w-full font-body text-xs text-amber border border-amber/30 hover:bg-amber/10 rounded px-3 py-1.5 transition-colors"
+              >
+                Smart Loop Weak Measures
+              </button>
             )}
           </div>
-        </div>
-      )}
+        )}
 
       {/* Tap overlay hint — shows briefly when controls are hidden */}
       {ghostMode && !controlsVisible && (
