@@ -1,19 +1,48 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { vi } from 'vitest'
 import App from './App'
+
+vi.mock('./lib/supabase', () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn().mockResolvedValue({
+        data: {
+          session: {
+            user: { id: '1', email: 'test@example.com' },
+            access_token: 'token',
+          },
+        },
+      }),
+      onAuthStateChange: vi.fn((callback) => {
+        callback('SIGNED_IN', {
+          user: { id: '1', email: 'test@example.com' },
+          access_token: 'token',
+        })
+        return {
+          data: {
+            subscription: { unsubscribe: vi.fn() },
+          },
+        }
+      }),
+      signInWithOAuth: vi.fn(),
+      signOut: vi.fn(),
+    },
+  },
+}))
 
 describe('App', () => {
   beforeEach(() => {
     window.location.hash = '#/'
   })
 
-  it('applies Midnight Conservatory background class', () => {
+  it('applies Midnight Conservatory background class', async () => {
     const { container } = render(<App />)
     const root = container.firstChild
     expect(root).toHaveClass('bg-oxford-blue')
   })
 
-  it('applies ivory text class', () => {
+  it('applies ivory text class', async () => {
     const { container } = render(<App />)
     const root = container.firstChild
     expect(root).toHaveClass('text-ivory')
@@ -81,8 +110,30 @@ describe('App routing', () => {
     render(<App />)
     const libraryLinks = screen.getAllByRole('link', { name: /library/i })
     await user.click(libraryLinks[0])
-    libraryLinks.forEach(link => {
+    libraryLinks.forEach((link) => {
       expect(link.className).toContain('text-amber')
     })
+  })
+
+  it('shows login page for unauthenticated users', async () => {
+    const { supabase } = await import('./lib/supabase')
+    supabase.auth.getSession.mockResolvedValueOnce({
+      data: { session: null },
+    })
+    supabase.auth.onAuthStateChange.mockImplementationOnce((callback) => {
+      callback('SIGNED_OUT', null)
+      return {
+        data: { subscription: { unsubscribe: vi.fn() } },
+      }
+    })
+    window.location.hash = '#/'
+    render(<App />)
+    expect(screen.getByText('Sign In')).toBeInTheDocument()
+  })
+
+  it('renders login page at /login route', () => {
+    window.location.hash = '#/login'
+    render(<App />)
+    expect(screen.getByText('Sign In')).toBeInTheDocument()
   })
 })

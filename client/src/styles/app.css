@@ -31,6 +31,12 @@
   --color-card: #1a1a28;
   --color-border-subtle: #2a2a3a;
 
+  /* Brand / OAuth Colors */
+  --color-google-blue: #4285F4;
+  --color-google-green: #34A853;
+  --color-google-yellow: #FBBC05;
+  --color-google-red: #EA4335;
+
   /* Typography */
   --font-heading: 'Playfair Display', Georgia, serif;
   --font-body: 'Source Sans 3', -apple-system, BlinkMacSystemFont, sans-serif;
