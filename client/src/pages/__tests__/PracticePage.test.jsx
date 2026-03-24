@@ -72,17 +72,34 @@ describe('PracticePage', () => {
     expect(useUIStore.getState().navVisible).toBe(true)
   })
 
-  it('pauses without exiting ghost mode', () => {
+  it('exits ghost mode on pause so nav reappears', () => {
     renderPracticePage()
     // Start
     fireEvent.click(screen.getByTestId('play-pause-button'))
     expect(useAudioStore.getState().isPracticing).toBe(true)
+    expect(useUIStore.getState().ghostMode).toBe(true)
+    expect(useUIStore.getState().navVisible).toBe(false)
 
-    // Pause
+    // Pause — ghost mode exits, nav comes back
     fireEvent.click(screen.getByTestId('play-pause-button'))
     expect(useAudioStore.getState().isPracticing).toBe(false)
-    // Ghost mode stays active on pause — nav stays hidden
-    // Controls become visible
+    expect(useUIStore.getState().ghostMode).toBe(false)
+    expect(useUIStore.getState().navVisible).toBe(true)
+  })
+
+  it('re-enters ghost mode on resume after pause', () => {
+    renderPracticePage()
+    // Start
+    fireEvent.click(screen.getByTestId('play-pause-button'))
+    // Pause
+    fireEvent.click(screen.getByTestId('play-pause-button'))
+    expect(useUIStore.getState().ghostMode).toBe(false)
+
+    // Resume
+    fireEvent.click(screen.getByTestId('play-pause-button'))
+    expect(useAudioStore.getState().isPracticing).toBe(true)
+    expect(useUIStore.getState().ghostMode).toBe(true)
+    expect(useUIStore.getState().navVisible).toBe(false)
   })
 
   it('Space key toggles play/pause', () => {

@@ -38,16 +38,19 @@ export default function PracticePage() {
   // Play/Pause handler
   const handlePlayPause = useCallback(() => {
     if (isPracticing) {
+      // Pause — exit ghost mode so nav reappears
       setIsPracticing(false)
+      exitGhostMode()
       setControlsVisible(true)
       clearTimeout(hideTimerRef.current)
     } else {
+      // Play / Resume — enter ghost mode
       setIsPracticing(true)
       enterGhostMode()
       setControlsVisible(true)
       startAutoHideTimer()
     }
-  }, [isPracticing, setIsPracticing, enterGhostMode, startAutoHideTimer])
+  }, [isPracticing, setIsPracticing, enterGhostMode, exitGhostMode, startAutoHideTimer])
 
   // Stop handler — exit ghost mode entirely
   const handleStop = useCallback(() => {
