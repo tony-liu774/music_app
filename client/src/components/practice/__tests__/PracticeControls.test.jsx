@@ -67,20 +67,52 @@ describe('PracticeControls', () => {
   })
 
   it('updates tempo display when slider changes', () => {
-    render(<PracticeControls {...defaultProps} />)
+    const onTempoChange = vi.fn()
+    const { rerender } = render(
+      <PracticeControls
+        {...defaultProps}
+        tempo={120}
+        onTempoChange={onTempoChange}
+      />,
+    )
     const slider = screen.getByTestId('tempo-slider')
     fireEvent.change(slider, { target: { value: '80' } })
+    expect(onTempoChange).toHaveBeenCalledWith(80)
+    // Re-render with updated tempo to verify display
+    rerender(
+      <PracticeControls
+        {...defaultProps}
+        tempo={80}
+        onTempoChange={onTempoChange}
+      />,
+    )
     expect(screen.getByText('80 BPM')).toBeInTheDocument()
   })
 
   it('toggles metronome on and off', () => {
-    render(<PracticeControls {...defaultProps} />)
+    const onMetronomeToggle = vi.fn()
+    const { rerender } = render(
+      <PracticeControls
+        {...defaultProps}
+        metronomeOn={false}
+        onMetronomeToggle={onMetronomeToggle}
+      />,
+    )
     const toggle = screen.getByTestId('metronome-toggle')
     expect(toggle).toHaveAttribute('aria-pressed', 'false')
     fireEvent.click(toggle)
+    expect(onMetronomeToggle).toHaveBeenCalledWith(true)
+    // Re-render with updated state
+    rerender(
+      <PracticeControls
+        {...defaultProps}
+        metronomeOn={true}
+        onMetronomeToggle={onMetronomeToggle}
+      />,
+    )
     expect(toggle).toHaveAttribute('aria-pressed', 'true')
     fireEvent.click(toggle)
-    expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    expect(onMetronomeToggle).toHaveBeenCalledWith(false)
   })
 
   it('applies opacity-0 and pointer-events-none when not visible', () => {

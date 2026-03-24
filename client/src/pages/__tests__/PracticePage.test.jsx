@@ -46,7 +46,9 @@ describe('PracticePage', () => {
     renderPracticePage()
     expect(screen.getByText('Practice')).toBeInTheDocument()
     expect(
-      screen.getByText('Press play to start your practice session'),
+      screen.getByText(
+        'No score selected. Choose a piece from the library to start.',
+      ),
     ).toBeInTheDocument()
   })
 
