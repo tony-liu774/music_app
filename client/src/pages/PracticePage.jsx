@@ -5,12 +5,14 @@ import { useAudioStore } from '../stores/useAudioStore'
 import { useLibraryStore } from '../stores/useLibraryStore'
 import { useSessionStore } from '../stores/useSessionStore'
 import { useSessionLogger } from '../hooks/useSessionLogger'
+import { useHeatMapData } from '../hooks/useHeatMapData'
 import { Button } from '../components/ui'
 import PracticeControls from '../components/practice/PracticeControls'
 import AudioSuspensionOverlay from '../components/practice/AudioSuspensionOverlay'
 import SheetMusic from '../components/practice/SheetMusic'
 import PredictiveCursor from '../components/practice/PredictiveCursor'
 import IntonationNeedle from '../components/practice/IntonationNeedle'
+import HeatMapOverlay from '../components/practice/HeatMapOverlay'
 import useScore from '../hooks/useScore'
 import usePredictiveCursor from '../hooks/usePredictiveCursor'
 
@@ -32,8 +34,12 @@ export default function PracticePage() {
     error: scoreError,
   } = useScore(selectedScore?.xmlUrl || null)
   const sessionSummary = useSessionStore((s) => s.sessionSummary)
+  const sessionLog = useSessionStore((s) => s.sessionLog)
 
   const { startSession, pauseSession, resumeSession, endSession, isPaused: sessionPaused } = useSessionLogger()
+
+  const heatMapData = useHeatMapData(sessionLog)
+  const [heatMapVisible, setHeatMapVisible] = useState(false)
 
   const resumeAudioContext = useAudioStore((s) => s.resumeAudioContext)
   const audioContextState = useAudioStore((s) => s.audioContextState)
@@ -160,6 +166,16 @@ export default function PracticePage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handlePlayPause, handleStop])
 
+  // Show heat map after practice ends and session data is available
+  useEffect(() => {
+    if (!isPracticing && sessionLog && heatMapData.length > 0) {
+      setHeatMapVisible(true)
+    }
+    if (isPracticing) {
+      setHeatMapVisible(false)
+    }
+  }, [isPracticing, sessionLog, heatMapData.length])
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -250,6 +266,11 @@ export default function PracticePage() {
             ref={cursorRef}
             visible={isPracticing && !!score}
             isBouncing={isBouncing}
+          />
+          <HeatMapOverlay
+            heatMapData={heatMapData}
+            totalMeasures={score?.parts?.[0]?.measures?.length || 0}
+            visible={heatMapVisible}
           />
         </div>
 
