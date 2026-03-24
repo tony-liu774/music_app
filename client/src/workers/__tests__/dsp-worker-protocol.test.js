@@ -56,6 +56,7 @@ describe('DSP Worker Protocol', () => {
         confidence: 0.95,
         note: 'A4',
         cents: 2,
+        vibrato: null,
       })
     })
 

@@ -25,8 +25,9 @@ export const useAudioStore = create(
 
       // Vibrato data
       vibratoData: {
-        rate: null,
-        extent: null,
+        isVibrato: false,
+        vibratoRate: null,
+        vibratoWidth: null,
         centerFrequency: null,
       },
       setVibratoData: (data) =>

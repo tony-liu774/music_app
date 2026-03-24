@@ -47,18 +47,32 @@ export function createProcessMessage(audioBuffer) {
 
 /**
  * Build a RESULT message payload (used inside the worker).
- * @param {number|null} frequency
- * @param {number} confidence
- * @param {string|null} note
- * @param {number|null} cents
+ * @param {number|null} frequency   — raw detected frequency
+ * @param {number}      confidence  — 0–1
+ * @param {string|null} note        — raw note name (e.g. "A4")
+ * @param {number|null} cents       — raw cents deviation
+ * @param {object}      [vibrato]   — vibrato / smoothing data
+ * @param {number|null} [vibrato.smoothedFrequency]
+ * @param {number|null} [vibrato.smoothedCents]
+ * @param {string|null} [vibrato.smoothedNote]
+ * @param {number|null} [vibrato.vibratoRate]
+ * @param {number|null} [vibrato.vibratoExtent]
+ * @param {boolean}     [vibrato.isVibrato]
  */
-export function createResultMessage(frequency, confidence, note, cents) {
+export function createResultMessage(
+  frequency,
+  confidence,
+  note,
+  cents,
+  vibrato,
+) {
   return {
     type: MSG_RESULT,
     frequency,
     confidence,
     note,
     cents,
+    vibrato: vibrato ?? null,
   }
 }
 
