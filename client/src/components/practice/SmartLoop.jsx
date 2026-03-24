@@ -133,6 +133,7 @@ export default function SmartLoop({
           return (
             <g key={gIdx} data-testid={`smart-loop-bracket-${gIdx}`}>
               {/* Amber bracket rectangle */}
+              {/* eslint-disable no-restricted-syntax -- SVG requires inline style for CSS animation */}
               <rect
                 x={x}
                 y={y}
@@ -143,8 +144,11 @@ export default function SmartLoop({
                 stroke={theme.amber}
                 strokeWidth={BRACKET_STROKE}
                 strokeDasharray="8 4"
-                opacity={0.8}
+                style={{
+                  animation: 'smart-loop-pulse 2s ease-in-out infinite',
+                }}
               />
+              {/* eslint-enable no-restricted-syntax */}
               {/* Loop indicator arrow at the end */}
               <LoopArrow
                 x={x + width - 12}
@@ -264,9 +268,12 @@ LoopArrow.propTypes = {
 }
 
 /**
- * Group loop measures that share the same system row for contiguous bracket rendering.
+ * Group loop measures into contiguous runs on the same system row.
+ * Measures must be both on the same system AND consecutive to share a bracket.
+ * This prevents a bracket from visually spanning non-looped measures.
+ *
  * @param {Array} measures - [{ measureNumber }]
- * @returns {Array<Array>} - groups of measures on the same system
+ * @returns {Array<Array>} - groups of contiguous measures on the same system
  */
 function groupMeasuresBySystem(measures) {
   if (measures.length === 0) return []
@@ -281,8 +288,10 @@ function groupMeasuresBySystem(measures) {
     const currSystem = Math.floor(
       (measures[i].measureNumber - 1) / MEASURES_PER_SYSTEM,
     )
+    const isContiguous =
+      measures[i].measureNumber === measures[i - 1].measureNumber + 1
 
-    if (currSystem === prevSystem) {
+    if (currSystem === prevSystem && isContiguous) {
       currentGroup.push(measures[i])
     } else {
       groups.push(currentGroup)

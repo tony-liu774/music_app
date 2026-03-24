@@ -66,6 +66,13 @@ describe('SmartLoop', () => {
     expect(screen.getByTestId('smart-loop-bracket-1')).toBeInTheDocument()
   })
 
+  it('splits non-contiguous measures on the same system into separate brackets', () => {
+    const measures = [makeLoopMeasure(1), makeLoopMeasure(4)] // Same system but not contiguous
+    render(<SmartLoop {...defaultProps} loopMeasures={measures} />)
+    expect(screen.getByTestId('smart-loop-bracket-0')).toBeInTheDocument()
+    expect(screen.getByTestId('smart-loop-bracket-1')).toBeInTheDocument()
+  })
+
   it('renders the status bar with loop count', () => {
     render(<SmartLoop {...defaultProps} />)
     expect(screen.getByTestId('smart-loop-status')).toBeInTheDocument()
@@ -134,11 +141,12 @@ describe('SmartLoop', () => {
     expect(screen.queryByTestId('loop-tempo')).not.toBeInTheDocument()
   })
 
-  it('bracket SVG rects use amber stroke', () => {
+  it('bracket SVG rects use amber stroke with pulse animation', () => {
     render(<SmartLoop {...defaultProps} />)
     const bracket = screen.getByTestId('smart-loop-bracket-0')
     const rect = bracket.querySelector('rect')
     expect(rect.getAttribute('stroke')).toBe('#c9a227')
     expect(rect.getAttribute('fill')).toBe('none')
+    expect(rect.style.animation).toContain('smart-loop-pulse')
   })
 })

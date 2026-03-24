@@ -91,6 +91,7 @@ export function calculateLoopTempo(currentTempo) {
  * @param {number} options.currentTempo - Current practice tempo
  * @param {object} options.cursorPosition - { measure, beat, progress } from audio store
  * @param {Function} options.onTempoChange - Callback to change the tempo
+ * @param {Function} [options.onSeekToMeasure] - Callback to reposition cursor to a measure
  * @param {Function} [options.onAutoExit] - Callback when auto-exit triggers
  * @returns {object} Smart loop state and controls
  */
@@ -99,6 +100,7 @@ export function useSmartLoop({
   currentTempo,
   cursorPosition,
   onTempoChange,
+  onSeekToMeasure,
   onAutoExit,
 } = {}) {
   const [isActive, setIsActive] = useState(false)
@@ -156,8 +158,13 @@ export function useSmartLoop({
       onTempoChange(reducedTempo)
     }
 
+    // Seek cursor to the start of the loop region
+    if (onSeekToMeasure) {
+      onSeekToMeasure(worst[0].measureNumber)
+    }
+
     return true
-  }, [heatMapData, currentTempo, onTempoChange])
+  }, [heatMapData, currentTempo, onTempoChange, onSeekToMeasure])
 
   /**
    * Exit smart loop: restore original tempo.
@@ -248,6 +255,7 @@ export function useSmartLoop({
 
   /**
    * Track cursor position to detect when the cursor wraps past the loop region.
+   * When a wrap is detected, complete the current iteration and seek back to start.
    */
   useEffect(() => {
     if (!isActive || !cursorPosition || loopMeasures.length === 0) return
@@ -255,16 +263,28 @@ export function useSmartLoop({
     const currentMeasure = cursorPosition.measure
     if (currentMeasure == null) return
 
+    const startMeasure = loopMeasures[0].measureNumber
     const endMeasure = loopMeasures[loopMeasures.length - 1].measureNumber
     const prev = prevMeasureRef.current
 
     // Detect when cursor moves past the end of the loop region
     if (prev !== null && prev === endMeasure && currentMeasure > endMeasure) {
-      completeLoopIteration()
+      const result = completeLoopIteration()
+
+      // Loop back to start of the region (unless auto-exited)
+      if (result && !result.shouldAutoExit && onSeekToMeasure) {
+        onSeekToMeasure(startMeasure)
+      }
     }
 
     prevMeasureRef.current = currentMeasure
-  }, [isActive, cursorPosition, loopMeasures, completeLoopIteration])
+  }, [
+    isActive,
+    cursorPosition,
+    loopMeasures,
+    completeLoopIteration,
+    onSeekToMeasure,
+  ])
 
   /**
    * Check if a measure is within the loop region.

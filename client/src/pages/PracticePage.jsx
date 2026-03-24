@@ -79,6 +79,7 @@ export default function PracticePage() {
     currentMeasure,
     isBouncing,
     reset: resetCursor,
+    seekToMeasure,
   } = usePredictiveCursor({
     score,
     partIndex: 0,
@@ -96,6 +97,7 @@ export default function PracticePage() {
     currentTempo: tempo,
     cursorPosition,
     onTempoChange: setTempo,
+    onSeekToMeasure: seekToMeasure,
     onAutoExit: handleSmartLoopAutoExit,
   })
 

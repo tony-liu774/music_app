@@ -299,11 +299,42 @@ export default function usePredictiveCursor({
     })
   }, [updateCursorDOM])
 
+  /**
+   * Seek cursor to a specific measure (beat 1).
+   * Used by Smart Loop to jump back to the start of the loop region.
+   */
+  const seekToMeasure = useCallback(
+    (measure) => {
+      const bpm = beatsPerMeasureRef.current
+      const total = totalMeasuresRef.current
+      const targetMeasure = Math.min(Math.max(1, measure), total || 1)
+
+      beatRef.current = { measure: targetMeasure, beat: 1 }
+      setCurrentMeasure(targetMeasure)
+      setCurrentBeat(1)
+
+      const seekPos = getBeatPosition(targetMeasure, 1, bpm)
+      posRef.current = { ...seekPos }
+      targetRef.current = { ...seekPos }
+      updateCursorDOM(seekPos.x, seekPos.y)
+      checkScroll(seekPos.x, seekPos.y)
+
+      const progress = total > 0 ? (targetMeasure - 1) / total : 0
+      useAudioStore.getState().setCursorPosition({
+        measure: targetMeasure,
+        beat: 1,
+        progress,
+      })
+    },
+    [updateCursorDOM, checkScroll],
+  )
+
   return {
     cursorRef,
     currentMeasure,
     currentBeat,
     isBouncing,
     reset,
+    seekToMeasure,
   }
 }

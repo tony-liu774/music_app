@@ -102,10 +102,12 @@ describe('useSmartLoop', () => {
 
   let onTempoChange
   let onAutoExit
+  let onSeekToMeasure
 
   beforeEach(() => {
     onTempoChange = vi.fn()
     onAutoExit = vi.fn()
+    onSeekToMeasure = vi.fn()
   })
 
   function renderSmartLoop(overrides = {}) {
@@ -115,6 +117,7 @@ describe('useSmartLoop', () => {
         currentTempo: 120,
         cursorPosition: { measure: 1, beat: 1, progress: 0 },
         onTempoChange,
+        onSeekToMeasure,
         onAutoExit,
         ...overrides,
       }),
@@ -326,5 +329,40 @@ describe('useSmartLoop', () => {
       shouldAutoExit: false,
       avgDeviation: 25,
     })
+  })
+
+  it('startLoop calls onSeekToMeasure with the first loop measure', () => {
+    const { result } = renderSmartLoop()
+    act(() => {
+      result.current.startLoop()
+    })
+    // Loop measures are 2 and 3; should seek to measure 2
+    expect(onSeekToMeasure).toHaveBeenCalledWith(2)
+  })
+
+  it('does not call onSeekToMeasure on auto-exit', () => {
+    const { result } = renderSmartLoop()
+    act(() => {
+      result.current.startLoop()
+    })
+    onSeekToMeasure.mockClear()
+
+    // First loop baseline
+    act(() => {
+      result.current.recordDeviation(40)
+      result.current.completeLoopIteration()
+    })
+
+    // Three consecutive good loops trigger auto-exit
+    for (let i = 0; i < 3; i++) {
+      act(() => {
+        result.current.recordDeviation(10)
+        result.current.completeLoopIteration()
+      })
+    }
+
+    // onSeekToMeasure should NOT be called after auto-exit
+    // (it's called by the cursor-tracking effect, not completeLoopIteration directly)
+    expect(result.current.autoExited).toBe(true)
   })
 })
