@@ -7,13 +7,21 @@ function TestConsumer() {
   const { addToast } = useToast()
   return (
     <div>
-      <button onClick={() => addToast({ variant: 'success', message: 'Success toast' })}>
+      <button
+        onClick={() =>
+          addToast({ variant: 'success', message: 'Success toast' })
+        }
+      >
         Add Success
       </button>
-      <button onClick={() => addToast({ variant: 'error', message: 'Error toast' })}>
+      <button
+        onClick={() => addToast({ variant: 'error', message: 'Error toast' })}
+      >
         Add Error
       </button>
-      <button onClick={() => addToast({ variant: 'info', message: 'Info toast' })}>
+      <button
+        onClick={() => addToast({ variant: 'info', message: 'Info toast' })}
+      >
         Add Info
       </button>
     </div>

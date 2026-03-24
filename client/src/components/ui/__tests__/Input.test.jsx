@@ -48,7 +48,9 @@ describe('Input', () => {
 
   it('contains no hardcoded hex codes', () => {
     render(<Input data-testid="input" />)
-    expect(screen.getByTestId('input').className).not.toMatch(/#[0-9a-fA-F]{3,8}/)
+    expect(screen.getByTestId('input').className).not.toMatch(
+      /#[0-9a-fA-F]{3,8}/,
+    )
   })
 
   it('forwards ref', () => {

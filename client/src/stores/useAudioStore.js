@@ -29,7 +29,8 @@ export const useAudioStore = create(
         extent: null,
         centerFrequency: null,
       },
-      setVibratoData: (data) => set({ vibratoData: data }, false, 'setVibratoData'),
+      setVibratoData: (data) =>
+        set({ vibratoData: data }, false, 'setVibratoData'),
 
       // Practice state
       isPracticing: false,
