@@ -1,15 +1,26 @@
+import { HashRouter, Routes, Route } from 'react-router-dom'
+import AppShell from './components/layout/AppShell'
+import Dashboard from './pages/Dashboard'
+import Library from './pages/Library'
+import Practice from './pages/Practice'
+import Tuner from './pages/Tuner'
+import Settings from './pages/Settings'
+import StudioDashboard from './pages/StudioDashboard'
+
 function App() {
   return (
-    <div className="min-h-screen bg-oxford-blue text-ivory flex items-center justify-center">
-      <div className="text-center">
-        <h1 className="font-heading text-4xl text-amber mb-4">
-          The Virtual Concertmaster
-        </h1>
-        <p className="font-body text-ivory-muted text-lg">
-          AI-Powered Practice Companion for String Players
-        </p>
-      </div>
-    </div>
+    <HashRouter>
+      <Routes>
+        <Route element={<AppShell />}>
+          <Route index element={<Dashboard />} />
+          <Route path="library" element={<Library />} />
+          <Route path="practice" element={<Practice />} />
+          <Route path="tuner" element={<Tuner />} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="studio-dashboard" element={<StudioDashboard />} />
+        </Route>
+      </Routes>
+    </HashRouter>
   )
 }
 
