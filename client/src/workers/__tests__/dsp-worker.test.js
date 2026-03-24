@@ -129,6 +129,29 @@ describe('DSP Worker (actual module)', () => {
     expect(result).toHaveProperty('confidence')
     expect(result).toHaveProperty('note')
     expect(result).toHaveProperty('cents')
+    expect(result).toHaveProperty('vibrato')
+  })
+
+  it('includes vibrato data in RESULT messages', () => {
+    self.onmessage({
+      data: {
+        type: 'INIT',
+        sampleRate: 44100,
+        bufferSize: 2048,
+        instrument: 'violin',
+      },
+    })
+    posted.length = 0
+
+    const buffer = generateSineWave(440, 44100, 2048)
+    self.onmessage({ data: { type: 'PROCESS', buffer } })
+
+    const result = posted.find((m) => m.type === 'RESULT')
+    expect(result.vibrato).toBeDefined()
+    expect(result.vibrato).toHaveProperty('smoothedFrequency')
+    expect(result.vibrato).toHaveProperty('vibratoRate')
+    expect(result.vibrato).toHaveProperty('vibratoExtent')
+    expect(result.vibrato).toHaveProperty('isVibrato')
   })
 
   it('handles different instruments', () => {

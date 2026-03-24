@@ -7,6 +7,7 @@
 import {
   PYINPitchDetector,
   SympatheticResonanceFilter,
+  VibratoSmoother,
   PerformanceMonitor,
   frequencyToNote,
 } from './dsp-core.js'
@@ -18,6 +19,7 @@ import {
 
 let detector = null
 let resonanceFilter = null
+let vibratoSmoother = null
 const perfMonitor = new PerformanceMonitor(30)
 
 self.onmessage = function (e) {
@@ -28,6 +30,7 @@ self.onmessage = function (e) {
       const { sampleRate, bufferSize, instrument } = e.data
       detector = new PYINPitchDetector(sampleRate, bufferSize)
       resonanceFilter = new SympatheticResonanceFilter(instrument || 'violin')
+      vibratoSmoother = new VibratoSmoother()
       self.postMessage({ type: 'INIT', success: true })
     } catch (err) {
       self.postMessage(createErrorMessage(err.message))
@@ -61,6 +64,9 @@ self.onmessage = function (e) {
         cents = info.cents
       }
 
+      // Run vibrato smoother on every frame (including nulls)
+      const vibrato = vibratoSmoother.process(frequency, confidence)
+
       const perf = perfMonitor.end(startTime)
 
       self.postMessage(
@@ -69,6 +75,7 @@ self.onmessage = function (e) {
           Math.round(confidence * 1000) / 1000,
           note,
           cents,
+          vibrato,
         ),
       )
 
