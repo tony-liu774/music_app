@@ -6,7 +6,9 @@ import { useLibraryStore } from '../stores/useLibraryStore'
 import { Button } from '../components/ui'
 import PracticeControls from '../components/practice/PracticeControls'
 import SheetMusic from '../components/practice/SheetMusic'
+import PredictiveCursor from '../components/practice/PredictiveCursor'
 import useScore from '../hooks/useScore'
+import usePredictiveCursor from '../hooks/usePredictiveCursor'
 
 const CONTROLS_AUTO_HIDE_MS = 3000
 
@@ -20,15 +22,35 @@ export default function PracticePage() {
   const setIsPracticing = useAudioStore((s) => s.setIsPracticing)
 
   const selectedScore = useLibraryStore((s) => s.selectedScore)
-  const { score, isLoading: scoreLoading, error: scoreError } = useScore(
-    selectedScore?.xmlUrl || null,
-  )
+  const {
+    score,
+    isLoading: scoreLoading,
+    error: scoreError,
+  } = useScore(selectedScore?.xmlUrl || null)
 
-  const [currentMeasure, setCurrentMeasure] = useState(null)
   const [controlsVisible, setControlsVisible] = useState(true)
+  const [tempo, setTempo] = useState(120)
+  const [metronomeOn, setMetronomeOn] = useState(true)
   const hideTimerRef = useRef(null)
   const isPracticingRef = useRef(isPracticing)
   isPracticingRef.current = isPracticing
+
+  const scrollRef = useRef(null)
+
+  const {
+    cursorX,
+    cursorY,
+    currentMeasure,
+    isBouncing,
+    reset: resetCursor,
+  } = usePredictiveCursor({
+    score,
+    partIndex: 0,
+    isPracticing,
+    tempo,
+    metronomeMode: metronomeOn,
+    scrollRef,
+  })
 
   const startAutoHideTimer = useCallback(() => {
     clearTimeout(hideTimerRef.current)
@@ -62,7 +84,13 @@ export default function PracticePage() {
       setControlsVisible(true)
       startAutoHideTimer()
     }
-  }, [isPracticing, setIsPracticing, enterGhostMode, exitGhostMode, startAutoHideTimer])
+  }, [
+    isPracticing,
+    setIsPracticing,
+    enterGhostMode,
+    exitGhostMode,
+    startAutoHideTimer,
+  ])
 
   // Stop handler — exit ghost mode entirely
   const handleStop = useCallback(() => {
@@ -70,7 +98,8 @@ export default function PracticePage() {
     exitGhostMode()
     setControlsVisible(true)
     clearTimeout(hideTimerRef.current)
-  }, [setIsPracticing, exitGhostMode])
+    resetCursor()
+  }, [setIsPracticing, exitGhostMode, resetCursor])
 
   // When practice stops externally, show controls
   useEffect(() => {
@@ -142,9 +171,7 @@ export default function PracticePage() {
       >
         {!isPracticing && !ghostMode && (
           <div className="text-center mb-4">
-            <h1 className="font-heading text-3xl text-ivory mb-4">
-              Practice
-            </h1>
+            <h1 className="font-heading text-3xl text-ivory mb-4">Practice</h1>
             {selectedScore ? (
               <div className="mb-8" data-testid="practice-score-info">
                 <h2 className="font-heading text-xl text-ivory">
@@ -159,36 +186,56 @@ export default function PracticePage() {
                   </span>
                 )}
               </div>
-            ) : !score && (
-              <div className="mb-8" data-testid="practice-no-score">
-                <p className="font-body text-ivory-muted mb-4">
-                  No score selected. Choose a piece from the library to start.
-                </p>
-                <Button variant="secondary" onClick={() => navigate('/library')}>
-                  Browse Library
-                </Button>
-              </div>
+            ) : (
+              !score && (
+                <div className="mb-8" data-testid="practice-no-score">
+                  <p className="font-body text-ivory-muted mb-4">
+                    No score selected. Choose a piece from the library to start.
+                  </p>
+                  <Button
+                    variant="secondary"
+                    onClick={() => navigate('/library')}
+                  >
+                    Browse Library
+                  </Button>
+                </div>
+              )
             )}
           </div>
         )}
 
         {scoreLoading && (
-          <p data-testid="score-loading" className="font-body text-ivory-muted text-sm">
+          <p
+            data-testid="score-loading"
+            className="font-body text-ivory-muted text-sm"
+          >
             Loading score...
           </p>
         )}
 
         {scoreError && (
-          <p data-testid="score-error" className="font-body text-crimson text-sm">
+          <p
+            data-testid="score-error"
+            className="font-body text-crimson text-sm"
+          >
             {scoreError}
           </p>
         )}
 
-        <SheetMusic
-          score={score}
-          currentMeasure={currentMeasure}
-          className="w-full max-w-6xl mx-auto"
-        />
+        <div className="relative w-full max-w-6xl mx-auto">
+          <SheetMusic
+            score={score}
+            currentMeasure={currentMeasure}
+            className="w-full"
+            scrollRef={scrollRef}
+          />
+          <PredictiveCursor
+            x={cursorX}
+            y={cursorY}
+            visible={isPracticing && !!score}
+            isBouncing={isBouncing}
+          />
+        </div>
       </div>
 
       {/* Tap overlay hint — shows briefly when controls are hidden */}
@@ -209,6 +256,10 @@ export default function PracticePage() {
         onPlayPause={handlePlayPause}
         onStop={handleStop}
         visible={controlsVisible}
+        tempo={tempo}
+        onTempoChange={setTempo}
+        metronomeOn={metronomeOn}
+        onMetronomeToggle={setMetronomeOn}
       />
     </div>
   )

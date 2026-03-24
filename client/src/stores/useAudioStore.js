@@ -42,6 +42,15 @@ export const useAudioStore = create(
       selectedInstrument: 'violin',
       setSelectedInstrument: (instrument) =>
         set({ selectedInstrument: instrument }, false, 'setSelectedInstrument'),
+
+      // Cursor position — tracks current location on the score
+      cursorPosition: {
+        measure: null, // 1-based measure number
+        beat: null, // 1-based beat within measure
+        progress: 0, // 0-1 overall progress through the score
+      },
+      setCursorPosition: (position) =>
+        set({ cursorPosition: position }, false, 'setCursorPosition'),
     }),
     { name: 'AudioStore' },
   ),

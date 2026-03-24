@@ -1,14 +1,13 @@
-import { useState } from 'react'
-
 export default function PracticeControls({
   isPracticing,
   onPlayPause,
   onStop,
   visible,
+  tempo = 120,
+  onTempoChange,
+  metronomeOn = false,
+  onMetronomeToggle,
 }) {
-  const [tempo, setTempo] = useState(120)
-  const [metronomeOn, setMetronomeOn] = useState(false)
-
   return (
     <div
       data-testid="practice-controls"
@@ -76,7 +75,7 @@ export default function PracticeControls({
             min="50"
             max="200"
             value={tempo}
-            onChange={(e) => setTempo(Number(e.target.value))}
+            onChange={(e) => onTempoChange?.(Number(e.target.value))}
             className="w-24 accent-amber"
           />
         </div>
@@ -84,7 +83,7 @@ export default function PracticeControls({
         {/* Metronome toggle */}
         <button
           data-testid="metronome-toggle"
-          onClick={() => setMetronomeOn(!metronomeOn)}
+          onClick={() => onMetronomeToggle?.(!metronomeOn)}
           className={`flex items-center justify-center w-10 h-10 rounded-full border transition-colors duration-200 ${
             metronomeOn
               ? 'bg-amber/20 border-amber text-amber'

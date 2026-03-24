@@ -65,9 +65,11 @@ export default function SheetMusic({
   partIndex = 0,
   currentMeasure = null,
   className = '',
+  scrollRef: externalScrollRef = null,
 }) {
   const containerRef = useRef(null)
-  const scrollRef = useRef(null)
+  const internalScrollRef = useRef(null)
+  const scrollRef = externalScrollRef || internalScrollRef
 
   const render = useCallback(() => {
     const container = containerRef.current
@@ -175,9 +177,7 @@ export default function SheetMusic({
       // Auto-beam eighth notes
       if (beamableNotes.length >= 2) {
         try {
-          const beams = Beam.generateBeams(
-            vexNotes.filter((n) => !n.isRest()),
-          )
+          const beams = Beam.generateBeams(vexNotes.filter((n) => !n.isRest()))
           beams.forEach((beam) => beam.setContext(context).draw())
         } catch {
           // Beaming can fail on edge cases — render without beams
@@ -249,7 +249,10 @@ function buildVexNotes(measure, clef, theme) {
         keys: ['b/4'],
         duration: n.duration,
       })
-      note.setStyle({ fillStyle: theme.ivoryMuted, strokeStyle: theme.ivoryMuted })
+      note.setStyle({
+        fillStyle: theme.ivoryMuted,
+        strokeStyle: theme.ivoryMuted,
+      })
       return note
     }
 
@@ -283,7 +286,10 @@ function buildVexNotes(measure, clef, theme) {
       fillStyle: theme.noteHead,
       strokeStyle: theme.noteHead,
     })
-    note.setStemStyle({ fillStyle: theme.noteHead, strokeStyle: theme.noteHead })
+    note.setStemStyle({
+      fillStyle: theme.noteHead,
+      strokeStyle: theme.noteHead,
+    })
 
     return note
   })
