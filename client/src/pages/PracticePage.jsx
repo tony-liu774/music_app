@@ -9,6 +9,7 @@ import { Button } from '../components/ui'
 import PracticeControls from '../components/practice/PracticeControls'
 import AudioSuspensionOverlay from '../components/practice/AudioSuspensionOverlay'
 import SheetMusic from '../components/practice/SheetMusic'
+import CoachDebrief from '../components/practice/CoachDebrief'
 import useScore from '../hooks/useScore'
 
 const CONTROLS_AUTO_HIDE_MS = 3000
@@ -23,12 +24,26 @@ export default function PracticePage() {
   const setIsPracticing = useAudioStore((s) => s.setIsPracticing)
 
   const selectedScore = useLibraryStore((s) => s.selectedScore)
-  const { score, isLoading: scoreLoading, error: scoreError } = useScore(
-    selectedScore?.xmlUrl || null,
-  )
+  const {
+    score,
+    isLoading: scoreLoading,
+    error: scoreError,
+  } = useScore(selectedScore?.xmlUrl || null)
   const sessionSummary = useSessionStore((s) => s.sessionSummary)
 
-  const { startSession, pauseSession, resumeSession, endSession, isPaused: sessionPaused } = useSessionLogger()
+  const {
+    startSession,
+    pauseSession,
+    resumeSession,
+    endSession,
+    getWorstMeasures,
+    isPaused: sessionPaused,
+  } = useSessionLogger()
+
+  const sessionLog = useSessionStore((s) => s.sessionLog)
+  const selectedInstrument = useAudioStore((s) => s.selectedInstrument)
+  const [debriefOpen, setDebriefOpen] = useState(false)
+  const debriefDataRef = useRef(null)
 
   const resumeAudioContext = useAudioStore((s) => s.resumeAudioContext)
   const audioContextState = useAudioStore((s) => s.audioContextState)
@@ -79,16 +94,32 @@ export default function PracticePage() {
       setControlsVisible(true)
       startAutoHideTimer()
     }
-  }, [isPracticing, setIsPracticing, enterGhostMode, exitGhostMode, startAutoHideTimer, startSession, pauseSession, resumeSession, sessionPaused, selectedScore])
+  }, [
+    isPracticing,
+    setIsPracticing,
+    enterGhostMode,
+    exitGhostMode,
+    startAutoHideTimer,
+    startSession,
+    pauseSession,
+    resumeSession,
+    sessionPaused,
+    selectedScore,
+  ])
 
-  // Stop handler — exit ghost mode and end session logging
+  // Stop handler — exit ghost mode, end session logging, show debrief
   const handleStop = useCallback(() => {
+    // Capture worst measures before endSession resets the logger
+    const worst = getWorstMeasures(5)
     setIsPracticing(false)
     endSession()
     exitGhostMode()
     setControlsVisible(true)
     clearTimeout(hideTimerRef.current)
-  }, [setIsPracticing, exitGhostMode, endSession])
+
+    debriefDataRef.current = { worstMeasures: worst }
+    setDebriefOpen(true)
+  }, [setIsPracticing, exitGhostMode, endSession, getWorstMeasures])
 
   // When practice stops externally, show controls
   useEffect(() => {
@@ -160,9 +191,7 @@ export default function PracticePage() {
       >
         {!isPracticing && !ghostMode && (
           <div className="text-center mb-4">
-            <h1 className="font-heading text-3xl text-ivory mb-4">
-              Practice
-            </h1>
+            <h1 className="font-heading text-3xl text-ivory mb-4">Practice</h1>
             {selectedScore ? (
               <div className="mb-8" data-testid="practice-score-info">
                 <h2 className="font-heading text-xl text-ivory">
@@ -177,27 +206,38 @@ export default function PracticePage() {
                   </span>
                 )}
               </div>
-            ) : !score && (
-              <div className="mb-8" data-testid="practice-no-score">
-                <p className="font-body text-ivory-muted mb-4">
-                  No score selected. Choose a piece from the library to start.
-                </p>
-                <Button variant="secondary" onClick={() => navigate('/library')}>
-                  Browse Library
-                </Button>
-              </div>
+            ) : (
+              !score && (
+                <div className="mb-8" data-testid="practice-no-score">
+                  <p className="font-body text-ivory-muted mb-4">
+                    No score selected. Choose a piece from the library to start.
+                  </p>
+                  <Button
+                    variant="secondary"
+                    onClick={() => navigate('/library')}
+                  >
+                    Browse Library
+                  </Button>
+                </div>
+              )
             )}
           </div>
         )}
 
         {scoreLoading && (
-          <p data-testid="score-loading" className="font-body text-ivory-muted text-sm">
+          <p
+            data-testid="score-loading"
+            className="font-body text-ivory-muted text-sm"
+          >
             Loading score...
           </p>
         )}
 
         {scoreError && (
-          <p data-testid="score-error" className="font-body text-crimson text-sm">
+          <p
+            data-testid="score-error"
+            className="font-body text-crimson text-sm"
+          >
             {scoreError}
           </p>
         )}
@@ -210,26 +250,36 @@ export default function PracticePage() {
       </div>
 
       {/* Session summary — shown after practice ends */}
-      {!isPracticing && !ghostMode && sessionSummary && sessionSummary.total_deviations > 0 && (
-        <div
-          data-testid="session-summary"
-          className="absolute top-4 right-4 w-72 bg-surface border border-border rounded-lg p-4 shadow-lg z-20"
-        >
-          <h3 className="font-heading text-sm text-ivory mb-2">Session Summary</h3>
-          <div className="space-y-1 font-body text-xs text-ivory-muted">
-            <p>Deviations logged: {sessionSummary.total_deviations}</p>
-            {sessionSummary.pitch_deviation_count > 0 && (
-              <p>Pitch: {sessionSummary.pitch_deviation_count} (avg {sessionSummary.average_pitch_deviation_cents}c)</p>
-            )}
-            {sessionSummary.intonation_deviation_count > 0 && (
-              <p>Intonation: {sessionSummary.intonation_deviation_count}</p>
-            )}
-            {sessionSummary.worst_measure && (
-              <p className="text-amber">Needs work: m.{sessionSummary.worst_measure}</p>
-            )}
+      {!isPracticing &&
+        !ghostMode &&
+        sessionSummary &&
+        sessionSummary.total_deviations > 0 && (
+          <div
+            data-testid="session-summary"
+            className="absolute top-4 right-4 w-72 bg-surface border border-border rounded-lg p-4 shadow-lg z-20"
+          >
+            <h3 className="font-heading text-sm text-ivory mb-2">
+              Session Summary
+            </h3>
+            <div className="space-y-1 font-body text-xs text-ivory-muted">
+              <p>Deviations logged: {sessionSummary.total_deviations}</p>
+              {sessionSummary.pitch_deviation_count > 0 && (
+                <p>
+                  Pitch: {sessionSummary.pitch_deviation_count} (avg{' '}
+                  {sessionSummary.average_pitch_deviation_cents}c)
+                </p>
+              )}
+              {sessionSummary.intonation_deviation_count > 0 && (
+                <p>Intonation: {sessionSummary.intonation_deviation_count}</p>
+              )}
+              {sessionSummary.worst_measure && (
+                <p className="text-amber">
+                  Needs work: m.{sessionSummary.worst_measure}
+                </p>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* Tap overlay hint — shows briefly when controls are hidden */}
       {ghostMode && !controlsVisible && (
@@ -260,6 +310,20 @@ export default function PracticePage() {
           }
         />
       )}
+
+      {/* AI Coach Debrief modal */}
+      <CoachDebrief
+        isOpen={debriefOpen}
+        onClose={() => setDebriefOpen(false)}
+        sessionLog={sessionLog}
+        sessionSummary={sessionSummary}
+        worstMeasures={debriefDataRef.current?.worstMeasures || []}
+        instrument={selectedInstrument || 'violin'}
+        onPracticeAgain={() => {
+          setDebriefOpen(false)
+          handlePlayPause()
+        }}
+      />
     </div>
   )
 }
