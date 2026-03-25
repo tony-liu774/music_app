@@ -36,7 +36,7 @@ Implement the AI coaching debrief, crimson heat map overlay on error-heavy measu
    - Store completed sessions in IndexedDB: `{ id, pieceId, date, duration, accuracy, errors, coachFeedback }`
    - Retrieve session history for a given piece
 5. Integrate into Practice page: show CoachDebrief modal on practice stop
-6. Add environment variable for LLM API endpoint (`VITE_LLM_API_URL`)
+6. Verify `VITE_LLM_API_URL` is already documented in `.env.example` (created in M1); add runtime validation that warns if not set
 
 **Acceptance criteria**:
 - AI generates concise, encouraging feedback (max 2 sentences)

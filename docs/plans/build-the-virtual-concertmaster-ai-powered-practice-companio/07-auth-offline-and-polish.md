@@ -38,7 +38,7 @@ Add Supabase authentication, offline support with service workers, handle AudioC
    - Wrapper component that redirects unauthenticated users to `/login`
    - Shows loading spinner while checking auth state
 7. Add `/login` route and wrap protected routes with AuthGuard
-8. Add `.env.example` with required Supabase environment variables (no real keys)
+8. Verify `.env.example` (created in M1) includes `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` entries
 9. Update session history to associate with authenticated user ID
 
 **Acceptance criteria**:
@@ -62,7 +62,7 @@ Add Supabase authentication, offline support with service workers, handle AudioC
 
 **Subtasks (ordered)**:
 1. Verify repo location
-2. Install Workbox for service worker tooling: `npm install -D workbox-webpack-plugins` or use Vite PWA plugin (`npm install -D vite-plugin-pwa`)
+2. Install the Vite PWA plugin: `npm install -D vite-plugin-pwa` (uses Workbox under the hood, configured via `vite.config.js`)
 3. Configure service worker with caching strategies:
    - App shell (HTML, JS, CSS): Cache-first
    - Music library (MusicXML files from IndexedDB): already local, ensure persistence

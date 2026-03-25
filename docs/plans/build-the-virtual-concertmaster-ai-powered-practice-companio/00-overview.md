@@ -52,4 +52,4 @@ Build iteratively across 7 milestones, each producing working functionality:
 4. **Repo Location**: ALL work in `~/virtual-concertmaster`. Verify with `pwd` and `git remote -v`.
 5. **Latency Budget**: <30ms mic-to-UI, 60FPS during live audio.
 
-## Estimated Total Tasks: 21
+## Estimated Total Tasks: 18
