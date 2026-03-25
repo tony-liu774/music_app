@@ -2,47 +2,54 @@
 
 ## Goal
 
-Migrate the existing vanilla-JS + Express monolith into a modern **Vite + React + Zustand** frontend application with the "Midnight Conservatory" design system, real-time audio analysis via Web Workers, VexFlow-based sheet music rendering, and AI-powered coaching. Auth is migrated from Express to **Supabase** (Google/Apple OAuth), while remaining Express API routes are preserved. The frontend is rebuilt from scratch as a React SPA.
+Build a premium, AI-powered practice companion for classical string players (Violin, Viola, Cello, Double Bass) with strict latency budgets (<30ms mic-to-UI) and 60FPS live audio visualization. The app uses Web Audio API for real-time pitch detection, VexFlow for sheet music rendering, and an LLM backend for coaching feedback.
 
 ## Current State
 
-The codebase already contains significant working logic in vanilla JS:
-
-- **Audio DSP pipeline** (`src/js/audio/`): pYIN pitch detection, DSP engine with vibrato smoothing, tone quality analysis, articulation detection, volume envelope analysis, scale engine
-- **UI components** (`src/js/components/`): sheet music renderer (canvas-based), follow-the-ball cursor, heat map renderer, practice loop, tuner, onboarding, dashboard, annotation canvas, assignment UI, studio dashboard
-- **Services** (`src/js/services/`): auth, OAuth, cloud sync, offline session manager, library, LLM, PDF export, annotation, session persistence, push notifications
-- **Analysis** (`src/js/analysis/`): session logger, AI summary generator, intonation analyzer, dynamics comparator
-- **Backend routes** (`src/routes/`): auth, OAuth, AI, OMR, sync, teacher, license, assignments, notifications, IMSLP, health
-- **Styling**: Tailwind CSS v4 with full `@theme` palette in `src/css/app.css` (Midnight Conservatory tokens already defined)
-- **Main app**: 3100-line `app.js` monolith class orchestrating everything
-
-The migration strategy is to **wrap existing logic into React components and Zustand stores** rather than rewriting DSP/analysis algorithms. The `@theme` tokens and `app.css` are already Tailwind v4 CSS-first and will carry forward.
+Phase 0 is partially complete:
+- Vite + React 19 + Tailwind CSS v4 scaffolded with CSS-first `@theme` config
+- Midnight Conservatory design system tokens defined in `src/index.css`
+- Design Sandbox page proving all tokens work
+- Tauri cross-platform shell configured (optional native builds)
+- React Router, ESLint configured
+- Missing: Zustand stores, reusable UI component library, Prettier, Supabase auth
 
 ## Approach
 
-1. Scaffold a Vite + React project alongside the existing Express backend (dual-entry setup)
-2. Set up Supabase project, configure Google/Apple OAuth, and migrate auth from Express to Supabase Auth
-3. Build the base component library using existing Midnight Conservatory tokens
-4. Port audio DSP to Web Worker architecture with React hooks
-5. Build the "Ghost" practice UI with VexFlow sheet music and predictive cursor
-6. Integrate AI coaching, analytics, and heat map overlays
-7. Add offline support, AudioContext handling, and polish
+Build iteratively across 7 milestones, each producing working functionality:
 
-## Milestones
-
-1. **Environment and Scaffolding** -- Initialize Vite + React alongside Express, configure Tailwind v4 CSS-first, set up Supabase Auth with Google/Apple OAuth, build base UI component library (Buttons, Modals, Nav, Layout) in Midnight Conservatory theme, set up Zustand stores
-2. **The Ear -- DSP and Hardware** -- Port audio capture and pitch detection to Web Worker architecture, build React hooks for microphone access with graceful denial handling, implement vibrato filter and continuous session logging
-3. **The Ghost Practice UI** -- Build the main practice view with distraction-free fade behavior, integrate VexFlow for MusicXML sheet music rendering, implement predictive amber cursor and intonation needle
-4. **AI Coach and Analytics** -- Wire post-session AI coaching via LLM backend, build crimson heat map overlay on sheet music, implement smart loop extraction with tempo reduction
-5. **Edge Cases and Offline Support** -- Add offline caching with IndexedDB sync, handle AudioContext suspension, build tuner and settings pages, final integration testing and polish
+1. **Complete Scaffolding & Core UI** -- Finish Phase 0: Zustand stores, reusable component library, Prettier, project structure
+2. **Microphone Onboarding & Audio Pipeline** -- Phase 1a: getUserMedia flow, AudioContext management, mic permission UX
+3. **Pitch Detection DSP** -- Phase 1b: pYIN algorithm in Web Worker, vibrato filter, pitch-to-cents conversion
+4. **Sheet Music & Practice View** -- Phase 2a: MusicXML parsing, VexFlow rendering, predictive cursor
+5. **Ghost Mode & Live Feedback** -- Phase 2b: Distraction-free practice UI, intonation needle, session error logging
+6. **AI Coach & Analytics** -- Phase 3: LLM integration for coaching, heat map overlay, smart loop extraction
+7. **Auth, Offline & Polish** -- Phase 4: Supabase auth, offline caching with service worker, AudioContext edge cases
 
 ## Cross-Milestone Dependencies
 
-- Milestone 2 depends on Milestone 1 (React scaffolding, Zustand stores, base components)
-- Milestone 3 depends on Milestone 1 (layout, nav components) and partially on Milestone 2 (audio hooks for intonation needle)
-- Milestone 4 depends on Milestone 2 (session logger data) and Milestone 3 (sheet music renderer for heat map overlay)
-- Milestone 5 depends on all prior milestones
+- Milestone 2 (Mic Onboarding) must complete before Milestone 3 (DSP) can process live audio
+- Milestone 3 (DSP) must complete before Milestone 5 (Live Feedback) can render pitch data
+- Milestone 4 (Sheet Music) must complete before Milestone 5 (Ghost Mode) can overlay feedback on notation
+- Milestone 5 (Session Logging) must complete before Milestone 6 (AI Coach) can analyze sessions
+- Milestone 1 (Scaffolding) should complete first as all milestones depend on shared components and stores
 
-## Estimated Task Count
+## Tech Stack
 
-24 tasks across 5 milestones.
+- **Frontend**: Vite 8 + React 19 (SPA)
+- **State**: Zustand (separate `useUIStore` and `useAudioStore`)
+- **Audio**: Web Audio API + Web Workers (pYIN pitch detection offloaded from main thread)
+- **Sheet Music**: VexFlow (MusicXML rendering)
+- **DB/Auth**: Supabase (Google/Apple OAuth)
+- **Styling**: Tailwind CSS v4 (CSS-first, `@theme` in `global.css`)
+- **Design**: Midnight Conservatory -- Oxford Blue, Polished Amber, Soft Ivory
+
+## Golden Rules (All Milestones)
+
+1. **Tailwind v4 CSS-First**: NO `tailwind.config.js`. All theme via `@theme` directive.
+2. **No Hardcoded Hex**: Zero inline hex codes. Use semantic theme variables only.
+3. **SVG Safety**: All `<svg>`, `<img>`, `<canvas>` must have `max-w` and `max-h` classes.
+4. **Repo Location**: ALL work in `~/virtual-concertmaster`. Verify with `pwd` and `git remote -v`.
+5. **Latency Budget**: <30ms mic-to-UI, 60FPS during live audio.
+
+## Estimated Total Tasks: 21
