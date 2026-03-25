@@ -4,6 +4,8 @@
 
 Migrate the core practice session UI -- the heart of the application -- including sheet music rendering, real-time intonation feedback, predictive cursor, heat map overlay, coach debrief, smart loop, and all supporting hooks and workers.
 
+**Target repo:** `tony-liu774/virtual-concertmaster` — see 00-overview.md "Cross-Repo Execution Model" for setup.
+
 ## Tasks
 
 ### Task 4.1: Migrate Practice Hooks and Workers

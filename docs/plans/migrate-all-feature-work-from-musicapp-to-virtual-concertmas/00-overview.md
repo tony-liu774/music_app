@@ -19,6 +19,18 @@ Migrate all 25 tasks worth of feature work from `tony-liu774/music_app` into `to
 - `src/App.jsx` -- Landing page with route to Sandbox
 - `src-tauri/` -- Tauri v2 Rust shell (build.rs, capabilities, config)
 
+## Cross-Repo Execution Model
+
+All task agents run inside the **music_app** repository worktree. To work on virtual-concertmaster, each task must:
+
+1. **Clone the target repo** as a first step: `gh repo clone tony-liu774/virtual-concertmaster /tmp/virtual-concertmaster` (or reuse if already cloned)
+2. **Read source files** from the music_app worktree (the current working directory) using relative paths
+3. **Write/copy files** into the cloned virtual-concertmaster directory at `/tmp/virtual-concertmaster/`
+4. **Create branches, commit, and push** from inside `/tmp/virtual-concertmaster/`
+5. **Create PRs** targeting the `tony-liu774/virtual-concertmaster` repo: `gh pr create --repo tony-liu774/virtual-concertmaster`
+
+Every task description below specifies that the PR targets **virtual-concertmaster**. The agent should treat the music_app worktree as read-only source material and the `/tmp/virtual-concertmaster` clone as the working repo where all changes are committed.
+
 ## High-Level Approach
 
 1. **Foundation first** -- Merge package dependencies, unify the CSS theme, and set up test infrastructure in the target repo

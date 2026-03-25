@@ -4,6 +4,8 @@
 
 Migrate the authentication system, Supabase client, Zustand stores, and auth-related components so that protected routes and state management are operational.
 
+**Target repo:** `tony-liu774/virtual-concertmaster` — see 00-overview.md "Cross-Repo Execution Model" for setup.
+
 ## Tasks
 
 ### Task 3.1: Migrate Supabase Client and Auth Context

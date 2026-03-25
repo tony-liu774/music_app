@@ -12,9 +12,11 @@ Prepare the virtual-concertmaster repo to receive migrated code by installing al
 
 **Agent type:** coder
 
+**Target repo:** `tony-liu774/virtual-concertmaster` — all changes and PRs target this repo, not music_app. See 00-overview.md "Cross-Repo Execution Model" for setup instructions.
+
 **Subtasks:**
-1. Clone virtual-concertmaster into a working directory (or work against the existing clone)
-2. Read both package.json files to determine exact version ranges needed
+1. Clone virtual-concertmaster: `gh repo clone tony-liu774/virtual-concertmaster /tmp/virtual-concertmaster` (all subsequent work happens in `/tmp/virtual-concertmaster/`)
+2. Read both package.json files to determine exact version ranges needed (music_app's from the current worktree, virtual-concertmaster's from the clone)
 3. Add runtime dependencies to virtual-concertmaster's package.json: `@supabase/supabase-js`, `vexflow`, `zustand`
 4. Add devDependencies: `@testing-library/jest-dom`, `@testing-library/react`, `@testing-library/user-event`, `fake-indexeddb`, `jsdom`, `vitest`, `prettier`, `eslint-config-prettier`, `eslint-plugin-react`
 5. Add scripts: `"test": "vitest run"`, `"test:watch": "vitest"`, `"format": "prettier --write \"src/**/*.{js,jsx,css,json}\""`, `"format:check": "prettier --check \"src/**/*.{js,jsx,css,json}\""`

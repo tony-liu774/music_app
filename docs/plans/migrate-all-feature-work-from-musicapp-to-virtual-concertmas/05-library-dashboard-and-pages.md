@@ -4,6 +4,8 @@
 
 Migrate all remaining feature components (library, dashboard, tuner, onboarding) and all page components, then wire up the full routing tree in App.jsx.
 
+**Target repo:** `tony-liu774/virtual-concertmaster` — see 00-overview.md "Cross-Repo Execution Model" for setup.
+
 ## Tasks
 
 ### Task 5.1: Migrate Library, Dashboard, Tuner, and Onboarding Components

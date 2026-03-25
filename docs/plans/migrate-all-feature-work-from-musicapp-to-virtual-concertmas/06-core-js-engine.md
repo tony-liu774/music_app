@@ -4,6 +4,8 @@
 
 Migrate the vanilla JavaScript engine modules (audio processing, analysis, parsers, hardware listeners, services, components, and utilities) from `src/js/` into `src/engine/` in virtual-concertmaster.
 
+**Target repo:** `tony-liu774/virtual-concertmaster` — see 00-overview.md "Cross-Repo Execution Model" for setup.
+
 ## Tasks
 
 ### Task 6.1: Migrate Audio and Analysis Modules
@@ -21,12 +23,14 @@ Migrate the vanilla JavaScript engine modules (audio processing, analysis, parse
 6. Update all internal cross-references between engine modules (e.g., `../audio/pitch-detector` stays the same, but verify)
 7. Copy corresponding test files from `tests/` (pitch-detector.test.js, dsp-engine.test.js, ai-summary-generator.test.js, intonation-analyzer.test.js, session-logger.test.js, dynamics-comparator.test.js, tone-quality-analyzer.test.js, scale-engine.test.js, volume-envelope-analyzer.test.js, articulation-detector.test.js, musicxml-dynamics.test.js) to `src/engine/__tests__/`
 8. Update test file import paths to reference `../audio/`, `../analysis/`, etc.
-9. Changes must be on a feature branch with a GitHub PR created via `gh pr create`
+9. **Convert Jest APIs to Vitest equivalents** in all test files: `jest.fn()` → `vi.fn()`, `jest.mock()` → `vi.mock()`, `jest.spyOn()` → `vi.spyOn()`, `jest.useFakeTimers()` → `vi.useFakeTimers()`, and any other Jest-specific APIs. Add `import { vi } from 'vitest'` where needed.
+10. Changes must be on a feature branch with a GitHub PR created via `gh pr create`
 
 **Acceptance criteria:**
 - All audio and analysis modules exist in `src/engine/`
 - Internal cross-references resolve correctly
-- Engine test files are present and import paths are updated
+- Engine test files are present with updated paths and converted from Jest to Vitest syntax
+- Engine tests pass: `npx vitest run src/engine`
 
 **Dependencies:** None (engine code is vanilla JS with no React dependencies)
 
@@ -48,11 +52,13 @@ Migrate the vanilla JavaScript engine modules (audio processing, analysis, parse
 7. Update all internal import paths across copied files
 8. Copy remaining test files from `tests/` that correspond to these modules to `src/engine/__tests__/`
 9. Update test import paths
-10. Changes must be on a feature branch with a GitHub PR created via `gh pr create`
+10. **Convert Jest APIs to Vitest equivalents** in all test files (same conversions as Task 6.1: `jest.fn()` → `vi.fn()`, `jest.mock()` → `vi.mock()`, etc.)
+11. Changes must be on a feature branch with a GitHub PR created via `gh pr create`
 
 **Acceptance criteria:**
 - All engine service, component, parser, hardware, and utility modules exist under `src/engine/`
 - Internal cross-references resolve correctly
-- Corresponding test files are present with updated paths
+- Corresponding test files are present with updated paths and converted from Jest to Vitest syntax
+- Engine tests pass: `npx vitest run src/engine`
 
 **Dependencies:** Task 6.1 (some services reference audio/analysis modules)

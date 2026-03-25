@@ -4,6 +4,8 @@
 
 Run the full test suite across all migrated code, fix any remaining import/path issues, verify the application builds and runs end-to-end, and clean up any leftover stubs or TODO comments.
 
+**Target repo:** `tony-liu774/virtual-concertmaster` — see 00-overview.md "Cross-Repo Execution Model" for setup.
+
 ## Tasks
 
 ### Task 8.1: Migrate Remaining Test Files and Run Full Suite
@@ -68,7 +70,7 @@ Run the full test suite across all migrated code, fix any remaining import/path 
 **Subtasks:**
 1. Merge `.gitignore` from music_app with virtual-concertmaster's existing `.gitignore`
 2. Copy `STYLE_GUIDE.md` to virtual-concertmaster root
-3. Copy PWA-related files (`sw.js`, `public/push-notification-worker.js`) to appropriate locations (may need adaptation for Tauri)
+3. Copy PWA-related files (`sw.js`, `public/push-notification-worker.js`) to `public/`. **Tauri adaptation:** Wrap service worker registration in a `if (!window.__TAURI__)` guard so SW registration is skipped when running as a Tauri desktop app (Tauri uses `file://` protocol where SWs are unsupported). Keep the SW files for the web/PWA deployment path.
 4. Copy `.env.example` files and merge them
 5. Verify no sensitive files are committed (check for .env, credentials, API keys)
 6. Changes must be on a feature branch with a GitHub PR created via `gh pr create`

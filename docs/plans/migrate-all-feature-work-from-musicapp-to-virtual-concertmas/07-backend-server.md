@@ -4,6 +4,8 @@
 
 Migrate the Express backend into a `server/` directory within virtual-concertmaster, with its own package.json and independent dependency management. In a Tauri app, this server can be spawned as a sidecar process or run separately during development.
 
+**Target repo:** `tony-liu774/virtual-concertmaster` — see 00-overview.md "Cross-Repo Execution Model" for setup.
+
 ## Tasks
 
 ### Task 7.1: Migrate Express Server Core
@@ -14,7 +16,7 @@ Migrate the Express backend into a `server/` directory within virtual-concertmas
 
 **Subtasks:**
 1. Create `server/` directory in virtual-concertmaster
-2. Create `server/package.json` based on music_app's root package.json -- keep Express, helmet, cors, dotenv, jsonwebtoken, bcryptjs, express-rate-limit, multer, openai, uuid, node-cron, jspdf, aws-sdk deps; keep jest as dev dep
+2. Create `server/package.json` based on music_app's root package.json -- keep Express, helmet, cors, dotenv, jsonwebtoken, bcryptjs, express-rate-limit, multer, openai, uuid, node-cron, jspdf, aws-sdk deps; keep jest as dev dep. **Note:** `aws-sdk` is v2; migrating to `@aws-sdk/client-*` v3 is out of scope for this migration but should be tracked as future tech debt.
 3. Copy `src/index.js` to `server/src/index.js`
 4. Copy `src/config/index.js` to `server/src/config/index.js`
 5. Copy `src/middleware/*.js` to `server/src/middleware/`

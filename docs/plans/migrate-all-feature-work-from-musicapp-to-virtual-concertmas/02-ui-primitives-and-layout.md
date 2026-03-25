@@ -4,6 +4,8 @@
 
 Migrate the foundational UI component library and layout shell so that subsequent milestones can compose pages from these building blocks.
 
+**Target repo:** `tony-liu774/virtual-concertmaster` — see 00-overview.md "Cross-Repo Execution Model" for setup.
+
 ## Tasks
 
 ### Task 2.1: Migrate UI Component Library
