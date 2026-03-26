@@ -10,6 +10,8 @@ import {
   VibratoSmoother,
   PerformanceMonitor,
   frequencyToNote,
+  isInInstrumentRange,
+  DEFAULT_TUNING_REFERENCE,
 } from './dsp-core.js'
 import {
   createResultMessage,
@@ -20,6 +22,8 @@ import {
 let detector = null
 let resonanceFilter = null
 let vibratoSmoother = null
+let tuningReference = DEFAULT_TUNING_REFERENCE
+let currentInstrument = 'violin'
 const perfMonitor = new PerformanceMonitor(30)
 
 self.onmessage = function (e) {
@@ -28,8 +32,10 @@ self.onmessage = function (e) {
   if (type === 'INIT') {
     try {
       const { sampleRate, bufferSize, instrument } = e.data
+      tuningReference = e.data.tuningReference ?? DEFAULT_TUNING_REFERENCE
+      currentInstrument = instrument || 'violin'
       detector = new PYINPitchDetector(sampleRate, bufferSize)
-      resonanceFilter = new SympatheticResonanceFilter(instrument || 'violin')
+      resonanceFilter = new SympatheticResonanceFilter(currentInstrument)
       vibratoSmoother = new VibratoSmoother()
       self.postMessage({ type: 'INIT', success: true })
     } catch (err) {
@@ -59,7 +65,13 @@ self.onmessage = function (e) {
       if (frequency !== null) {
         // Apply sympathetic resonance filter
         confidence = resonanceFilter.filter(frequency, rawConfidence)
-        const info = frequencyToNote(frequency)
+
+        // Penalize out-of-range frequencies after resonance filtering
+        if (!isInInstrumentRange(frequency, currentInstrument)) {
+          confidence = confidence * 0.2
+        }
+
+        const info = frequencyToNote(frequency, tuningReference)
         note = info.note ? `${info.note}${info.octave}` : null
         cents = info.cents
       }

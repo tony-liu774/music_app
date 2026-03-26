@@ -2,6 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   frequencyToMidi,
   frequencyToNote,
+  centsDeviation,
+  midiToFrequency,
+  isInInstrumentRange,
+  INSTRUMENT_RANGES,
+  DEFAULT_TUNING_REFERENCE,
   PYINPitchDetector,
   SympatheticResonanceFilter,
   PerformanceMonitor,
@@ -331,5 +336,139 @@ describe('PerformanceMonitor', () => {
     monitor.end(s2)
 
     expect(monitor.maxMs).toBe(25)
+  })
+})
+
+/* ------------------------------------------------------------------ */
+/*  CONFIGURABLE TUNING REFERENCE                                     */
+/* ------------------------------------------------------------------ */
+
+describe('frequencyToMidi with custom tuning', () => {
+  it('returns 69 for A4 at 442 Hz when tuningRef=442', () => {
+    expect(frequencyToMidi(442, 442)).toBe(69)
+  })
+
+  it('returns a value slightly above 69 for 442 Hz at standard tuning', () => {
+    expect(frequencyToMidi(442, 440)).toBeGreaterThan(69)
+  })
+})
+
+describe('frequencyToNote with custom tuning', () => {
+  it('returns A4 with 0 cents for 442 Hz when tuningRef=442', () => {
+    const result = frequencyToNote(442, 442)
+    expect(result.note).toBe('A')
+    expect(result.octave).toBe(4)
+    expect(result.cents).toBe(0)
+  })
+
+  it('returns A4 with positive cents for 442 Hz at standard tuning', () => {
+    const result = frequencyToNote(442, 440)
+    expect(result.note).toBe('A')
+    expect(result.cents).toBeGreaterThan(0)
+  })
+})
+
+/* ------------------------------------------------------------------ */
+/*  CENTS DEVIATION                                                   */
+/* ------------------------------------------------------------------ */
+
+describe('centsDeviation', () => {
+  it('returns 0 when frequencies are equal', () => {
+    expect(centsDeviation(440, 440)).toBe(0)
+  })
+
+  it('returns 1200 for an octave up', () => {
+    expect(centsDeviation(880, 440)).toBeCloseTo(1200, 5)
+  })
+
+  it('returns -1200 for an octave down', () => {
+    expect(centsDeviation(220, 440)).toBeCloseTo(-1200, 5)
+  })
+
+  it('returns ~100 cents for a semitone', () => {
+    // A4 to A#4 (466.16 Hz)
+    const result = centsDeviation(466.16, 440)
+    expect(result).toBeCloseTo(100, 0)
+  })
+
+  it('returns 0 for invalid frequencies', () => {
+    expect(centsDeviation(0, 440)).toBe(0)
+    expect(centsDeviation(440, 0)).toBe(0)
+    expect(centsDeviation(-100, 440)).toBe(0)
+  })
+})
+
+/* ------------------------------------------------------------------ */
+/*  MIDI TO FREQUENCY                                                 */
+/* ------------------------------------------------------------------ */
+
+describe('midiToFrequency', () => {
+  it('returns 440 for MIDI 69 at standard tuning', () => {
+    expect(midiToFrequency(69)).toBeCloseTo(440, 2)
+  })
+
+  it('returns 442 for MIDI 69 at tuningRef=442', () => {
+    expect(midiToFrequency(69, 442)).toBeCloseTo(442, 2)
+  })
+
+  it('returns 880 for MIDI 81 (A5)', () => {
+    expect(midiToFrequency(81)).toBeCloseTo(880, 1)
+  })
+
+  it('returns ~261.63 for MIDI 60 (middle C)', () => {
+    expect(midiToFrequency(60)).toBeCloseTo(261.63, 0)
+  })
+})
+
+/* ------------------------------------------------------------------ */
+/*  INSTRUMENT RANGE VALIDATION                                       */
+/* ------------------------------------------------------------------ */
+
+describe('INSTRUMENT_RANGES', () => {
+  it('defines ranges for all four string instruments', () => {
+    expect(INSTRUMENT_RANGES).toHaveProperty('violin')
+    expect(INSTRUMENT_RANGES).toHaveProperty('viola')
+    expect(INSTRUMENT_RANGES).toHaveProperty('cello')
+    expect(INSTRUMENT_RANGES).toHaveProperty('double-bass')
+  })
+
+  it('violin range starts at G3 (~196 Hz)', () => {
+    expect(INSTRUMENT_RANGES.violin.min).toBeCloseTo(196, 0)
+  })
+
+  it('double-bass range starts at E1 (~41.2 Hz)', () => {
+    expect(INSTRUMENT_RANGES['double-bass'].min).toBeCloseTo(41.2, 0)
+  })
+})
+
+describe('isInInstrumentRange', () => {
+  it('returns true for A4 on violin', () => {
+    expect(isInInstrumentRange(440, 'violin')).toBe(true)
+  })
+
+  it('returns false for very low frequency on violin', () => {
+    expect(isInInstrumentRange(50, 'violin')).toBe(false)
+  })
+
+  it('returns true for C2 on cello', () => {
+    expect(isInInstrumentRange(65.41, 'cello')).toBe(true)
+  })
+
+  it('returns false for very high frequency on cello', () => {
+    expect(isInInstrumentRange(3000, 'cello')).toBe(false)
+  })
+
+  it('returns true for E1 on double-bass', () => {
+    expect(isInInstrumentRange(41.2, 'double-bass')).toBe(true)
+  })
+
+  it('returns true for unknown instrument (no filtering)', () => {
+    expect(isInInstrumentRange(440, 'unknown')).toBe(true)
+  })
+})
+
+describe('DEFAULT_TUNING_REFERENCE', () => {
+  it('is 440 Hz', () => {
+    expect(DEFAULT_TUNING_REFERENCE).toBe(440)
   })
 })
