@@ -30,6 +30,9 @@ export const INSTRUMENT_CONFIG = {
 }
 
 export const SETTINGS_DEFAULTS = {
+  // User profile
+  displayName: '',
+
   // Instrument
   instrument: 'violin',
 
@@ -49,6 +52,15 @@ export const useSettingsStore = create(
     persist(
       (set, get) => ({
         ...SETTINGS_DEFAULTS,
+
+        // User profile
+        setDisplayName: (name) => {
+          set(
+            { displayName: String(name).slice(0, 100) },
+            false,
+            'setDisplayName',
+          )
+        },
 
         // Instrument selection
         setInstrument: (instrument) => {

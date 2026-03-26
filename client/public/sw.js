@@ -18,7 +18,13 @@ const MAX_QUEUE_AGE_MS = 7 * 24 * 60 * 60 * 1000
 
 // Vite build output uses hashed filenames — we precache the shell
 // and let runtime caching handle the rest
-const PRECACHE_URLS = ['/', '/index.html']
+const PRECACHE_URLS = [
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/icons/icon-192.svg',
+  '/icons/icon-512.svg',
+]
 
 // ---------------------------------------------------------------------------
 // IndexedDB queue for failed API mutations

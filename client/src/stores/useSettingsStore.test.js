@@ -12,11 +12,31 @@ describe('useSettingsStore', () => {
 
   it('has correct initial state', () => {
     const state = useSettingsStore.getState()
+    expect(state.displayName).toBe('')
     expect(state.instrument).toBe('violin')
     expect(state.tuningReference).toBe(440)
     expect(state.confidenceThreshold).toBe(0.8)
     expect(state.cursorSpeed).toBe(1.0)
     expect(state.needleSensitivity).toBe(0.5)
+  })
+
+  describe('setDisplayName', () => {
+    it('sets a display name', () => {
+      useSettingsStore.getState().setDisplayName('Alice')
+      expect(useSettingsStore.getState().displayName).toBe('Alice')
+    })
+
+    it('truncates names longer than 100 characters', () => {
+      const longName = 'A'.repeat(150)
+      useSettingsStore.getState().setDisplayName(longName)
+      expect(useSettingsStore.getState().displayName).toHaveLength(100)
+    })
+
+    it('resets on resetSettings', () => {
+      useSettingsStore.getState().setDisplayName('Bob')
+      useSettingsStore.getState().resetSettings()
+      expect(useSettingsStore.getState().displayName).toBe('')
+    })
   })
 
   describe('setInstrument', () => {
