@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect } from 'vitest'
 import { readFileSync, existsSync } from 'fs'
 import { resolve } from 'path'
@@ -19,7 +20,7 @@ describe('Project setup', () => {
 
   it('app.css contains @import "tailwindcss"', () => {
     const css = readFileSync(resolve(clientRoot, 'src/styles/app.css'), 'utf-8')
-    expect(css).toContain('@import "tailwindcss"')
+    expect(css).toMatch(/@import\s+['"]tailwindcss['"]/)
   })
 
   it('app.css defines oxford-blue color', () => {
@@ -88,5 +89,22 @@ describe('Project setup', () => {
     expect(pkg.scripts.dev).toBe('vite')
     expect(pkg.scripts.build).toBe('vite build')
     expect(pkg.scripts.preview).toBe('vite preview')
+  })
+
+  it('app.css defines semantic alias tokens', () => {
+    const css = readFileSync(resolve(clientRoot, 'src/styles/app.css'), 'utf-8')
+    expect(css).toContain('--color-bg-deep: #0a0a12')
+    expect(css).toContain('--color-bg-panel: #14141f')
+    expect(css).toContain('--color-accent-amber: #c9a227')
+    expect(css).toContain('--color-text-primary: #f3f4f6')
+    expect(css).toContain('--color-text-muted: #9ca3af')
+    expect(css).toContain('--color-feedback-success: #10b981')
+    expect(css).toContain('--color-feedback-error: #dc2626')
+  })
+
+  it('app.css defines breath animation', () => {
+    const css = readFileSync(resolve(clientRoot, 'src/styles/app.css'), 'utf-8')
+    expect(css).toContain('--animate-breath: breath 4s ease-in-out infinite')
+    expect(css).toContain('@keyframes breath')
   })
 })
