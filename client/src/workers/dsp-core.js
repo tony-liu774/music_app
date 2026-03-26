@@ -419,8 +419,7 @@ export class VibratoSmoother {
     }
 
     // Time span in seconds
-    const spanSec =
-      (this.samples[n - 1].ts - this.samples[0].ts) / 1000
+    const spanSec = (this.samples[n - 1].ts - this.samples[0].ts) / 1000
     if (spanSec <= 0) {
       return { rate: null, extent, isVibrato: false }
     }

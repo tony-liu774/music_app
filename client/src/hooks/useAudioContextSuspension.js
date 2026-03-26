@@ -104,7 +104,12 @@ export function useAudioContextSuspension(audioContext, options = {}) {
         setIsSuspendedBySystem(false)
       }
     },
-    [attemptResume, setAudioContextState, setIsSuspendedBySystem, setResumeFailCount],
+    [
+      attemptResume,
+      setAudioContextState,
+      setIsSuspendedBySystem,
+      setResumeFailCount,
+    ],
   )
 
   /**
@@ -142,7 +147,13 @@ export function useAudioContextSuspension(audioContext, options = {}) {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       clearTimeout(retryTimerRef.current)
     }
-  }, [audioContext, enabled, handleStateChange, handleVisibilityChange, setAudioContextState])
+  }, [
+    audioContext,
+    enabled,
+    handleStateChange,
+    handleVisibilityChange,
+    setAudioContextState,
+  ])
 
   /**
    * Manual resume — lets the UI trigger a resume (e.g. via a "Tap to resume" button).

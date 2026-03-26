@@ -193,7 +193,12 @@ export function useAudioPipeline(options = {}) {
 
     // Reset pitch and vibrato data
     setPitchData({ frequency: null, confidence: 0, note: null, cents: null })
-    setVibratoData({ isVibrato: false, vibratoRate: null, vibratoWidth: null, centerFrequency: null })
+    setVibratoData({
+      isVibrato: false,
+      vibratoRate: null,
+      vibratoWidth: null,
+      centerFrequency: null,
+    })
   }, [setAudioContextState, setPitchData, setVibratoData])
 
   // Register the resume callback in the store so other components can use it

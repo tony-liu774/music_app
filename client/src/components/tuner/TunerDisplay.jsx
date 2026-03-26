@@ -1,4 +1,7 @@
-import { useSettingsStore, INSTRUMENT_CONFIG } from '../../stores/useSettingsStore'
+import {
+  useSettingsStore,
+  INSTRUMENT_CONFIG,
+} from '../../stores/useSettingsStore'
 
 /* eslint-disable react/prop-types */
 
@@ -47,7 +50,11 @@ export default function TunerDisplay({
 
   // Cents display text
   const centsText =
-    cents !== null ? (cents > 0 ? `+${Math.round(cents)}` : `${Math.round(cents)}`) : '0'
+    cents !== null
+      ? cents > 0
+        ? `+${Math.round(cents)}`
+        : `${Math.round(cents)}`
+      : '0'
 
   // Cents color
   const absCents = Math.abs(cents || 0)
@@ -59,17 +66,25 @@ export default function TunerDisplay({
   }
 
   return (
-    <div className="flex flex-col items-center gap-4" data-testid="tuner-display">
+    <div
+      className="flex flex-col items-center gap-4"
+      data-testid="tuner-display"
+    >
       {/* Detected note name */}
       <div className="flex items-baseline gap-1" data-testid="note-display">
         <span className="font-heading text-7xl text-ivory leading-none">
           {noteName}
         </span>
-        <span className="font-mono text-2xl text-ivory-muted">{noteOctave}</span>
+        <span className="font-mono text-2xl text-ivory-muted">
+          {noteOctave}
+        </span>
       </div>
 
       {/* Frequency readout */}
-      <p className="font-body text-lg text-ivory-muted" data-testid="frequency-display">
+      <p
+        className="font-body text-lg text-ivory-muted"
+        data-testid="frequency-display"
+      >
         {frequency ? `${frequency.toFixed(1)} Hz` : '-- Hz'}
       </p>
 

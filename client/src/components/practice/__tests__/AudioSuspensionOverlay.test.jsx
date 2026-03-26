@@ -12,9 +12,7 @@ describe('AudioSuspensionOverlay', () => {
   })
 
   it('renders nothing when not suspended and not initial suspension', () => {
-    const { container } = render(
-      <AudioSuspensionOverlay onResume={vi.fn()} />,
-    )
+    const { container } = render(<AudioSuspensionOverlay onResume={vi.fn()} />)
     expect(container.firstChild).toBeNull()
   })
 
@@ -26,23 +24,17 @@ describe('AudioSuspensionOverlay', () => {
     expect(screen.getByTestId('audio-suspension-overlay')).toBeInTheDocument()
     expect(screen.getByText('Audio Interrupted')).toBeInTheDocument()
     expect(
-      screen.getByText(
-        'Audio was paused by your browser. Tap to resume.',
-      ),
+      screen.getByText('Audio was paused by your browser. Tap to resume.'),
     ).toBeInTheDocument()
   })
 
   it('renders overlay when isInitialSuspension is true', () => {
-    render(
-      <AudioSuspensionOverlay onResume={vi.fn()} isInitialSuspension />,
-    )
+    render(<AudioSuspensionOverlay onResume={vi.fn()} isInitialSuspension />)
 
     expect(screen.getByTestId('audio-suspension-overlay')).toBeInTheDocument()
     expect(screen.getByText('Tap to Enable Audio')).toBeInTheDocument()
     expect(
-      screen.getByText(
-        'Your browser requires a gesture to start audio.',
-      ),
+      screen.getByText('Your browser requires a gesture to start audio.'),
     ).toBeInTheDocument()
   })
 
@@ -81,9 +73,7 @@ describe('AudioSuspensionOverlay', () => {
   })
 
   it('uses initial suspension aria-label when isInitialSuspension', () => {
-    render(
-      <AudioSuspensionOverlay onResume={vi.fn()} isInitialSuspension />,
-    )
+    render(<AudioSuspensionOverlay onResume={vi.fn()} isInitialSuspension />)
 
     const overlay = screen.getByTestId('audio-suspension-overlay')
     expect(overlay).toHaveAttribute('aria-label', 'Tap to Enable Audio')

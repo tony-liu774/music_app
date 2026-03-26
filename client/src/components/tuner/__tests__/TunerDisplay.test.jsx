@@ -25,14 +25,18 @@ describe('TunerDisplay', () => {
   })
 
   it('displays sharp note names correctly', () => {
-    render(<TunerDisplay note="C#5" frequency={554.37} cents={2} isActive={true} />)
+    render(
+      <TunerDisplay note="C#5" frequency={554.37} cents={2} isActive={true} />,
+    )
     expect(screen.getByTestId('note-display')).toHaveTextContent('C#')
     expect(screen.getByTestId('note-display')).toHaveTextContent('5')
   })
 
   it('displays frequency in Hz', () => {
     render(<TunerDisplay note="A4" frequency={440} cents={0} isActive={true} />)
-    expect(screen.getByTestId('frequency-display')).toHaveTextContent('440.0 Hz')
+    expect(screen.getByTestId('frequency-display')).toHaveTextContent(
+      '440.0 Hz',
+    )
   })
 
   it('shows -- Hz when no frequency', () => {
@@ -46,7 +50,9 @@ describe('TunerDisplay', () => {
   })
 
   it('displays negative cents deviation', () => {
-    render(<TunerDisplay note="A4" frequency={438} cents={-8} isActive={true} />)
+    render(
+      <TunerDisplay note="A4" frequency={438} cents={-8} isActive={true} />,
+    )
     expect(screen.getByTestId('cents-display')).toHaveTextContent('-8¢')
   })
 
@@ -115,19 +121,25 @@ describe('TunerDisplay', () => {
   })
 
   it('applies amber color for moderate cents deviation', () => {
-    render(<TunerDisplay note="A4" frequency={442} cents={12} isActive={true} />)
+    render(
+      <TunerDisplay note="A4" frequency={442} cents={12} isActive={true} />,
+    )
     const centsEl = screen.getByTestId('cents-display')
     expect(centsEl.className).toContain('text-amber')
   })
 
   it('applies crimson color for large cents deviation', () => {
-    render(<TunerDisplay note="A4" frequency={450} cents={30} isActive={true} />)
+    render(
+      <TunerDisplay note="A4" frequency={450} cents={30} isActive={true} />,
+    )
     const centsEl = screen.getByTestId('cents-display')
     expect(centsEl.className).toContain('text-crimson')
   })
 
   it('uses muted color when inactive', () => {
-    render(<TunerDisplay note="A4" frequency={440} cents={3} isActive={false} />)
+    render(
+      <TunerDisplay note="A4" frequency={440} cents={3} isActive={false} />,
+    )
     const centsEl = screen.getByTestId('cents-display')
     expect(centsEl.className).toContain('text-ivory-muted')
   })

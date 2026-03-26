@@ -114,7 +114,9 @@ describe('MicPermissionModal', () => {
     await waitFor(() => {
       expect(screen.getByText('Microphone Access Denied')).toBeInTheDocument()
     })
-    expect(screen.getByText(/Click the lock\/settings icon/)).toBeInTheDocument()
+    expect(
+      screen.getByText(/Click the lock\/settings icon/),
+    ).toBeInTheDocument()
     expect(screen.getByText('Try Again')).toBeInTheDocument()
   })
 
@@ -196,9 +198,7 @@ describe('MicPermissionModal', () => {
     fireEvent.click(screen.getByText('Allow Microphone'))
 
     await waitFor(() => {
-      expect(
-        screen.getByText('Waiting for Permission...'),
-      ).toBeInTheDocument()
+      expect(screen.getByText('Waiting for Permission...')).toBeInTheDocument()
     })
   })
 
@@ -276,8 +276,6 @@ describe('MicPermissionModal', () => {
 
     render(<MicPermissionModal isOpen={true} onClose={vi.fn()} />)
 
-    expect(
-      screen.getByText('Secure Connection Required'),
-    ).toBeInTheDocument()
+    expect(screen.getByText('Secure Connection Required')).toBeInTheDocument()
   })
 })

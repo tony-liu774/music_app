@@ -36,7 +36,10 @@ export default function RecentSessionsList() {
     <Card data-testid="recent-sessions-list">
       <h2 className="font-heading text-lg text-amber mb-4">Recent Sessions</h2>
       {recentSessions.length === 0 ? (
-        <p className="text-ivory-muted font-body text-sm" data-testid="empty-state">
+        <p
+          className="text-ivory-muted font-body text-sm"
+          data-testid="empty-state"
+        >
           No practice sessions yet. Start practicing to see your history here.
         </p>
       ) : (

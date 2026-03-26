@@ -248,7 +248,9 @@ describe('MusicXMLParser', () => {
     })
 
     it('throws on XML with wrong root element', () => {
-      expect(() => parseMusicXML('<html></html>')).toThrow('missing score element')
+      expect(() => parseMusicXML('<html></html>')).toThrow(
+        'missing score element',
+      )
     })
 
     it('throws when no parts found', () => {

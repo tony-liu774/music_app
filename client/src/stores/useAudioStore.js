@@ -17,7 +17,11 @@ export const useAudioStore = create(
       // Whether the AudioContext is suspended and being auto-resumed
       isSuspendedBySystem: false,
       setIsSuspendedBySystem: (suspended) =>
-        set({ isSuspendedBySystem: suspended }, false, 'setIsSuspendedBySystem'),
+        set(
+          { isSuspendedBySystem: suspended },
+          false,
+          'setIsSuspendedBySystem',
+        ),
 
       // Count of consecutive resume failures (resets on success)
       resumeFailCount: 0,

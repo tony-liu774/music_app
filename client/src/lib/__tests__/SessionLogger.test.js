@@ -94,8 +94,16 @@ describe('SessionLogger (ESM re-export)', () => {
 
   it('generates session log with correct counts', () => {
     logger.startSession('test')
-    logger.logPitchDeviation({ measureNumber: 1, centsDeviation: -10, confidence: 0.9 })
-    logger.logPitchDeviation({ measureNumber: 2, centsDeviation: -20, confidence: 0.9 })
+    logger.logPitchDeviation({
+      measureNumber: 1,
+      centsDeviation: -10,
+      confidence: 0.9,
+    })
+    logger.logPitchDeviation({
+      measureNumber: 2,
+      centsDeviation: -20,
+      confidence: 0.9,
+    })
     logger.logRhythmDeviation({ measureNumber: 3, deviationMs: 30 })
     logger.logToneQualityDeviation({ measureNumber: 4, qualityScore: 75 })
 
@@ -109,9 +117,21 @@ describe('SessionLogger (ESM re-export)', () => {
 
   it('getErrorsByMeasure groups errors correctly', () => {
     logger.startSession('test')
-    logger.logPitchDeviation({ measureNumber: 1, centsDeviation: -10, confidence: 0.9 })
-    logger.logPitchDeviation({ measureNumber: 1, centsDeviation: -20, confidence: 0.9 })
-    logger.logPitchDeviation({ measureNumber: 2, centsDeviation: 15, confidence: 0.9 })
+    logger.logPitchDeviation({
+      measureNumber: 1,
+      centsDeviation: -10,
+      confidence: 0.9,
+    })
+    logger.logPitchDeviation({
+      measureNumber: 1,
+      centsDeviation: -20,
+      confidence: 0.9,
+    })
+    logger.logPitchDeviation({
+      measureNumber: 2,
+      centsDeviation: 15,
+      confidence: 0.9,
+    })
 
     const byMeasure = logger.getErrorsByMeasure()
     expect(byMeasure[1]).toHaveLength(2)
@@ -120,10 +140,26 @@ describe('SessionLogger (ESM re-export)', () => {
 
   it('getWorstMeasures(n) returns n measures ranked by average deviation', () => {
     logger.startSession('test')
-    logger.logPitchDeviation({ measureNumber: 1, centsDeviation: -10, confidence: 0.9 })
-    logger.logPitchDeviation({ measureNumber: 1, centsDeviation: -20, confidence: 0.9 })
-    logger.logPitchDeviation({ measureNumber: 2, centsDeviation: 50, confidence: 0.9 })
-    logger.logPitchDeviation({ measureNumber: 3, centsDeviation: 5, confidence: 0.9 })
+    logger.logPitchDeviation({
+      measureNumber: 1,
+      centsDeviation: -10,
+      confidence: 0.9,
+    })
+    logger.logPitchDeviation({
+      measureNumber: 1,
+      centsDeviation: -20,
+      confidence: 0.9,
+    })
+    logger.logPitchDeviation({
+      measureNumber: 2,
+      centsDeviation: 50,
+      confidence: 0.9,
+    })
+    logger.logPitchDeviation({
+      measureNumber: 3,
+      centsDeviation: 5,
+      confidence: 0.9,
+    })
 
     const worst = logger.getWorstMeasures(2)
     expect(worst).toHaveLength(2)
@@ -135,7 +171,11 @@ describe('SessionLogger (ESM re-export)', () => {
 
   it('supports pause and resume', () => {
     logger.startSession('test')
-    logger.logPitchDeviation({ measureNumber: 1, centsDeviation: -10, confidence: 0.9 })
+    logger.logPitchDeviation({
+      measureNumber: 1,
+      centsDeviation: -10,
+      confidence: 0.9,
+    })
 
     logger.pauseSession()
     expect(logger._paused).toBe(true)
@@ -143,13 +183,21 @@ describe('SessionLogger (ESM re-export)', () => {
     logger.resumeSession()
     expect(logger._paused).toBe(false)
 
-    logger.logPitchDeviation({ measureNumber: 2, centsDeviation: -20, confidence: 0.9 })
+    logger.logPitchDeviation({
+      measureNumber: 2,
+      centsDeviation: -20,
+      confidence: 0.9,
+    })
     expect(logger.deviations).toHaveLength(2)
   })
 
   it('exports for LLM', () => {
     logger.startSession('test')
-    logger.logPitchDeviation({ measureNumber: 1, centsDeviation: -10, confidence: 0.9 })
+    logger.logPitchDeviation({
+      measureNumber: 1,
+      centsDeviation: -10,
+      confidence: 0.9,
+    })
 
     const exported = logger.exportForLLM()
     const parsed = JSON.parse(exported)
@@ -159,7 +207,11 @@ describe('SessionLogger (ESM re-export)', () => {
 
   it('clears session data', () => {
     logger.startSession('test')
-    logger.logPitchDeviation({ measureNumber: 1, centsDeviation: -10, confidence: 0.9 })
+    logger.logPitchDeviation({
+      measureNumber: 1,
+      centsDeviation: -10,
+      confidence: 0.9,
+    })
     logger.clear()
 
     expect(logger.deviations).toEqual([])
@@ -169,7 +221,11 @@ describe('SessionLogger (ESM re-export)', () => {
 
   it('getSessionSummary is an alias for getSummaryStats', () => {
     logger.startSession('test')
-    logger.logPitchDeviation({ measureNumber: 1, centsDeviation: -10, confidence: 0.9 })
+    logger.logPitchDeviation({
+      measureNumber: 1,
+      centsDeviation: -10,
+      confidence: 0.9,
+    })
 
     expect(logger.getSessionSummary()).toEqual(logger.getSummaryStats())
   })
