@@ -124,8 +124,8 @@ describe('calculateHeatMapData', () => {
     const m2 = result.find((m) => m.measureNumber === 2)
 
     // Max errors is 10, so m2 should have full 0.4 opacity
-    expect(m2.opacity).toBeCloseTo(0.4, 2)
-    // m1 has 1 error out of max 10 → log(2)/log(11) ≈ 0.289 * 0.4 ≈ 0.116
+    expect(m2.opacity).toBeCloseTo(0.6, 2)
+    // m1 has 1 error out of max 10 → log(2)/log(11) ≈ 0.289 * 0.6 ≈ 0.174
     expect(m1.opacity).toBeGreaterThan(0)
     expect(m1.opacity).toBeLessThan(m2.opacity)
   })
@@ -137,7 +137,7 @@ describe('calculateHeatMapData', () => {
     const result = calculateHeatMapData(devs)
 
     // Single measure gets max opacity
-    expect(result[0].opacity).toBeCloseTo(0.4, 2)
+    expect(result[0].opacity).toBeCloseTo(0.6, 2)
   })
 
   it('sorts results by measure number', () => {
@@ -163,7 +163,7 @@ describe('calculateHeatMapData', () => {
     const result = calculateHeatMapData(devs)
 
     const m2 = result.find((m) => m.measureNumber === 2)
-    // log(3)/log(101) ≈ 0.238 * 0.4 ≈ 0.095 — should be visible
+    // log(3)/log(101) ≈ 0.238 * 0.6 ≈ 0.143 — should be visible
     expect(m2.opacity).toBeGreaterThan(0.05)
   })
 })
@@ -209,5 +209,67 @@ describe('useHeatMapData', () => {
     const first = result.current
     rerender()
     expect(result.current).toBe(first)
+  })
+
+  it('includes success overlays when totalMeasures is provided', () => {
+    const sessionLog = {
+      deviations: [pitchDev(1, 30), pitchDev(1, 25)],
+    }
+    const { result } = renderHook(() => useHeatMapData(sessionLog, 3))
+
+    const successMeasures = result.current.filter((m) => m.type === 'success')
+    expect(successMeasures.length).toBe(2) // measures 2 and 3
+    expect(successMeasures[0].opacity).toBe(0.2)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// calculateHeatMapData — success overlay tests
+// ---------------------------------------------------------------------------
+describe('calculateHeatMapData success overlays', () => {
+  it('adds success overlays for measures with no errors', () => {
+    const devs = [pitchDev(1, 30)]
+    const result = calculateHeatMapData(devs, 4)
+
+    const successMeasures = result.filter((m) => m.type === 'success')
+    expect(successMeasures.length).toBe(3)
+    expect(successMeasures.map((s) => s.measureNumber).sort()).toEqual([2, 3, 4])
+  })
+
+  it('marks low-error measures as success when deviation is small', () => {
+    const devs = [
+      pitchDev(1, 5), // 1 error, avg=5 → below threshold → success
+      pitchDev(2, 40), // above threshold → stays error
+      pitchDev(2, 35),
+      pitchDev(2, 30),
+    ]
+    const result = calculateHeatMapData(devs, 2)
+
+    const m1 = result.find((r) => r.measureNumber === 1)
+    expect(m1.type).toBe('success')
+    expect(m1.opacity).toBe(0.2)
+
+    const m2 = result.find((r) => r.measureNumber === 2)
+    expect(m2.type).toBe('error')
+  })
+
+  it('does not add success overlays when totalMeasures is 0', () => {
+    const devs = [pitchDev(1, 30)]
+    const result = calculateHeatMapData(devs, 0)
+    const successMeasures = result.filter((m) => m.type === 'success')
+    expect(successMeasures.length).toBe(0)
+  })
+
+  it('success overlays have correct default properties', () => {
+    const devs = [pitchDev(1, 30)]
+    const result = calculateHeatMapData(devs, 2)
+
+    const success = result.find((m) => m.measureNumber === 2)
+    expect(success.type).toBe('success')
+    expect(success.errorCount).toBe(0)
+    expect(success.avgDeviation).toBe(0)
+    expect(success.maxDeviation).toBe(0)
+    expect(success.worstNote).toBeNull()
+    expect(success.opacity).toBe(0.2)
   })
 })

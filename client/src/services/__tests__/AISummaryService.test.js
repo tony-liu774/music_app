@@ -4,6 +4,7 @@ import {
   buildPrompt,
   generateLocalDebrief,
   requestAIDebrief,
+  clearAICache,
 } from '../AISummaryService'
 
 function makePitchDev(cents, isVibrato = false) {
@@ -244,10 +245,12 @@ describe('AISummaryService', () => {
 
     beforeEach(() => {
       originalFetch = global.fetch
+      clearAICache()
     })
 
     afterEach(() => {
       global.fetch = originalFetch
+      clearAICache()
     })
 
     it('returns AI debrief on successful response with raw field', async () => {
@@ -391,6 +394,87 @@ describe('AISummaryService', () => {
       const body = JSON.parse(global.fetch.mock.calls[0][1].body)
       expect(body.prompt).toContain('cello')
       expect(body.session_data).toBeDefined()
+    })
+
+    it('caches responses and returns cached result on identical payload', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            success: true,
+            raw: JSON.stringify({ debrief: 'Cached response!', score: 88 }),
+          }),
+      })
+
+      const payload = buildPayload({
+        sessionLog: makeSessionLog([makePitchDev(20)]),
+        sessionSummary: makeSummary(),
+        worstMeasures: [],
+      })
+
+      // First call — should hit the API
+      const result1 = await requestAIDebrief(payload)
+      expect(result1.debrief).toBe('Cached response!')
+      expect(global.fetch).toHaveBeenCalledTimes(1)
+
+      // Second call with same payload — should use cache
+      const result2 = await requestAIDebrief(payload)
+      expect(result2.debrief).toBe('Cached response!')
+      expect(result2.isCached).toBe(true)
+      expect(global.fetch).toHaveBeenCalledTimes(1) // no additional fetch
+    })
+
+    it('does not return cache for different payloads', async () => {
+      let callCount = 0
+      global.fetch = vi.fn().mockImplementation(() => {
+        callCount++
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              raw: JSON.stringify({ debrief: `Response ${callCount}`, score: 70 }),
+            }),
+        })
+      })
+
+      const payload1 = buildPayload({
+        sessionLog: makeSessionLog([makePitchDev(20)]),
+        sessionSummary: makeSummary({ total_deviations: 5 }),
+        worstMeasures: [],
+      })
+
+      const payload2 = buildPayload({
+        sessionLog: makeSessionLog([makePitchDev(20)]),
+        sessionSummary: makeSummary({ total_deviations: 15 }),
+        worstMeasures: [],
+      })
+
+      await requestAIDebrief(payload1)
+      await requestAIDebrief(payload2)
+      expect(global.fetch).toHaveBeenCalledTimes(2) // both should hit API
+    })
+
+    it('clearAICache empties the cache', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            success: true,
+            raw: JSON.stringify({ debrief: 'To be cleared', score: 60 }),
+          }),
+      })
+
+      const payload = buildPayload({
+        sessionLog: makeSessionLog([]),
+        sessionSummary: makeSummary(),
+        worstMeasures: [],
+      })
+
+      await requestAIDebrief(payload)
+      clearAICache()
+      await requestAIDebrief(payload)
+      expect(global.fetch).toHaveBeenCalledTimes(2) // cache was cleared
     })
   })
 })
