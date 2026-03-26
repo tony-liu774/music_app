@@ -187,7 +187,11 @@ export function useSessionLogger(options = {}) {
 
       // Read vibrato data for the isVibrato flag
       const vibratoData = state.vibratoData
-      const isVibrato = !!(vibratoData && vibratoData.rate && vibratoData.rate > 0)
+      const isVibrato = !!(
+        vibratoData &&
+        vibratoData.rate &&
+        vibratoData.rate > 0
+      )
 
       const absCents = Math.abs(cents || 0)
 
@@ -227,7 +231,10 @@ export function useSessionLogger(options = {}) {
   // Cleanup on unmount — end session if still active
   useEffect(() => {
     return () => {
-      if (loggerRef.current && (isActiveRef.current || loggerRef.current._paused)) {
+      if (
+        loggerRef.current &&
+        (isActiveRef.current || loggerRef.current._paused)
+      ) {
         if (loggerRef.current._paused) {
           loggerRef.current.resumeSession()
         }

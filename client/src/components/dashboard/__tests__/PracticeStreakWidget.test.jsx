@@ -27,7 +27,9 @@ describe('PracticeStreakWidget', () => {
   it('shows correct streak for consecutive days', () => {
     const today = new Date().toISOString().slice(0, 10)
     const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
-    const twoDaysAgo = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10)
+    const twoDaysAgo = new Date(Date.now() - 2 * 86400000)
+      .toISOString()
+      .slice(0, 10)
 
     useSessionStore.setState({
       practiceHistory: [

@@ -108,14 +108,14 @@ describe('TunerPage', () => {
 
   it('shows subtitle text', () => {
     render(<TunerPage />)
-    expect(
-      screen.getByText(/Fine-tune your instrument/),
-    ).toBeInTheDocument()
+    expect(screen.getByText(/Fine-tune your instrument/)).toBeInTheDocument()
   })
 
   it('renders SVG icons with max-w and max-h classes', () => {
     render(<TunerPage />)
-    const svgs = screen.getByTestId('tuner-page').querySelectorAll('svg[aria-hidden]')
+    const svgs = screen
+      .getByTestId('tuner-page')
+      .querySelectorAll('svg[aria-hidden]')
     svgs.forEach((svg) => {
       expect(svg.classList.toString()).toContain('max-w')
       expect(svg.classList.toString()).toContain('max-h')

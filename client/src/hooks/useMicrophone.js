@@ -61,8 +61,7 @@ export function useMicrophone() {
   const getInitialError = () => {
     if (!isGetUserMediaSupported())
       return new Error('getUserMedia is not supported in this browser')
-    if (!isSecureContext())
-      return new Error('Microphone access requires HTTPS')
+    if (!isSecureContext()) return new Error('Microphone access requires HTTPS')
     return null
   }
 

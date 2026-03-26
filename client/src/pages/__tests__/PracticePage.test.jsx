@@ -41,6 +41,7 @@ describe('PracticePage', () => {
   it('renders the practice page', () => {
     renderPracticePage()
     expect(screen.getByTestId('practice-page')).toBeInTheDocument()
+    expect(screen.getByTestId('practice-view')).toBeInTheDocument()
     expect(screen.getByTestId('sheet-music-area')).toBeInTheDocument()
     expect(screen.getByTestId('practice-controls')).toBeInTheDocument()
   })
@@ -212,20 +213,17 @@ describe('PracticePage', () => {
     expect(useAudioStore.getState().isPracticing).toBe(false)
   })
 
-  it('takes full viewport in ghost mode', () => {
+  it('wraps content in PracticeView', () => {
     renderPracticePage()
-
-    fireEvent.click(screen.getByTestId('play-pause-button'))
-
+    const view = screen.getByTestId('practice-view')
+    expect(view).toBeInTheDocument()
+    // practice-page should be inside practice-view
     const page = screen.getByTestId('practice-page')
-    expect(page.className).toContain('fixed')
-    expect(page.className).toContain('inset-0')
+    expect(view.contains(page)).toBe(true)
   })
 
-  it('has relative positioning when not in ghost mode', () => {
+  it('renders loop selector in controls', () => {
     renderPracticePage()
-    const page = screen.getByTestId('practice-page')
-    expect(page.className).toContain('relative')
-    expect(page.className).not.toContain('fixed')
+    expect(screen.getByTestId('loop-selector')).toBeInTheDocument()
   })
 })

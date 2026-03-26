@@ -39,7 +39,10 @@ function getWeekStats(history) {
     return t && new Date(t).getTime() >= weekAgo
   })
 
-  const totalMinutes = weekRecords.reduce((sum, r) => sum + (r.duration || 0), 0)
+  const totalMinutes = weekRecords.reduce(
+    (sum, r) => sum + (r.duration || 0),
+    0,
+  )
   return { sessions: weekRecords.length, totalMinutes }
 }
 
@@ -53,7 +56,10 @@ function formatDuration(minutes) {
 export default function PracticeStreakWidget() {
   const practiceHistory = useSessionStore((s) => s.practiceHistory)
 
-  const streak = useMemo(() => getStreakDays(practiceHistory), [practiceHistory])
+  const streak = useMemo(
+    () => getStreakDays(practiceHistory),
+    [practiceHistory],
+  )
   const { sessions, totalMinutes } = useMemo(
     () => getWeekStats(practiceHistory),
     [practiceHistory],
@@ -82,7 +88,9 @@ export default function PracticeStreakWidget() {
             >
               {formatDuration(totalMinutes)}
             </span>
-            <span className="text-sm text-ivory-muted font-body">this week</span>
+            <span className="text-sm text-ivory-muted font-body">
+              this week
+            </span>
           </div>
           <div>
             <span

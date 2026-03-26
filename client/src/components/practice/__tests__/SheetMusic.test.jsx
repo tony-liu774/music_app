@@ -52,9 +52,16 @@ vi.mock('vexflow', () => {
     constructor() {
       this.tickables = []
     }
-    setMode() { return this }
-    addTickables(t) { this.tickables = t; return this }
-    draw() { return this }
+    setMode() {
+      return this
+    }
+    addTickables(t) {
+      this.tickables = t
+      return this
+    }
+    draw() {
+      return this
+    }
   }
   MockVoice.Mode = { SOFT: 2 }
 
@@ -226,9 +233,24 @@ describe('SheetMusic', () => {
                   accidentals: [{ index: 0, type: '#' }],
                   articulations: [],
                 },
-                { isRest: false, duration: 'q', keys: ['c/4'], articulations: [] },
-                { isRest: false, duration: 'q', keys: ['c/4'], articulations: [] },
-                { isRest: false, duration: 'q', keys: ['c/4'], articulations: [] },
+                {
+                  isRest: false,
+                  duration: 'q',
+                  keys: ['c/4'],
+                  articulations: [],
+                },
+                {
+                  isRest: false,
+                  duration: 'q',
+                  keys: ['c/4'],
+                  articulations: [],
+                },
+                {
+                  isRest: false,
+                  duration: 'q',
+                  keys: ['c/4'],
+                  articulations: [],
+                },
               ],
             },
           ],
@@ -250,10 +272,30 @@ describe('SheetMusic', () => {
             {
               ...mockScore.parts[0].measures[0],
               notes: [
-                { isRest: false, duration: 'qd', keys: ['c/4'], articulations: [] },
-                { isRest: false, duration: 'q', keys: ['d/4'], articulations: [] },
-                { isRest: false, duration: 'q', keys: ['e/4'], articulations: [] },
-                { isRest: false, duration: '8', keys: ['f/4'], articulations: [] },
+                {
+                  isRest: false,
+                  duration: 'qd',
+                  keys: ['c/4'],
+                  articulations: [],
+                },
+                {
+                  isRest: false,
+                  duration: 'q',
+                  keys: ['d/4'],
+                  articulations: [],
+                },
+                {
+                  isRest: false,
+                  duration: 'q',
+                  keys: ['e/4'],
+                  articulations: [],
+                },
+                {
+                  isRest: false,
+                  duration: '8',
+                  keys: ['f/4'],
+                  articulations: [],
+                },
               ],
             },
           ],

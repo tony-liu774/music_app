@@ -16,6 +16,7 @@ describe('PracticeControls', () => {
     expect(screen.getByTestId('stop-button')).toBeInTheDocument()
     expect(screen.getByTestId('tempo-slider')).toBeInTheDocument()
     expect(screen.getByTestId('metronome-toggle')).toBeInTheDocument()
+    expect(screen.getByTestId('loop-selector')).toBeInTheDocument()
   })
 
   it('shows play icon when not practicing', () => {
@@ -127,5 +128,31 @@ describe('PracticeControls', () => {
     const controls = screen.getByTestId('practice-controls')
     expect(controls.className).toContain('opacity-100')
     expect(controls.className).not.toContain('pointer-events-none')
+  })
+
+  it('renders loop selector with totalMeasures', () => {
+    render(<PracticeControls {...defaultProps} totalMeasures={16} />)
+    expect(screen.getByTestId('loop-selector')).toBeInTheDocument()
+    expect(screen.getByTestId('loop-toggle')).toBeInTheDocument()
+  })
+
+  it('passes loop props to LoopSelector', () => {
+    render(
+      <PracticeControls
+        {...defaultProps}
+        totalMeasures={16}
+        loopStart={3}
+        loopEnd={8}
+      />,
+    )
+    expect(screen.getByTestId('loop-range')).toBeInTheDocument()
+    expect(screen.getByTestId('loop-start-input')).toHaveValue(3)
+    expect(screen.getByTestId('loop-end-input')).toHaveValue(8)
+  })
+
+  it('uses accent-amber for the play button', () => {
+    render(<PracticeControls {...defaultProps} />)
+    const playBtn = screen.getByTestId('play-pause-button')
+    expect(playBtn.className).toContain('bg-accent-amber')
   })
 })

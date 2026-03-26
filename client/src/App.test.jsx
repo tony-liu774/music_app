@@ -72,7 +72,7 @@ describe('App routing', () => {
     render(<App />)
     const practiceLinks = screen.getAllByRole('link', { name: /practice/i })
     await user.click(practiceLinks[0])
-    expect(screen.getByText(/press play to start/i)).toBeInTheDocument()
+    expect(screen.getByTestId('practice-view')).toBeInTheDocument()
   })
 
   it('navigates to Tuner page', async () => {

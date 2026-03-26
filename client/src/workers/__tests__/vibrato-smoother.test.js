@@ -207,9 +207,7 @@ describe('VibratoSmoother — vibrato detection', () => {
 
     // Smoothed frequency should be close to the center (440 Hz)
     // Within 5 cents means within ~1.27 Hz of 440
-    const centsDev = Math.abs(
-      1200 * Math.log2(result.smoothedFrequency / 440),
-    )
+    const centsDev = Math.abs(1200 * Math.log2(result.smoothedFrequency / 440))
     expect(centsDev).toBeLessThan(5)
   })
 })

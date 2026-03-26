@@ -18,7 +18,11 @@ const MAX_OPACITY = 0.4
  */
 export function useHeatMapData(sessionLog) {
   return useMemo(() => {
-    if (!sessionLog || !sessionLog.deviations || sessionLog.deviations.length === 0) {
+    if (
+      !sessionLog ||
+      !sessionLog.deviations ||
+      sessionLog.deviations.length === 0
+    ) {
       return []
     }
 
@@ -65,9 +69,8 @@ export function calculateHeatMapData(deviations) {
       if (dev > maxDeviation) maxDeviation = dev
     }
 
-    const avgDeviation = devs.length > 0
-      ? Math.round((totalDeviation / devs.length) * 10) / 10
-      : 0
+    const avgDeviation =
+      devs.length > 0 ? Math.round((totalDeviation / devs.length) * 10) / 10 : 0
 
     return {
       measureNumber: parseInt(measure),
@@ -90,9 +93,8 @@ export function calculateHeatMapData(deviations) {
   return measures
     .map((m) => ({
       ...m,
-      opacity: logMax > 0
-        ? (Math.log(1 + m.errorCount) / logMax) * MAX_OPACITY
-        : 0,
+      opacity:
+        logMax > 0 ? (Math.log(1 + m.errorCount) / logMax) * MAX_OPACITY : 0,
     }))
     .sort((a, b) => a.measureNumber - b.measureNumber)
 }

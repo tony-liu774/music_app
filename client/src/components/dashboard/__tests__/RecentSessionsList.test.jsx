@@ -93,9 +93,27 @@ describe('RecentSessionsList', () => {
   it('color-codes accuracy: emerald for high, amber for medium, crimson for low', () => {
     useSessionStore.setState({
       practiceHistory: [
-        { id: 's1', pieceName: 'High', date: new Date().toISOString(), duration: 20, accuracy: 90 },
-        { id: 's2', pieceName: 'Med', date: new Date().toISOString(), duration: 20, accuracy: 70 },
-        { id: 's3', pieceName: 'Low', date: new Date().toISOString(), duration: 20, accuracy: 50 },
+        {
+          id: 's1',
+          pieceName: 'High',
+          date: new Date().toISOString(),
+          duration: 20,
+          accuracy: 90,
+        },
+        {
+          id: 's2',
+          pieceName: 'Med',
+          date: new Date().toISOString(),
+          duration: 20,
+          accuracy: 70,
+        },
+        {
+          id: 's3',
+          pieceName: 'Low',
+          date: new Date().toISOString(),
+          duration: 20,
+          accuracy: 50,
+        },
       ],
     })
 
@@ -124,7 +142,9 @@ describe('formatDate', () => {
   })
 
   it('returns "Yesterday" for yesterday', () => {
-    expect(formatDate(new Date(Date.now() - 86400000).toISOString())).toBe('Yesterday')
+    expect(formatDate(new Date(Date.now() - 86400000).toISOString())).toBe(
+      'Yesterday',
+    )
   })
 
   it('returns "X days ago" for recent dates', () => {
