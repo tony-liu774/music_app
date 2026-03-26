@@ -109,6 +109,19 @@ describe('AI Route - Claude API integration', () => {
       'system prompt should reference masterclass instructor'
     );
   });
+
+  it('sets temperature to 0.7 for consistent responses', () => {
+    const fs = require('fs');
+    const routeSource = fs.readFileSync(
+      require.resolve('../src/routes/ai'),
+      'utf-8'
+    );
+
+    assert.ok(
+      routeSource.includes('temperature: 0.7'),
+      'should set temperature to 0.7'
+    );
+  });
 });
 
 /**

@@ -8,6 +8,8 @@ import { useSessionLogger } from '../hooks/useSessionLogger'
 import { useHeatMapData } from '../hooks/useHeatMapData'
 import { useSmartLoop } from '../hooks/useSmartLoop'
 import { buildPayload, requestAIDebrief } from '../services/AISummaryService'
+import { savePracticeSession, getProgressTrend } from '../services/PracticeSessionService'
+import { useAuth } from '../contexts/AuthContext'
 import { Button } from '../components/ui'
 import { useToast } from '../components/ui/Toast'
 import PracticeControls from '../components/practice/PracticeControls'
@@ -25,6 +27,7 @@ const CONTROLS_AUTO_HIDE_MS = 3000
 
 export default function PracticePage() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const ghostMode = useUIStore((s) => s.ghostMode)
   const enterGhostMode = useUIStore((s) => s.enterGhostMode)
   const exitGhostMode = useUIStore((s) => s.exitGhostMode)
@@ -56,6 +59,7 @@ export default function PracticePage() {
   const [showSummary, setShowSummary] = useState(false)
   const [aiResult, setAiResult] = useState(null)
   const [aiLoading, setAiLoading] = useState(false)
+  const [progressTrend, setProgressTrend] = useState(null)
 
   const totalMeasures = score?.parts?.[0]?.measures?.length || 0
   const heatMapData = useHeatMapData(sessionLog, totalMeasures)
@@ -201,10 +205,46 @@ export default function PracticePage() {
 
     // Transition to PracticeSummary view
     setShowSummary(true)
+    setProgressTrend(null)
 
     // Fetch AI debrief asynchronously
     if (result) {
       fetchAIDebrief(result.log, result.summary, worst)
+
+      // Persist session to Supabase and load progress trend
+      const scoreId = selectedScore?.id
+      const instrument = selectedInstrument || 'violin'
+
+      // Calculate accuracy for persistence
+      const pitchDevs = (result.log?.deviations || []).filter(
+        (d) => d.type === 'pitch',
+      )
+      const accurateCount = pitchDevs.filter(
+        (d) => Math.abs(d.centsDeviation || 0) <= 15,
+      ).length
+      const accuracyPercent =
+        pitchDevs.length > 0
+          ? Math.round((accurateCount / pitchDevs.length) * 100)
+          : 100
+
+      if (user?.id) {
+        savePracticeSession({
+          userId: user.id,
+          scoreId,
+          scoreTitle: selectedScore?.title,
+          sessionLog: result.log,
+          sessionSummary: result.summary,
+          accuracyPercent,
+          instrument,
+        })
+
+        // Fetch progress trend if practicing a specific piece
+        if (scoreId) {
+          getProgressTrend(user.id, scoreId).then((trend) => {
+            if (trend.length > 0) setProgressTrend(trend)
+          })
+        }
+      }
     }
   }, [
     setIsPracticing,
@@ -213,6 +253,9 @@ export default function PracticePage() {
     getWorstMeasures,
     resetCursor,
     fetchAIDebrief,
+    user,
+    selectedScore,
+    selectedInstrument,
   ])
 
   // Start smart loop: extract worst measures and begin loop practice
@@ -306,6 +349,7 @@ export default function PracticePage() {
             aiResult={aiResult}
             aiLoading={aiLoading}
             heatMapData={heatMapData}
+            progressTrend={progressTrend}
             onPracticeAgain={() => {
               setShowSummary(false)
               handlePlayPause()

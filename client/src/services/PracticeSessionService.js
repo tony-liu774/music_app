@@ -67,6 +67,7 @@ export async function savePracticeSession({
     if (deviations.length > 0) {
       const errorRows = deviations.map((d) => ({
         session_id: sessionId,
+        user_id: userId,
         type: d.type,
         measure_number: d.measureNumber,
         beat: d.beat || null,

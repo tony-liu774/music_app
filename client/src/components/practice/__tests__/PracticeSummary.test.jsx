@@ -168,4 +168,41 @@ describe('PracticeSummary', () => {
     render(<PracticeSummary {...defaultProps} />)
     expect(screen.getByText('40%')).toBeInTheDocument()
   })
+
+  it('shows progress trend when historical data is available', () => {
+    const trend = [
+      { accuracy_percent: 60, created_at: '2026-03-01' },
+      { accuracy_percent: 75, created_at: '2026-03-10' },
+      { accuracy_percent: 85, created_at: '2026-03-20' },
+    ]
+    render(<PracticeSummary {...defaultProps} progressTrend={trend} />)
+
+    expect(screen.getByTestId('progress-trend')).toBeInTheDocument()
+    expect(screen.getByText(/3 times/)).toBeInTheDocument()
+    expect(screen.getByText(/improving/)).toBeInTheDocument()
+    expect(screen.getByTestId('trend-bar-0')).toBeInTheDocument()
+    expect(screen.getByTestId('trend-bar-2')).toBeInTheDocument()
+  })
+
+  it('does not show progress trend with only 1 entry', () => {
+    const trend = [{ accuracy_percent: 70, created_at: '2026-03-01' }]
+    render(<PracticeSummary {...defaultProps} progressTrend={trend} />)
+
+    expect(screen.queryByTestId('progress-trend')).not.toBeInTheDocument()
+  })
+
+  it('does not show progress trend when null', () => {
+    render(<PracticeSummary {...defaultProps} progressTrend={null} />)
+    expect(screen.queryByTestId('progress-trend')).not.toBeInTheDocument()
+  })
+
+  it('shows steady message when accuracy is unchanged', () => {
+    const trend = [
+      { accuracy_percent: 70, created_at: '2026-03-01' },
+      { accuracy_percent: 70, created_at: '2026-03-10' },
+    ]
+    render(<PracticeSummary {...defaultProps} progressTrend={trend} />)
+
+    expect(screen.getByText(/holding steady/)).toBeInTheDocument()
+  })
 })

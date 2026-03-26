@@ -16,6 +16,7 @@ export default function PracticeSummary({
   aiResult,
   aiLoading,
   heatMapData,
+  progressTrend,
   onPracticeAgain,
   onSmartLoop,
   onToggleHeatMap,
@@ -237,6 +238,57 @@ export default function PracticeSummary({
                 </div>
               </div>
             )}
+
+            {/* Progress trend — shown when historical data exists */}
+            {progressTrend && progressTrend.length > 1 && (
+              <div
+                className="bg-surface rounded-lg border border-border p-4"
+                data-testid="progress-trend"
+              >
+                <h3 className="font-heading text-sm text-ivory mb-3">
+                  Progress Over Time
+                </h3>
+                <p className="font-body text-sm text-ivory-muted mb-3">
+                  You&apos;ve practiced this piece{' '}
+                  <span className="text-ivory">{progressTrend.length} times</span>.
+                  {progressTrend[progressTrend.length - 1].accuracy_percent >
+                  progressTrend[0].accuracy_percent ? (
+                    <span className="text-emerald">
+                      {' '}
+                      Your accuracy is improving!
+                    </span>
+                  ) : progressTrend[progressTrend.length - 1].accuracy_percent ===
+                    progressTrend[0].accuracy_percent ? (
+                    <span className="text-amber"> Accuracy is holding steady.</span>
+                  ) : (
+                    <span className="text-amber">
+                      {' '}
+                      Keep practicing — consistency builds mastery.
+                    </span>
+                  )}
+                </p>
+                <div className="flex items-end gap-1 h-12">
+                  {progressTrend.map((entry, i) => (
+                    <div
+                      key={i}
+                      className="flex-1 rounded-t"
+                      data-testid={`trend-bar-${i}`}
+                      style={{
+                        height: `${Math.max(entry.accuracy_percent, 5)}%`,
+                        backgroundColor:
+                          entry.accuracy_percent >= 80
+                            ? 'var(--color-emerald)'
+                            : entry.accuracy_percent >= 60
+                              ? 'var(--color-amber)'
+                              : 'var(--color-crimson)',
+                        opacity: 0.7 + (i / progressTrend.length) * 0.3,
+                      }}
+                      title={`${entry.accuracy_percent}% — ${new Date(entry.created_at).toLocaleDateString()}`}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -356,6 +408,12 @@ PracticeSummary.propTypes = {
   }),
   aiLoading: PropTypes.bool,
   heatMapData: PropTypes.array,
+  progressTrend: PropTypes.arrayOf(
+    PropTypes.shape({
+      accuracy_percent: PropTypes.number,
+      created_at: PropTypes.string,
+    }),
+  ),
   onPracticeAgain: PropTypes.func,
   onSmartLoop: PropTypes.func,
   onToggleHeatMap: PropTypes.func,

@@ -24,6 +24,7 @@ CREATE INDEX IF NOT EXISTS idx_practice_sessions_score
 CREATE TABLE IF NOT EXISTS session_errors (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   session_id UUID NOT NULL REFERENCES practice_sessions(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   type TEXT NOT NULL,
   measure_number INTEGER,
   beat INTEGER,
@@ -37,6 +38,9 @@ CREATE TABLE IF NOT EXISTS session_errors (
 
 CREATE INDEX IF NOT EXISTS idx_session_errors_session
   ON session_errors(session_id);
+
+CREATE INDEX IF NOT EXISTS idx_session_errors_user
+  ON session_errors(user_id);
 
 -- User pieces table — tracks per-piece progress over time
 CREATE TABLE IF NOT EXISTS user_pieces (
@@ -64,11 +68,7 @@ CREATE POLICY practice_sessions_user_policy ON practice_sessions
   FOR ALL USING (auth.uid() = user_id);
 
 CREATE POLICY session_errors_user_policy ON session_errors
-  FOR ALL USING (
-    session_id IN (
-      SELECT id FROM practice_sessions WHERE user_id = auth.uid()
-    )
-  );
+  FOR ALL USING (auth.uid() = user_id);
 
 CREATE POLICY user_pieces_user_policy ON user_pieces
   FOR ALL USING (auth.uid() = user_id);

@@ -47,6 +47,7 @@ router.post('/ai-summary', async (req, res) => {
         const message = await client.messages.create({
             model: 'claude-sonnet-4-6',
             max_tokens: 500,
+            temperature: 0.7,
             system: 'You are a masterclass string instructor providing encouraging and actionable feedback to students after their practice sessions. Keep your feedback concise, specific, and focused on improvement. Always respond with valid JSON.',
             messages: [
                 {
