@@ -22,6 +22,7 @@ import PredictiveCursor from '../components/practice/PredictiveCursor'
 import IntonationNeedle from '../components/practice/IntonationNeedle'
 import HeatMapOverlay from '../components/practice/HeatMapOverlay'
 import SmartLoop from '../components/practice/SmartLoop'
+import NoMicFallbackBanner from '../components/practice/NoMicFallbackBanner'
 import useScore from '../hooks/useScore'
 import usePredictiveCursor from '../hooks/usePredictiveCursor'
 
@@ -65,6 +66,7 @@ export default function PracticePage() {
 
   const [heatMapVisible, setHeatMapVisible] = useState(false)
 
+  const micPermission = useAudioStore((s) => s.micPermission)
   const resumeAudioContext = useAudioStore((s) => s.resumeAudioContext)
   const audioContextState = useAudioStore((s) => s.audioContextState)
 
@@ -497,6 +499,15 @@ export default function PracticePage() {
             <p className="font-body text-ivory-dim text-xs animate-pulse">
               Move mouse or tap to show controls
             </p>
+          </div>
+        )}
+
+        {/* No-mic fallback banner */}
+        {(micPermission === 'denied' || micPermission === 'unsupported') && (
+          <div className="absolute top-4 left-4 z-20">
+            <NoMicFallbackBanner
+              reason={micPermission === 'denied' ? 'denied' : 'unsupported'}
+            />
           </div>
         )}
 

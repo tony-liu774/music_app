@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import {
   Renderer,
   Stave,
@@ -49,6 +49,11 @@ import {
   MEASURES_PER_SYSTEM,
 } from '../../constants/scoreLayout'
 
+/** Threshold: virtualize rendering when a score exceeds this many systems. */
+const VIRTUALIZE_THRESHOLD_SYSTEMS = 10
+/** Number of extra systems to render above/below the viewport. */
+const VIRTUALIZE_BUFFER_SYSTEMS = 2
+
 /**
  * SheetMusic — renders a parsed VexFlow-compatible score onto an SVG element.
  *
@@ -68,6 +73,45 @@ export default function SheetMusic({
   const containerRef = useRef(null)
   const internalScrollRef = useRef(null)
   const scrollRef = externalScrollRef || internalScrollRef
+  const visibleRangeRef = useRef({ start: 0, end: Infinity })
+  const [virtualizeGeneration, setVirtualizeGeneration] = useState(0)
+
+  // Track scroll position to determine which systems are visible
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el || !score) return
+
+    const part = score.parts?.[partIndex]
+    if (!part) return
+
+    const systemCount = Math.ceil(
+      (part.measures?.length || 0) / MEASURES_PER_SYSTEM,
+    )
+    if (systemCount <= VIRTUALIZE_THRESHOLD_SYSTEMS) return
+
+    const handleScroll = () => {
+      const scrollTop = el.scrollTop
+      const viewHeight = el.clientHeight
+      const firstVisible = Math.floor(scrollTop / SYSTEM_HEIGHT)
+      const lastVisible = Math.ceil((scrollTop + viewHeight) / SYSTEM_HEIGHT)
+      const newStart = Math.max(0, firstVisible - VIRTUALIZE_BUFFER_SYSTEMS)
+      const newEnd = Math.min(
+        systemCount - 1,
+        lastVisible + VIRTUALIZE_BUFFER_SYSTEMS,
+      )
+      if (
+        newStart !== visibleRangeRef.current.start ||
+        newEnd !== visibleRangeRef.current.end
+      ) {
+        visibleRangeRef.current = { start: newStart, end: newEnd }
+        setVirtualizeGeneration((n) => n + 1)
+      }
+    }
+
+    handleScroll()
+    el.addEventListener('scroll', handleScroll, { passive: true })
+    return () => el.removeEventListener('scroll', handleScroll)
+  }, [score, partIndex, scrollRef])
 
   const render = useCallback(() => {
     const container = containerRef.current
@@ -87,6 +131,7 @@ export default function SheetMusic({
     const totalWidth =
       MEASURES_PER_SYSTEM * MEASURE_WIDTH + FIRST_MEASURE_INDENT + 40
     const totalHeight = systemCount * SYSTEM_HEIGHT + 40
+    const shouldVirtualize = systemCount > VIRTUALIZE_THRESHOLD_SYSTEMS
 
     // Create SVG renderer
     const renderer = new Renderer(container, Renderer.Backends.SVG)
@@ -109,10 +154,19 @@ export default function SheetMusic({
       const posInSystem = mIdx % MEASURES_PER_SYSTEM
       const isFirstInSystem = posInSystem === 0
 
-      // Update running state
+      // Update running state (always, to keep clef/key/time correct)
       if (measure.clef) runningClef = measure.clef
       if (measure.keySignature) runningKey = measure.keySignature
       if (measure.timeSignature) runningTime = measure.timeSignature
+
+      // Skip rendering if outside visible range (virtualization)
+      if (
+        shouldVirtualize &&
+        (systemIndex < visibleRangeRef.current.start ||
+          systemIndex > visibleRangeRef.current.end)
+      ) {
+        return
+      }
 
       // Calculate position
       const x = isFirstInSystem
@@ -187,7 +241,7 @@ export default function SheetMusic({
         highlightMeasure(context, x, y, width, theme)
       }
     })
-  }, [score, partIndex, currentMeasure])
+  }, [score, partIndex, currentMeasure, virtualizeGeneration])
 
   // Render on score or measure change
   useEffect(() => {

@@ -1,6 +1,6 @@
 import { useAuth } from '../contexts/AuthContext'
 import { useSettingsStore, INSTRUMENT_CONFIG } from '../stores/useSettingsStore'
-import { Button, Card, Select } from '../components/ui'
+import { Button, Card, Input, Select } from '../components/ui'
 
 const instrumentOptions = Object.entries(INSTRUMENT_CONFIG).map(
   ([value, { label }]) => ({
@@ -59,11 +59,13 @@ function SliderControl({
 export default function SettingsPage() {
   const { user, signOut } = useAuth()
   const {
+    displayName,
     instrument,
     tuningReference,
     confidenceThreshold,
     cursorSpeed,
     needleSensitivity,
+    setDisplayName,
     setInstrument,
     setTuningReference,
     setConfidenceThreshold,
@@ -82,6 +84,19 @@ export default function SettingsPage() {
           Configure your practice preferences and account settings.
         </p>
       </div>
+
+      {/* Profile */}
+      <Card>
+        <SectionHeading>Profile</SectionHeading>
+        <Input
+          label="Display Name"
+          value={displayName}
+          onChange={(e) => setDisplayName(e.target.value)}
+          placeholder="Your name"
+          data-testid="display-name-input"
+          maxLength={100}
+        />
+      </Card>
 
       {/* Instrument Selection */}
       <Card>

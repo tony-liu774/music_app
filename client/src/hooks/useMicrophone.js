@@ -68,6 +68,8 @@ export function useMicrophone() {
   const [status, setStatus] = useState(getInitialStatus)
   const [error, setError] = useState(getInitialError)
   const [isActive, setIsActive] = useState(false)
+  const [audioDevices, setAudioDevices] = useState([])
+  const [selectedDeviceId, setSelectedDeviceId] = useState(null)
 
   // Query the browser permission API on mount to detect previously-denied state
   useEffect(() => {
@@ -98,43 +100,75 @@ export function useMicrophone() {
   }, [setMicPermission])
 
   /**
-   * Request microphone access. Returns the MediaStream on success.
+   * Enumerate available audio input devices.
+   * Must be called after permission is granted for full labels.
    */
-  const requestAccess = useCallback(async () => {
-    if (!isGetUserMediaSupported()) {
-      setStatus('unsupported')
-      setError(new Error('getUserMedia is not supported in this browser'))
-      return null
-    }
-
-    if (!isSecureContext()) {
-      setStatus('error')
-      setError(new Error('Microphone access requires HTTPS'))
-      return null
-    }
-
-    setStatus('prompting')
-    setError(null)
-
+  const enumerateDevices = useCallback(async () => {
+    if (!navigator.mediaDevices?.enumerateDevices) return []
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      streamRef.current = stream
-      setStatus('granted')
-      setIsActive(true)
-      persistState('granted')
-      setMicPermission('granted')
-      return stream
-    } catch (err) {
-      const isDenied =
-        err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError'
-      const newStatus = isDenied ? 'denied' : 'error'
-      setStatus(newStatus)
-      setError(err)
-      persistState(isDenied ? 'denied' : null)
-      setMicPermission(isDenied ? 'denied' : 'prompt')
-      return null
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      const inputs = devices
+        .filter((d) => d.kind === 'audioinput')
+        .map((d) => ({
+          deviceId: d.deviceId,
+          label: d.label || `Microphone ${d.deviceId.slice(0, 6)}`,
+        }))
+      setAudioDevices(inputs)
+      return inputs
+    } catch {
+      return []
     }
-  }, [setMicPermission])
+  }, [])
+
+  /**
+   * Request microphone access. Returns the MediaStream on success.
+   * @param {string} [deviceId] — optional specific device to use
+   */
+  const requestAccess = useCallback(
+    async (deviceId) => {
+      if (!isGetUserMediaSupported()) {
+        setStatus('unsupported')
+        setError(new Error('getUserMedia is not supported in this browser'))
+        return null
+      }
+
+      if (!isSecureContext()) {
+        setStatus('error')
+        setError(new Error('Microphone access requires HTTPS'))
+        return null
+      }
+
+      setStatus('prompting')
+      setError(null)
+
+      const constraints = deviceId
+        ? { audio: { deviceId: { exact: deviceId } } }
+        : { audio: true }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraints)
+        streamRef.current = stream
+        setStatus('granted')
+        setIsActive(true)
+        persistState('granted')
+        setMicPermission('granted')
+        if (deviceId) setSelectedDeviceId(deviceId)
+        // Enumerate devices now that we have permission (for full labels)
+        enumerateDevices()
+        return stream
+      } catch (err) {
+        const isDenied =
+          err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError'
+        const newStatus = isDenied ? 'denied' : 'error'
+        setStatus(newStatus)
+        setError(err)
+        persistState(isDenied ? 'denied' : null)
+        setMicPermission(isDenied ? 'denied' : 'prompt')
+        return null
+      }
+    },
+    [setMicPermission, enumerateDevices],
+  )
 
   /**
    * Stop all tracks on the current MediaStream and release the reference.
@@ -181,5 +215,8 @@ export function useMicrophone() {
     reset,
     isSupported: isGetUserMediaSupported(),
     isSecure: isSecureContext(),
+    audioDevices,
+    selectedDeviceId,
+    enumerateDevices,
   }
 }

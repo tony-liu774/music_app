@@ -1,7 +1,25 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { vi } from 'vitest'
+import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest'
 import App from './App'
+
+// BrowserCompatCheck requires these APIs to pass through to children
+beforeAll(() => {
+  window.AudioContext = vi.fn()
+  window.Worker = vi.fn()
+  Object.defineProperty(window, 'isSecureContext', {
+    value: true,
+    writable: true,
+    configurable: true,
+  })
+  if (!navigator.mediaDevices) {
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: { getUserMedia: vi.fn(), enumerateDevices: vi.fn() },
+      writable: true,
+      configurable: true,
+    })
+  }
+})
 
 vi.mock('./lib/supabase', () => ({
   supabase: {
@@ -72,7 +90,7 @@ describe('App routing', () => {
     render(<App />)
     const practiceLinks = screen.getAllByRole('link', { name: /practice/i })
     await user.click(practiceLinks[0])
-    expect(screen.getByTestId('practice-view')).toBeInTheDocument()
+    expect(screen.getByTestId('practice-page')).toBeInTheDocument()
   })
 
   it('navigates to Tuner page', async () => {
