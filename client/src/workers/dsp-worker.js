@@ -63,13 +63,14 @@ self.onmessage = function (e) {
       let cents = null
 
       if (frequency !== null) {
-        // Filter out-of-range frequencies for the selected instrument
+        // Apply sympathetic resonance filter
+        confidence = resonanceFilter.filter(frequency, rawConfidence)
+
+        // Penalize out-of-range frequencies after resonance filtering
         if (!isInInstrumentRange(frequency, currentInstrument)) {
           confidence = confidence * 0.2
         }
 
-        // Apply sympathetic resonance filter
-        confidence = resonanceFilter.filter(frequency, rawConfidence)
         const info = frequencyToNote(frequency, tuningReference)
         note = info.note ? `${info.note}${info.octave}` : null
         cents = info.cents

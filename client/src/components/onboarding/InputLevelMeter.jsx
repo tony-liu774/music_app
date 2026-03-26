@@ -33,14 +33,39 @@ const BAR_HEIGHTS = [
 ]
 
 /**
+ * Compute RMS level (0–1) from an AnalyserNode's time-domain data.
+ * Shared logic used by the rAF loop.
+ */
+function computeRmsLevel(analyser, buffer) {
+  analyser.getByteTimeDomainData(buffer)
+  let sum = 0
+  for (let i = 0; i < buffer.length; i++) {
+    const sample = (buffer[i] - 128) / 128
+    sum += sample * sample
+  }
+  return Math.min(1, Math.sqrt(sum / buffer.length) * 3)
+}
+
+/**
  * Real-time audio input level meter.
  * Reads RMS level from an AnalyserNode and renders a bar-style visualization.
  *
+ * Accepts an optional `analyserNode` prop to reuse an existing AnalyserNode
+ * (e.g., from AudioEngine) instead of creating a new AudioContext. Falls back
+ * to creating a standalone AudioContext from the `stream` prop when no
+ * analyserNode is provided. This avoids leaking AudioContexts on remount
+ * and avoids hitting the browser's concurrent context limit.
+ *
  * @param {object} props
- * @param {MediaStream|null} props.stream — active MediaStream to monitor
+ * @param {MediaStream|null} [props.stream] — active MediaStream (used only when analyserNode is not provided)
+ * @param {AnalyserNode|null} [props.analyserNode] — external AnalyserNode to read from
  * @param {boolean} [props.active=false] — whether to animate
  */
-export default function InputLevelMeter({ stream, active = false }) {
+export default function InputLevelMeter({
+  stream,
+  analyserNode = null,
+  active = false,
+}) {
   const [level, setLevel] = useState(0)
   const analyserRef = useRef(null)
   const audioCtxRef = useRef(null)
@@ -50,21 +75,31 @@ export default function InputLevelMeter({ stream, active = false }) {
 
   const updateLevel = useCallback(() => {
     if (!analyserRef.current || !bufferRef.current) return
-    analyserRef.current.getByteTimeDomainData(bufferRef.current)
-    let sum = 0
-    for (let i = 0; i < bufferRef.current.length; i++) {
-      const sample = (bufferRef.current[i] - 128) / 128
-      sum += sample * sample
-    }
-    const rms = Math.sqrt(sum / bufferRef.current.length)
-    // Scale to 0-1 with some amplification for visual feedback
-    setLevel(Math.min(1, rms * 3))
+    setLevel(computeRmsLevel(analyserRef.current, bufferRef.current))
     rafRef.current = requestAnimationFrame(updateLevel)
   }, [])
 
+  // When an external analyserNode is provided, use it directly
   useEffect(() => {
-    if (!stream || !active) {
-      setLevel(0)
+    if (!analyserNode || !active) return
+
+    analyserRef.current = analyserNode
+    bufferRef.current = new Uint8Array(analyserNode.frequencyBinCount)
+    rafRef.current = requestAnimationFrame(updateLevel)
+
+    return () => {
+      cancelAnimationFrame(rafRef.current)
+      // Don't disconnect — we don't own the external analyser
+      analyserRef.current = null
+      bufferRef.current = null
+    }
+  }, [analyserNode, active, updateLevel])
+
+  // Fallback: create a standalone AudioContext from the stream
+  useEffect(() => {
+    // Skip if an external analyserNode is provided, or if no stream/active
+    if (analyserNode || !stream || !active) {
+      if (!analyserNode) setLevel(0)
       return
     }
 
@@ -92,7 +127,7 @@ export default function InputLevelMeter({ stream, active = false }) {
       sourceRef.current = null
       bufferRef.current = null
     }
-  }, [stream, active, updateLevel])
+  }, [analyserNode, stream, active, updateLevel])
 
   const activeBars = Math.round(level * BAR_COUNT)
 

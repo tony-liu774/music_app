@@ -26,24 +26,20 @@ function createMockAudioContext() {
 
 describe('InputLevelMeter', () => {
   let originalAudioContext
-  let originalRAF
   let mockCtx
 
   beforeEach(() => {
     originalAudioContext = window.AudioContext
-    originalRAF = window.requestAnimationFrame
 
     mockCtx = createMockAudioContext()
     vi.stubGlobal('AudioContext', vi.fn().mockReturnValue(mockCtx))
     // Do NOT call rAF callback synchronously — causes infinite recursion.
-    // Just return a fake ID.
     vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1))
     vi.stubGlobal('cancelAnimationFrame', vi.fn())
   })
 
   afterEach(() => {
     window.AudioContext = originalAudioContext
-    window.requestAnimationFrame = originalRAF
     vi.restoreAllMocks()
   })
 
@@ -53,7 +49,9 @@ describe('InputLevelMeter', () => {
   })
 
   it('renders 20 bars', () => {
-    const { container } = render(<InputLevelMeter stream={null} active={false} />)
+    const { container } = render(
+      <InputLevelMeter stream={null} active={false} />,
+    )
     const bars = container.querySelectorAll('[role="meter"] > div')
     expect(bars).toHaveLength(20)
   })
@@ -66,21 +64,59 @@ describe('InputLevelMeter', () => {
     expect(meter).toHaveAttribute('aria-label', 'Microphone input level')
   })
 
-  it('connects to AudioContext when stream and active are provided', () => {
+  it('creates AudioContext from stream when no analyserNode is provided', () => {
     const stream = { getTracks: () => [] }
     render(<InputLevelMeter stream={stream} active={true} />)
     expect(mockCtx.createMediaStreamSource).toHaveBeenCalledWith(stream)
     expect(mockCtx.createAnalyser).toHaveBeenCalled()
   })
 
-  it('does not connect when not active', () => {
+  it('does not create AudioContext when not active', () => {
     const stream = { getTracks: () => [] }
     render(<InputLevelMeter stream={stream} active={false} />)
     expect(mockCtx.createMediaStreamSource).not.toHaveBeenCalled()
   })
 
-  it('does not connect when no stream', () => {
+  it('does not create AudioContext when no stream', () => {
     render(<InputLevelMeter stream={null} active={true} />)
+    expect(mockCtx.createMediaStreamSource).not.toHaveBeenCalled()
+  })
+
+  it('uses external analyserNode when provided (no new AudioContext)', () => {
+    const externalAnalyser = {
+      frequencyBinCount: 128,
+      getByteTimeDomainData: vi.fn((buffer) => {
+        for (let i = 0; i < buffer.length; i++) buffer[i] = 128
+      }),
+    }
+
+    render(
+      <InputLevelMeter analyserNode={externalAnalyser} active={true} />,
+    )
+
+    // Should NOT create a new AudioContext when external analyser is provided
+    expect(mockCtx.createAnalyser).not.toHaveBeenCalled()
+    expect(mockCtx.createMediaStreamSource).not.toHaveBeenCalled()
+    // Should start rAF loop
+    expect(requestAnimationFrame).toHaveBeenCalled()
+  })
+
+  it('skips stream-based AudioContext when analyserNode is provided', () => {
+    const externalAnalyser = {
+      frequencyBinCount: 128,
+      getByteTimeDomainData: vi.fn(),
+    }
+    const stream = { getTracks: () => [] }
+
+    render(
+      <InputLevelMeter
+        analyserNode={externalAnalyser}
+        stream={stream}
+        active={true}
+      />,
+    )
+
+    // External analyser takes priority — no AudioContext created
     expect(mockCtx.createMediaStreamSource).not.toHaveBeenCalled()
   })
 })
