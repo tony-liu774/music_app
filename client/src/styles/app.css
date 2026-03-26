@@ -14,6 +14,15 @@
   --color-hover: #222233;
   --color-navy: #06060e;
   --color-amber: #c9a227;
+
+  /* Semantic Aliases (task-specified tokens) */
+  --color-bg-deep: #0a0a12;
+  --color-bg-panel: #14141f;
+  --color-accent-amber: #c9a227;
+  --color-text-primary: #f3f4f6;
+  --color-text-muted: #9ca3af;
+  --color-feedback-success: #10b981;
+  --color-feedback-error: #dc2626;
   --color-amber-light: #ddb832;
   --color-amber-dark: #a68520;
   --color-amber-glow: rgba(201, 162, 39, 0.3);
@@ -67,6 +76,9 @@
   /* Amber spinner for loading states */
   --animate-amber-spin: amber-spin 0.8s linear infinite;
 
+  /* Breath animation (intonation needle) */
+  --animate-breath: breath 4s ease-in-out infinite;
+
   /* Animations for Predictive Cursor (Follow the Ball) */
   --animate-ball-pulse: ball-pulse 2s ease-in-out infinite;
   --animate-ball-bounce: ball-bounce 0.3s ease-out;
@@ -91,6 +103,18 @@
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes breath {
+  0%,
+  100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
   }
 }
 
@@ -162,8 +186,12 @@
 }
 
 @keyframes amber-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ============================================================================
