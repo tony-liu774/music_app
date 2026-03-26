@@ -26,7 +26,10 @@ const FULLY_VISIBLE_THRESHOLD = 25
 export function computeOpacity(absCents) {
   if (absCents <= INVISIBLE_THRESHOLD) return 0
   if (absCents >= FULLY_VISIBLE_THRESHOLD) return 1
-  return (absCents - INVISIBLE_THRESHOLD) / (FULLY_VISIBLE_THRESHOLD - INVISIBLE_THRESHOLD)
+  return (
+    (absCents - INVISIBLE_THRESHOLD) /
+    (FULLY_VISIBLE_THRESHOLD - INVISIBLE_THRESHOLD)
+  )
 }
 
 /**
@@ -38,7 +41,7 @@ export function isDrifting(currentCents, previousCents) {
   return Math.abs(currentCents) >= Math.abs(previousCents)
 }
 
-export default function IntonationNeedle({ cursorX = 0, cursorY = 0, className = '' }) {
+export default function IntonationNeedle({ className = '' }) {
   const needleRef = useRef(null)
   const prevCentsRef = useRef(null)
   const rafRef = useRef(null)
@@ -56,7 +59,11 @@ export default function IntonationNeedle({ cursorX = 0, cursorY = 0, className =
 
     // Use vibrato-filtered cents when vibrato is active, raw cents otherwise
     let cents = pitchData.cents
-    if (vibratoData.isVibrato && vibratoData.centerFrequency != null && pitchData.frequency != null) {
+    if (
+      vibratoData.isVibrato &&
+      vibratoData.centerFrequency != null &&
+      pitchData.frequency != null
+    ) {
       // Recalculate cents from the smoothed center frequency vs the nearest note
       // For vibrato, the raw cents already reflects the center, so we use it directly
       cents = pitchData.cents
@@ -86,8 +93,10 @@ export default function IntonationNeedle({ cursorX = 0, cursorY = 0, className =
 
     // Vertical offset: needle shifts up/down based on deviation direction
     // Positive cents (sharp) → needle shifts up, Negative (flat) → down
-    const maxShift = 20
-    const shift = (scaledCents / 50) * maxShift
+    // Max deflection at ±50 cents, proportional to cents deviation
+    const maxShift = 40
+    const clampedCents = Math.max(-50, Math.min(50, scaledCents))
+    const shift = (clampedCents / 50) * maxShift
     needle.style.transform = `translate3d(0, ${-shift}px, 0)`
 
     // Color: crimson when drifting, emerald when correcting
@@ -119,20 +128,20 @@ export default function IntonationNeedle({ cursorX = 0, cursorY = 0, className =
       data-testid="intonation-needle"
       data-state="hidden"
       className={`
-        absolute pointer-events-none z-30
-        w-1 h-10 rounded-full
+        fixed right-4 top-1/2 pointer-events-none z-30
+        w-1.5 h-24 rounded-full
         transition-colors duration-300
-        data-[state=drifting]:bg-crimson
-        data-[state=correcting]:bg-emerald
+        data-[state=drifting]:bg-feedback-error
+        data-[state=correcting]:bg-feedback-success
         data-[state=hidden]:bg-transparent
         data-[state=drifting]:shadow-crimson-glow
         data-[state=correcting]:shadow-emerald-glow
+        data-[state=drifting]:animate-breath
+        data-[state=correcting]:animate-breath
         ${className}
       `.trim()}
-      // eslint-disable-next-line no-restricted-syntax -- dynamic cursor position + GPU-composited opacity/transform require inline style
+      // eslint-disable-next-line no-restricted-syntax -- GPU-composited opacity/transform require inline style
       style={{
-        left: `${cursorX}px`,
-        top: `${cursorY}px`,
         opacity: 0,
         willChange: 'opacity, transform',
       }}

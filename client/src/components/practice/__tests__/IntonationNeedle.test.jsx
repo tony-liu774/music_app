@@ -1,13 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
-import IntonationNeedle, { computeOpacity, isDrifting } from '../IntonationNeedle'
+import IntonationNeedle, {
+  computeOpacity,
+  isDrifting,
+} from '../IntonationNeedle'
 import { useAudioStore } from '../../../stores/useAudioStore'
 
 // Mock useSettingsStore
 vi.mock('../../../stores/useSettingsStore', () => ({
-  useSettingsStore: vi.fn((selector) =>
-    selector({ needleSensitivity: 1.0 }),
-  ),
+  useSettingsStore: vi.fn((selector) => selector({ needleSensitivity: 1.0 })),
 }))
 
 // Track RAF callbacks for manual flushing
@@ -127,10 +128,17 @@ describe('IntonationNeedle', () => {
     expect(needle.style.opacity).toBe('0')
   })
 
-  it('uses absolute positioning to avoid layout reflow', () => {
+  it('uses fixed positioning on the right edge of the screen', () => {
     render(<IntonationNeedle />)
     const needle = screen.getByTestId('intonation-needle')
-    expect(needle.className).toContain('absolute')
+    expect(needle.className).toContain('fixed')
+    expect(needle.className).toContain('right-4')
+    expect(needle.className).toContain('top-1/2')
+  })
+
+  it('is pointer-events-none to avoid blocking interaction', () => {
+    render(<IntonationNeedle />)
+    const needle = screen.getByTestId('intonation-needle')
     expect(needle.className).toContain('pointer-events-none')
   })
 
@@ -138,13 +146,6 @@ describe('IntonationNeedle', () => {
     render(<IntonationNeedle />)
     const needle = screen.getByTestId('intonation-needle')
     expect(needle.style.willChange).toBe('opacity, transform')
-  })
-
-  it('positions at cursor coordinates', () => {
-    render(<IntonationNeedle cursorX={100} cursorY={200} />)
-    const needle = screen.getByTestId('intonation-needle')
-    expect(needle.style.left).toBe('100px')
-    expect(needle.style.top).toBe('200px')
   })
 
   it('remains invisible when not practicing', () => {
@@ -272,8 +273,8 @@ describe('IntonationNeedle', () => {
     act(() => flushRAF())
 
     const needle = screen.getByTestId('intonation-needle')
-    // 25/50 * 20 = 10px shift
-    expect(needle.style.transform).toBe('translate3d(0, -10px, 0)')
+    // 25/50 * 40 = 20px shift
+    expect(needle.style.transform).toBe('translate3d(0, -20px, 0)')
   })
 
   it('shifts opposite direction for flat deviation', () => {
@@ -286,7 +287,21 @@ describe('IntonationNeedle', () => {
     act(() => flushRAF())
 
     const needle = screen.getByTestId('intonation-needle')
-    expect(needle.style.transform).toBe('translate3d(0, 10px, 0)')
+    expect(needle.style.transform).toBe('translate3d(0, 20px, 0)')
+  })
+
+  it('clamps deflection at ±50 cents max', () => {
+    useAudioStore.setState({
+      isPracticing: true,
+      pitchData: { frequency: 440, note: 'A4', cents: 100, confidence: 0.9 },
+    })
+    render(<IntonationNeedle />)
+
+    act(() => flushRAF())
+
+    const needle = screen.getByTestId('intonation-needle')
+    // 100 cents is clamped to 50, so shift = 50/50 * 40 = 40px
+    expect(needle.style.transform).toBe('translate3d(0, -40px, 0)')
   })
 
   it('has smooth color transition classes', () => {
@@ -296,28 +311,48 @@ describe('IntonationNeedle', () => {
     expect(needle.className).toContain('duration-300')
   })
 
+  it('uses feedback-error color for drifting state', () => {
+    render(<IntonationNeedle />)
+    const needle = screen.getByTestId('intonation-needle')
+    expect(needle.className).toContain(
+      'data-[state=drifting]:bg-feedback-error',
+    )
+  })
+
+  it('uses feedback-success color for correcting state', () => {
+    render(<IntonationNeedle />)
+    const needle = screen.getByTestId('intonation-needle')
+    expect(needle.className).toContain(
+      'data-[state=correcting]:bg-feedback-success',
+    )
+  })
+
   it('includes crimson glow class for drifting state', () => {
     render(<IntonationNeedle />)
     const needle = screen.getByTestId('intonation-needle')
-    expect(needle.className).toContain('data-[state=drifting]:shadow-crimson-glow')
+    expect(needle.className).toContain(
+      'data-[state=drifting]:shadow-crimson-glow',
+    )
   })
 
   it('includes emerald glow class for correcting state', () => {
     render(<IntonationNeedle />)
     const needle = screen.getByTestId('intonation-needle')
-    expect(needle.className).toContain('data-[state=correcting]:shadow-emerald-glow')
+    expect(needle.className).toContain(
+      'data-[state=correcting]:shadow-emerald-glow',
+    )
   })
 
-  it('includes crimson background for drifting', () => {
+  it('uses breath animation for drifting state', () => {
     render(<IntonationNeedle />)
     const needle = screen.getByTestId('intonation-needle')
-    expect(needle.className).toContain('data-[state=drifting]:bg-crimson')
+    expect(needle.className).toContain('data-[state=drifting]:animate-breath')
   })
 
-  it('includes emerald background for correcting', () => {
+  it('uses breath animation for correcting state', () => {
     render(<IntonationNeedle />)
     const needle = screen.getByTestId('intonation-needle')
-    expect(needle.className).toContain('data-[state=correcting]:bg-emerald')
+    expect(needle.className).toContain('data-[state=correcting]:animate-breath')
   })
 
   it('cancels animation frame on unmount', () => {

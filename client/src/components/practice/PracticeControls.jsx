@@ -1,3 +1,7 @@
+import LoopSelector from './LoopSelector'
+
+/* eslint-disable react/prop-types */
+
 export default function PracticeControls({
   isPracticing,
   onPlayPause,
@@ -7,6 +11,10 @@ export default function PracticeControls({
   onTempoChange,
   metronomeOn = false,
   onMetronomeToggle,
+  totalMeasures = 0,
+  loopStart = null,
+  loopEnd = null,
+  onLoopChange,
 }) {
   return (
     <div
@@ -15,7 +23,7 @@ export default function PracticeControls({
         visible ? 'opacity-100' : 'opacity-0 pointer-events-none'
       }`}
     >
-      <div className="flex items-center justify-center gap-6 h-full max-w-2xl mx-auto px-4">
+      <div className="flex items-center justify-center gap-6 h-full max-w-3xl mx-auto px-4">
         {/* Stop button */}
         <button
           data-testid="stop-button"
@@ -37,7 +45,7 @@ export default function PracticeControls({
         <button
           data-testid="play-pause-button"
           onClick={onPlayPause}
-          className="flex items-center justify-center w-16 h-16 rounded-full bg-amber text-oxford-blue hover:bg-amber-light hover:shadow-amber-glow transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-amber focus:ring-offset-2 focus:ring-offset-oxford-blue"
+          className="flex items-center justify-center w-16 h-16 rounded-full bg-accent-amber text-oxford-blue hover:bg-amber-light hover:shadow-amber-glow transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-amber focus:ring-offset-2 focus:ring-offset-oxford-blue"
           aria-label={isPracticing ? 'Pause' : 'Play'}
         >
           {isPracticing ? (
@@ -105,6 +113,15 @@ export default function PracticeControls({
             <path d="M12 8l4 4" />
           </svg>
         </button>
+
+        {/* Loop section selector */}
+        <LoopSelector
+          totalMeasures={totalMeasures}
+          loopStart={loopStart}
+          loopEnd={loopEnd}
+          onLoopChange={onLoopChange}
+          disabled={totalMeasures === 0}
+        />
       </div>
     </div>
   )
