@@ -17,7 +17,11 @@ export const useAudioStore = create(
       // Whether the AudioContext is suspended and being auto-resumed
       isSuspendedBySystem: false,
       setIsSuspendedBySystem: (suspended) =>
-        set({ isSuspendedBySystem: suspended }, false, 'setIsSuspendedBySystem'),
+        set(
+          { isSuspendedBySystem: suspended },
+          false,
+          'setIsSuspendedBySystem',
+        ),
 
       // Count of consecutive resume failures (resets on success)
       resumeFailCount: 0,
@@ -66,6 +70,23 @@ export const useAudioStore = create(
       },
       setCursorPosition: (position) =>
         set({ cursorPosition: position }, false, 'setCursorPosition'),
+
+      // Real-time input level (0–1) for mic level meter
+      inputLevel: 0,
+      setInputLevel: (level) =>
+        set({ inputLevel: level }, false, 'setInputLevel'),
+
+      // Session error log — JSON array of pitch deviations during practice
+      // Each entry: { timestamp, measure, beat, expectedNote, detectedPitch, centsDeviation, confidence }
+      sessionErrors: [],
+      addSessionError: (error) =>
+        set(
+          (state) => ({ sessionErrors: [...state.sessionErrors, error] }),
+          false,
+          'addSessionError',
+        ),
+      clearSessionErrors: () =>
+        set({ sessionErrors: [] }, false, 'clearSessionErrors'),
     }),
     { name: 'AudioStore' },
   ),

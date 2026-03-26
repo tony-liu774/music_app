@@ -169,7 +169,10 @@ function HeatMapTooltip({ x, y, data, theme }) {
 
   return (
     // eslint-disable-next-line no-restricted-syntax -- SVG requires inline style for pointer-events
-    <g data-testid={`heat-tooltip-${data.measureNumber}`} style={{ pointerEvents: 'none' }}>
+    <g
+      data-testid={`heat-tooltip-${data.measureNumber}`}
+      style={{ pointerEvents: 'none' }}
+    >
       <rect
         x={tx - tooltipWidth / 2}
         y={ty}

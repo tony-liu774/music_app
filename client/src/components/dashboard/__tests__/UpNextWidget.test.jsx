@@ -30,7 +30,9 @@ describe('UpNextWidget', () => {
 
   it('suggests unpracticed score when available', () => {
     useLibraryStore.setState({
-      scores: [{ id: 'score-1', title: 'Beethoven Sonata', composer: 'Beethoven' }],
+      scores: [
+        { id: 'score-1', title: 'Beethoven Sonata', composer: 'Beethoven' },
+      ],
     })
 
     render(<UpNextWidget />)
@@ -50,8 +52,18 @@ describe('UpNextWidget', () => {
 
     useSessionStore.setState({
       practiceHistory: [
-        { scoreId: 'score-1', date: new Date().toISOString(), accuracy: 90, duration: 20 },
-        { scoreId: 'score-2', date: new Date().toISOString(), accuracy: 55, duration: 20 },
+        {
+          scoreId: 'score-1',
+          date: new Date().toISOString(),
+          accuracy: 90,
+          duration: 20,
+        },
+        {
+          scoreId: 'score-2',
+          date: new Date().toISOString(),
+          accuracy: 55,
+          duration: 20,
+        },
       ],
     })
 
@@ -66,12 +78,19 @@ describe('UpNextWidget', () => {
     })
     useSessionStore.setState({
       practiceHistory: [
-        { scoreId: 'score-1', date: new Date().toISOString(), accuracy: 40, duration: 20 },
+        {
+          scoreId: 'score-1',
+          date: new Date().toISOString(),
+          accuracy: 40,
+          duration: 20,
+        },
       ],
     })
 
     render(<UpNextWidget />)
-    expect(screen.getByTestId('suggestion-accuracy').className).toContain('text-crimson')
+    expect(screen.getByTestId('suggestion-accuracy').className).toContain(
+      'text-crimson',
+    )
   })
 
   it('shows Start Practice button', () => {

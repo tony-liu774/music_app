@@ -52,7 +52,10 @@ const PADDING = 24
 export default function ProgressChart() {
   const practiceHistory = useSessionStore((s) => s.practiceHistory)
 
-  const dataPoints = useMemo(() => aggregateByDay(practiceHistory), [practiceHistory])
+  const dataPoints = useMemo(
+    () => aggregateByDay(practiceHistory),
+    [practiceHistory],
+  )
   const polyline = useMemo(
     () => buildPolyline(dataPoints, CHART_WIDTH, CHART_HEIGHT, PADDING),
     [dataPoints],
@@ -131,11 +134,13 @@ export default function ProgressChart() {
           {/* Data points */}
           {dataPoints.map((p, i) => {
             const x =
-              PADDING + (i / (dataPoints.length - 1)) * (CHART_WIDTH - PADDING * 2)
+              PADDING +
+              (i / (dataPoints.length - 1)) * (CHART_WIDTH - PADDING * 2)
             const y =
               PADDING +
               (CHART_HEIGHT - PADDING * 2) -
-              ((p.accuracy - Math.min(...dataPoints.map((d) => d.accuracy), 0)) /
+              ((p.accuracy -
+                Math.min(...dataPoints.map((d) => d.accuracy), 0)) /
                 (Math.max(...dataPoints.map((d) => d.accuracy), 100) -
                   Math.min(...dataPoints.map((d) => d.accuracy), 0) || 1)) *
                 (CHART_HEIGHT - PADDING * 2)

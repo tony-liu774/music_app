@@ -112,9 +112,7 @@ function parseDocument(doc) {
 function parsePart(doc, partEl, index, divisions) {
   const id = partEl.getAttribute('id') || `part-${index}`
   // part-name lives in <part-list><score-part>, not in <part>
-  const scorePartEl = id
-    ? doc.querySelector(`score-part[id="${id}"]`)
-    : null
+  const scorePartEl = id ? doc.querySelector(`score-part[id="${id}"]`) : null
   const name =
     scorePartEl?.querySelector('part-name')?.textContent || `Part ${index + 1}`
 
@@ -222,8 +220,7 @@ function parseMeasure(measureEl, measureNumber, divisions, running) {
       // Pitched note
       const step = pitchEl.querySelector('step')?.textContent || 'C'
       const octave = pitchEl.querySelector('octave')?.textContent || '4'
-      const alter =
-        parseInt(pitchEl.querySelector('alter')?.textContent) || 0
+      const alter = parseInt(pitchEl.querySelector('alter')?.textContent) || 0
       const accidental = ALTER_TO_ACCIDENTAL[alter] || ''
       const key = `${step.toLowerCase()}${accidental}/${octave}`
 
@@ -397,7 +394,8 @@ function mapClef(sign, line) {
 }
 
 function guessType(noteEl, divisions) {
-  const dur = parseInt(noteEl.querySelector('duration')?.textContent) || divisions
+  const dur =
+    parseInt(noteEl.querySelector('duration')?.textContent) || divisions
   const ratio = dur / divisions
   if (ratio >= 4) return 'whole'
   if (ratio >= 2) return 'half'

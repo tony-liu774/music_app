@@ -10,8 +10,10 @@ import { useSmartLoop } from '../hooks/useSmartLoop'
 import { buildPayload, requestAIDebrief } from '../services/AISummaryService'
 import { savePracticeSession, getProgressTrend } from '../services/PracticeSessionService'
 import { useAuth } from '../contexts/AuthContext'
+import useMetronome from '../hooks/useMetronome'
 import { Button } from '../components/ui'
 import { useToast } from '../components/ui/Toast'
+import PracticeView from '../components/practice/PracticeView'
 import PracticeControls from '../components/practice/PracticeControls'
 import AudioSuspensionOverlay from '../components/practice/AudioSuspensionOverlay'
 import SheetMusic from '../components/practice/SheetMusic'
@@ -61,8 +63,6 @@ export default function PracticePage() {
   const [aiLoading, setAiLoading] = useState(false)
   const [progressTrend, setProgressTrend] = useState(null)
 
-  const totalMeasures = score?.parts?.[0]?.measures?.length || 0
-  const heatMapData = useHeatMapData(sessionLog, totalMeasures)
   const [heatMapVisible, setHeatMapVisible] = useState(false)
 
   const resumeAudioContext = useAudioStore((s) => s.resumeAudioContext)
@@ -82,12 +82,29 @@ export default function PracticePage() {
   const [controlsVisible, setControlsVisible] = useState(true)
   const [tempo, setTempo] = useState(120)
   const [metronomeOn, setMetronomeOn] = useState(true)
+  const [loopStart, setLoopStart] = useState(null)
+  const [loopEnd, setLoopEnd] = useState(null)
   const hideTimerRef = useRef(null)
   const isPracticingRef = useRef(isPracticing)
   isPracticingRef.current = isPracticing
 
   const scrollRef = useRef(null)
   const sheetMusicAreaRef = useRef(null)
+
+  // Derive time signature for metronome
+  const part = score?.parts?.[0]
+  const timeSignature = part?.measures?.[0]?.timeSignature || '4/4'
+  const beatsPerMeasure = parseInt(timeSignature.split('/')[0], 10) || 4
+  const totalMeasures = part?.measures?.length || 0
+
+  const heatMapData = useHeatMapData(sessionLog, totalMeasures)
+
+  // Web Audio API metronome click
+  useMetronome({
+    tempo,
+    beatsPerMeasure,
+    enabled: isPracticing && metronomeOn,
+  })
 
   const {
     cursorRef,
@@ -115,6 +132,23 @@ export default function PracticePage() {
     onSeekToMeasure: seekToMeasure,
     onAutoExit: handleSmartLoopAutoExit,
   })
+
+  const handleLoopChange = useCallback((start, end) => {
+    setLoopStart(start)
+    setLoopEnd(end)
+  }, [])
+
+  // When cursor reaches loop end, seek back to loop start
+  useEffect(() => {
+    if (
+      loopStart !== null &&
+      loopEnd !== null &&
+      isPracticing &&
+      currentMeasure > loopEnd
+    ) {
+      seekToMeasure(loopStart)
+    }
+  }, [currentMeasure, loopStart, loopEnd, isPracticing, seekToMeasure])
 
   const startAutoHideTimer = useCallback(() => {
     clearTimeout(hideTimerRef.current)
@@ -336,161 +370,162 @@ export default function PracticePage() {
   }, [])
 
   return (
-    <div
-      data-testid="practice-page"
-      className={`relative ${ghostMode ? 'fixed inset-0 z-40 bg-oxford-blue' : 'h-[calc(100vh-5rem)]'}`}
-    >
-      {/* Practice Summary — full post-session analytics view */}
-      {showSummary && !isPracticing && !ghostMode && (
-        <div className="absolute inset-0 z-30 bg-oxford-blue overflow-y-auto">
-          <PracticeSummary
-            sessionLog={sessionLog}
-            sessionSummary={sessionSummary}
-            aiResult={aiResult}
-            aiLoading={aiLoading}
-            heatMapData={heatMapData}
-            progressTrend={progressTrend}
-            onPracticeAgain={() => {
-              setShowSummary(false)
-              handlePlayPause()
-            }}
-            onSmartLoop={handleStartSmartLoop}
-            onToggleHeatMap={() => setHeatMapVisible((v) => !v)}
-            heatMapVisible={heatMapVisible}
-            onClose={() => setShowSummary(false)}
-          />
-        </div>
-      )}
-
-      {/* Sheet music area */}
-      <div
-        ref={sheetMusicAreaRef}
-        data-testid="sheet-music-area"
-        className={`${ghostMode ? 'h-full' : 'h-[80%]'} relative flex flex-col items-center justify-center`}
-      >
-        {!isPracticing && !ghostMode && !showSummary && (
-          <div className="text-center mb-4">
-            <h1 className="font-heading text-3xl text-ivory mb-4">Practice</h1>
-            {selectedScore ? (
-              <div className="mb-8" data-testid="practice-score-info">
-                <h2 className="font-heading text-xl text-ivory">
-                  {selectedScore.title}
-                </h2>
-                <p className="font-body text-ivory-muted">
-                  {selectedScore.composer || 'Unknown Composer'}
-                </p>
-                {selectedScore.instrument && (
-                  <span className="inline-block font-body text-xs text-amber bg-amber/10 px-2 py-0.5 rounded-full mt-2">
-                    {selectedScore.instrument}
-                  </span>
-                )}
-              </div>
-            ) : (
-              !score && (
-                <div className="mb-8" data-testid="practice-no-score">
-                  <p className="font-body text-ivory-muted mb-4">
-                    No score selected. Choose a piece from the library to start.
-                  </p>
-                  <Button
-                    variant="secondary"
-                    onClick={() => navigate('/library')}
-                  >
-                    Browse Library
-                  </Button>
-                </div>
-              )
-            )}
+    <PracticeView>
+      <div data-testid="practice-page" className="relative h-full">
+        {/* Practice Summary — full post-session analytics view */}
+        {showSummary && !isPracticing && !ghostMode && (
+          <div className="absolute inset-0 z-30 bg-oxford-blue overflow-y-auto">
+            <PracticeSummary
+              sessionLog={sessionLog}
+              sessionSummary={sessionSummary}
+              aiResult={aiResult}
+              aiLoading={aiLoading}
+              heatMapData={heatMapData}
+              progressTrend={progressTrend}
+              onPracticeAgain={() => {
+                setShowSummary(false)
+                handlePlayPause()
+              }}
+              onSmartLoop={handleStartSmartLoop}
+              onToggleHeatMap={() => setHeatMapVisible((v) => !v)}
+              heatMapVisible={heatMapVisible}
+              onClose={() => setShowSummary(false)}
+            />
           </div>
         )}
 
-        {scoreLoading && (
-          <p
-            data-testid="score-loading"
-            className="font-body text-ivory-muted text-sm"
-          >
-            Loading score...
-          </p>
-        )}
+        {/* Sheet music area */}
+        <div
+          ref={sheetMusicAreaRef}
+          data-testid="sheet-music-area"
+          className={`${ghostMode ? 'h-full' : 'h-[80%]'} relative flex flex-col items-center justify-center`}
+        >
+          {!isPracticing && !ghostMode && !showSummary && (
+            <div className="text-center mb-4">
+              <h1 className="font-heading text-3xl text-ivory mb-4">
+                Practice
+              </h1>
+              {selectedScore ? (
+                <div className="mb-8" data-testid="practice-score-info">
+                  <h2 className="font-heading text-xl text-ivory">
+                    {selectedScore.title}
+                  </h2>
+                  <p className="font-body text-ivory-muted">
+                    {selectedScore.composer || 'Unknown Composer'}
+                  </p>
+                  {selectedScore.instrument && (
+                    <span className="inline-block font-body text-xs text-amber bg-amber/10 px-2 py-0.5 rounded-full mt-2">
+                      {selectedScore.instrument}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                !score && (
+                  <div className="mb-8" data-testid="practice-no-score">
+                    <p className="font-body text-ivory-muted mb-4">
+                      No score selected. Choose a piece from the library to
+                      start.
+                    </p>
+                    <Button
+                      variant="secondary"
+                      onClick={() => navigate('/library')}
+                    >
+                      Browse Library
+                    </Button>
+                  </div>
+                )
+              )}
+            </div>
+          )}
 
-        {scoreError && (
-          <p
-            data-testid="score-error"
-            className="font-body text-crimson text-sm"
-          >
-            {scoreError}
-          </p>
-        )}
+          {scoreLoading && (
+            <p
+              data-testid="score-loading"
+              className="font-body text-ivory-muted text-sm"
+            >
+              Loading score...
+            </p>
+          )}
 
-        <div className="relative w-full max-w-6xl mx-auto">
-          <SheetMusic
-            score={score}
-            currentMeasure={currentMeasure}
-            className="w-full"
-            scrollRef={scrollRef}
-          />
-          <PredictiveCursor
-            ref={cursorRef}
-            visible={isPracticing && !!score}
-            isBouncing={isBouncing}
-          />
-          <HeatMapOverlay
-            heatMapData={heatMapData}
-            totalMeasures={totalMeasures}
-            visible={heatMapVisible}
-          />
-          <SmartLoop
-            loopMeasures={smartLoop.loopMeasures}
-            loopCount={smartLoop.loopCount}
-            isImproving={smartLoop.isImproving}
-            isActive={smartLoop.isActive}
-            loopTempo={smartLoop.loopTempo}
-            onExit={smartLoop.exitLoop}
-            totalMeasures={totalMeasures}
-          />
+          {scoreError && (
+            <p
+              data-testid="score-error"
+              className="font-body text-crimson text-sm"
+            >
+              {scoreError}
+            </p>
+          )}
+
+          <div className="relative w-full max-w-6xl mx-auto">
+            <SheetMusic
+              score={score}
+              currentMeasure={currentMeasure}
+              className="w-full"
+              scrollRef={scrollRef}
+            />
+            <PredictiveCursor
+              ref={cursorRef}
+              visible={isPracticing && !!score}
+              isBouncing={isBouncing}
+            />
+            <HeatMapOverlay
+              heatMapData={heatMapData}
+              totalMeasures={totalMeasures}
+              visible={heatMapVisible}
+            />
+            <SmartLoop
+              loopMeasures={smartLoop.loopMeasures}
+              loopCount={smartLoop.loopCount}
+              isImproving={smartLoop.isImproving}
+              isActive={smartLoop.isActive}
+              loopTempo={smartLoop.loopTempo}
+              onExit={smartLoop.exitLoop}
+              totalMeasures={totalMeasures}
+            />
+          </div>
+
+          {/* Breath Intonation Needle — fixed on right edge of screen */}
+          {isPracticing && <IntonationNeedle />}
         </div>
 
-        {/* Breath Intonation Needle — tracks with predictive cursor */}
+        {/* Tap overlay hint — shows briefly when controls are hidden */}
+        {ghostMode && !controlsVisible && (
+          <div
+            data-testid="tap-overlay"
+            className="absolute inset-0 z-10 flex items-end justify-center pb-32 pointer-events-none"
+          >
+            <p className="font-body text-ivory-dim text-xs animate-pulse">
+              Move mouse or tap to show controls
+            </p>
+          </div>
+        )}
+
+        {/* Practice controls bar */}
+        <PracticeControls
+          isPracticing={isPracticing}
+          onPlayPause={handlePlayPause}
+          onStop={handleStop}
+          visible={controlsVisible}
+          tempo={tempo}
+          onTempoChange={setTempo}
+          metronomeOn={metronomeOn}
+          onMetronomeToggle={setMetronomeOn}
+          totalMeasures={totalMeasures}
+          loopStart={loopStart}
+          loopEnd={loopEnd}
+          onLoopChange={handleLoopChange}
+        />
+
+        {/* Audio suspension overlay — shown when browser suspends AudioContext */}
         {isPracticing && (
-          <IntonationNeedle
-            cursorX={cursorPosition.progress * 100}
-            cursorY={0}
+          <AudioSuspensionOverlay
+            onResume={resumeAudioContext}
+            isInitialSuspension={
+              isPracticing && audioContextState === 'suspended'
+            }
           />
         )}
       </div>
-
-      {/* Tap overlay hint — shows briefly when controls are hidden */}
-      {ghostMode && !controlsVisible && (
-        <div
-          data-testid="tap-overlay"
-          className="absolute inset-0 z-10 flex items-end justify-center pb-32 pointer-events-none"
-        >
-          <p className="font-body text-ivory-dim text-xs animate-pulse">
-            Move mouse or tap to show controls
-          </p>
-        </div>
-      )}
-
-      {/* Practice controls bar */}
-      <PracticeControls
-        isPracticing={isPracticing}
-        onPlayPause={handlePlayPause}
-        onStop={handleStop}
-        visible={controlsVisible}
-        tempo={tempo}
-        onTempoChange={setTempo}
-        metronomeOn={metronomeOn}
-        onMetronomeToggle={setMetronomeOn}
-      />
-
-      {/* Audio suspension overlay — shown when browser suspends AudioContext */}
-      {isPracticing && (
-        <AudioSuspensionOverlay
-          onResume={resumeAudioContext}
-          isInitialSuspension={
-            isPracticing && audioContextState === 'suspended'
-          }
-        />
-      )}
-    </div>
+    </PracticeView>
   )
 }

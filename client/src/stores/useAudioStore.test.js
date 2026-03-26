@@ -12,6 +12,9 @@ describe('useAudioStore', () => {
       vibratoData: { rate: null, extent: null, centerFrequency: null },
       isPracticing: false,
       selectedInstrument: 'violin',
+      sessionErrors: [],
+      inputLevel: 0,
+      cursorPosition: { measure: null, beat: null, progress: 0 },
     })
   })
 
@@ -105,5 +108,54 @@ describe('useAudioStore', () => {
     expect(audioState).not.toHaveProperty('currentView')
     expect(audioState).not.toHaveProperty('modalOpen')
     expect(audioState).not.toHaveProperty('sidebarOpen')
+  })
+
+  it('has initial empty sessionErrors', () => {
+    const state = useAudioStore.getState()
+    expect(state.sessionErrors).toEqual([])
+  })
+
+  it('adds a session error', () => {
+    const error = {
+      timestamp: Date.now(),
+      measure: 1,
+      beat: 2,
+      expectedNote: 'A4',
+      detectedPitch: 442,
+      centsDeviation: 8,
+      confidence: 0.92,
+    }
+    useAudioStore.getState().addSessionError(error)
+    expect(useAudioStore.getState().sessionErrors).toHaveLength(1)
+    expect(useAudioStore.getState().sessionErrors[0]).toEqual(error)
+  })
+
+  it('accumulates multiple session errors', () => {
+    const e1 = { timestamp: 1, measure: 1, beat: 1, expectedNote: 'A4', detectedPitch: 442, centsDeviation: 8, confidence: 0.9 }
+    const e2 = { timestamp: 2, measure: 2, beat: 1, expectedNote: 'B4', detectedPitch: 490, centsDeviation: -5, confidence: 0.85 }
+    useAudioStore.getState().addSessionError(e1)
+    useAudioStore.getState().addSessionError(e2)
+    expect(useAudioStore.getState().sessionErrors).toHaveLength(2)
+  })
+
+  it('clears session errors', () => {
+    useAudioStore.getState().addSessionError({ timestamp: 1, measure: 1, beat: 1, expectedNote: 'A4', detectedPitch: 442, centsDeviation: 8, confidence: 0.9 })
+    expect(useAudioStore.getState().sessionErrors).toHaveLength(1)
+    useAudioStore.getState().clearSessionErrors()
+    expect(useAudioStore.getState().sessionErrors).toEqual([])
+  })
+
+  it('has initial inputLevel of 0', () => {
+    expect(useAudioStore.getState().inputLevel).toBe(0)
+  })
+
+  it('sets inputLevel', () => {
+    useAudioStore.getState().setInputLevel(0.75)
+    expect(useAudioStore.getState().inputLevel).toBe(0.75)
+  })
+
+  it('sets cursor position', () => {
+    useAudioStore.getState().setCursorPosition({ measure: 5, beat: 3, progress: 0.5 })
+    expect(useAudioStore.getState().cursorPosition).toEqual({ measure: 5, beat: 3, progress: 0.5 })
   })
 })

@@ -8,7 +8,9 @@ import { useMicrophone } from '../../hooks/useMicrophone'
  */
 function MicIcon({ isActive }) {
   return (
-    <div className={`relative inline-flex items-center justify-center ${isActive ? 'animate-amber-pulse' : ''}`}>
+    <div
+      className={`relative inline-flex items-center justify-center ${isActive ? 'animate-amber-pulse' : ''}`}
+    >
       <div className="w-16 h-16 rounded-full bg-amber/10 flex items-center justify-center">
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -62,14 +64,18 @@ function DeniedContent({ onRetry }) {
       </h3>
 
       <p className="text-ivory-muted text-sm text-center leading-relaxed">
-        The Virtual Concertmaster needs microphone access to listen to your playing
-        and provide real-time feedback.
+        The Virtual Concertmaster needs microphone access to listen to your
+        playing and provide real-time feedback.
       </p>
 
       <div className="bg-surface rounded-lg p-4 space-y-2">
-        <p className="text-ivory text-sm font-semibold">To enable your microphone:</p>
+        <p className="text-ivory text-sm font-semibold">
+          To enable your microphone:
+        </p>
         <ol className="text-ivory-muted text-sm space-y-1 list-decimal list-inside">
-          <li>Click the lock/settings icon in your browser&apos;s address bar</li>
+          <li>
+            Click the lock/settings icon in your browser&apos;s address bar
+          </li>
           <li>Find &quot;Microphone&quot; in the permissions list</li>
           <li>Change it to &quot;Allow&quot;</li>
           <li>Refresh this page</li>
@@ -115,8 +121,8 @@ function UnsupportedContent() {
       </h3>
 
       <p className="text-ivory-muted text-sm text-center leading-relaxed">
-        Your browser does not support microphone access. Please use a modern browser
-        like Chrome, Firefox, or Safari.
+        Your browser does not support microphone access. Please use a modern
+        browser like Chrome, Firefox, or Safari.
       </p>
 
       <div className="bg-surface rounded-lg p-4">
@@ -191,9 +197,9 @@ function PromptContent({ onAllow, isPrompting }) {
       </h3>
 
       <p className="text-ivory-muted text-sm text-center leading-relaxed">
-        The Virtual Concertmaster listens to your playing in real-time to provide
-        pitch detection, intonation feedback, and personalized coaching. Your audio
-        is processed locally and never recorded.
+        The Virtual Concertmaster listens to your playing in real-time to
+        provide pitch detection, intonation feedback, and personalized coaching.
+        Your audio is processed locally and never recorded.
       </p>
 
       <div className="flex justify-center pt-2">
@@ -225,8 +231,8 @@ function GrantedContent({ onContinue }) {
       </h3>
 
       <p className="text-ivory-muted text-sm text-center leading-relaxed">
-        Your microphone is ready. The Virtual Concertmaster can now listen to your
-        playing and provide real-time feedback.
+        Your microphone is ready. The Virtual Concertmaster can now listen to
+        your playing and provide real-time feedback.
       </p>
 
       <div className="flex justify-center pt-2">

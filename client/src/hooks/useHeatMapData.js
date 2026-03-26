@@ -35,7 +35,11 @@ const SUCCESS_OPACITY = 0.2
  */
 export function useHeatMapData(sessionLog, totalMeasures = 0) {
   return useMemo(() => {
-    if (!sessionLog || !sessionLog.deviations || sessionLog.deviations.length === 0) {
+    if (
+      !sessionLog ||
+      !sessionLog.deviations ||
+      sessionLog.deviations.length === 0
+    ) {
       return []
     }
 
@@ -86,9 +90,8 @@ export function calculateHeatMapData(deviations, totalMeasures = 0) {
       if (dev > maxDeviation) maxDeviation = dev
     }
 
-    const avgDeviation = devs.length > 0
-      ? Math.round((totalDeviation / devs.length) * 10) / 10
-      : 0
+    const avgDeviation =
+      devs.length > 0 ? Math.round((totalDeviation / devs.length) * 10) / 10 : 0
 
     return {
       measureNumber: parseInt(measure),
@@ -112,9 +115,8 @@ export function calculateHeatMapData(deviations, totalMeasures = 0) {
     .map((m) => ({
       ...m,
       type: 'error',
-      opacity: logMax > 0
-        ? (Math.log(1 + m.errorCount) / logMax) * MAX_OPACITY
-        : 0,
+      opacity:
+        logMax > 0 ? (Math.log(1 + m.errorCount) / logMax) * MAX_OPACITY : 0,
     }))
 
   // Identify "excellent" measures: those with very few/no errors

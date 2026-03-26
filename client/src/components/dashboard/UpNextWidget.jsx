@@ -119,7 +119,8 @@ export default function UpNextWidget() {
                 {Math.round(suggestion.avgAccuracy)}%
               </span>
               <span className="text-sm text-ivory-dim font-body">
-                ({suggestion.sessions} {suggestion.sessions === 1 ? 'session' : 'sessions'})
+                ({suggestion.sessions}{' '}
+                {suggestion.sessions === 1 ? 'session' : 'sessions'})
               </span>
             </div>
           )}

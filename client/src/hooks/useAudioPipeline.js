@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useAudioStore } from '../stores/useAudioStore'
 import { useAudioContextSuspension } from './useAudioContextSuspension'
+import { useSettingsStore } from '../stores/useSettingsStore'
 
 /**
  * Default audio pipeline configuration.
@@ -33,6 +34,7 @@ export function useAudioPipeline(options = {}) {
   const setAudioContextState = useAudioStore((s) => s.setAudioContextState)
   const setResumeAudioContext = useAudioStore((s) => s.setResumeAudioContext)
   const selectedInstrument = useAudioStore((s) => s.selectedInstrument)
+  const tuningReference = useSettingsStore((s) => s.tuningReference)
 
   const workerRef = useRef(null)
   const audioCtxRef = useRef(null)
@@ -121,6 +123,7 @@ export function useAudioPipeline(options = {}) {
         sampleRate,
         bufferSize,
         instrument: selectedInstrument,
+        tuningReference,
       })
 
       // 4. Connect MediaStream → ScriptProcessorNode
@@ -155,6 +158,7 @@ export function useAudioPipeline(options = {}) {
     [
       bufferSize,
       selectedInstrument,
+      tuningReference,
       handleWorkerMessage,
       handleWorkerError,
       setAudioContextState,
@@ -193,7 +197,12 @@ export function useAudioPipeline(options = {}) {
 
     // Reset pitch and vibrato data
     setPitchData({ frequency: null, confidence: 0, note: null, cents: null })
-    setVibratoData({ isVibrato: false, vibratoRate: null, vibratoWidth: null, centerFrequency: null })
+    setVibratoData({
+      isVibrato: false,
+      vibratoRate: null,
+      vibratoWidth: null,
+      centerFrequency: null,
+    })
   }, [setAudioContextState, setPitchData, setVibratoData])
 
   // Register the resume callback in the store so other components can use it

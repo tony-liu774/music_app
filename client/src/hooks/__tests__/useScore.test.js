@@ -10,7 +10,8 @@ vi.mock('../../services/MusicXMLParser', () => ({
   }),
 }))
 
-const MOCK_XML = '<?xml version="1.0"?><score-partwise><part></part></score-partwise>'
+const MOCK_XML =
+  '<?xml version="1.0"?><score-partwise><part></part></score-partwise>'
 
 describe('useScore', () => {
   beforeEach(() => {
@@ -31,9 +32,7 @@ describe('useScore', () => {
   })
 
   it('parses raw XML when isRaw is true', async () => {
-    const { result } = renderHook(() =>
-      useScore(MOCK_XML, { isRaw: true }),
-    )
+    const { result } = renderHook(() => useScore(MOCK_XML, { isRaw: true }))
 
     await waitFor(() => {
       expect(result.current.score).not.toBeNull()
@@ -96,10 +95,9 @@ describe('useScore', () => {
       text: () => Promise.resolve(MOCK_XML),
     })
 
-    const { result, rerender } = renderHook(
-      ({ url }) => useScore(url),
-      { initialProps: { url: 'https://example.com/cached.xml' } },
-    )
+    const { result, rerender } = renderHook(({ url }) => useScore(url), {
+      initialProps: { url: 'https://example.com/cached.xml' },
+    })
 
     await waitFor(() => {
       expect(result.current.score).not.toBeNull()
@@ -142,10 +140,9 @@ describe('useScore', () => {
       text: () => Promise.resolve(MOCK_XML),
     })
 
-    const { result, rerender } = renderHook(
-      ({ url }) => useScore(url),
-      { initialProps: { url: 'https://example.com/score.xml' } },
-    )
+    const { result, rerender } = renderHook(({ url }) => useScore(url), {
+      initialProps: { url: 'https://example.com/score.xml' },
+    })
 
     await waitFor(() => {
       expect(result.current.score).not.toBeNull()
@@ -168,10 +165,9 @@ describe('useScore', () => {
       )
     })
 
-    const { rerender } = renderHook(
-      ({ url }) => useScore(url),
-      { initialProps: { url: 'https://example.com/first.xml' } },
-    )
+    const { rerender } = renderHook(({ url }) => useScore(url), {
+      initialProps: { url: 'https://example.com/first.xml' },
+    })
 
     // Quickly change URL before first fetch completes
     rerender({ url: 'https://example.com/second.xml' })

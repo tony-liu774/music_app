@@ -26,8 +26,12 @@ export default function TunerPage() {
   const rawCentsRef = useRef(0)
   const sensitivityRef = useRef(needleSensitivity)
 
-  useEffect(() => { rawCentsRef.current = pitchData.cents ?? 0 }, [pitchData.cents])
-  useEffect(() => { sensitivityRef.current = needleSensitivity }, [needleSensitivity])
+  useEffect(() => {
+    rawCentsRef.current = pitchData.cents ?? 0
+  }, [pitchData.cents])
+  useEffect(() => {
+    sensitivityRef.current = needleSensitivity
+  }, [needleSensitivity])
 
   // Stable smoothing loop — reads from refs, never recreated
   const updateSmoothing = useCallback(() => {
@@ -69,7 +73,7 @@ export default function TunerPage() {
     }
   }, [isRunning, stop, stopStream, requestAccess, start])
 
-  const showError = pipelineError || (micStatus === 'denied')
+  const showError = pipelineError || micStatus === 'denied'
 
   return (
     <div
@@ -133,10 +137,14 @@ export default function TunerPage() {
 
       {/* Error state */}
       {showError && (
-        <p className="font-body text-sm text-crimson text-center" data-testid="tuner-error">
+        <p
+          className="font-body text-sm text-crimson text-center"
+          data-testid="tuner-error"
+        >
           {micStatus === 'denied'
             ? 'Microphone access was denied. Please allow microphone access in your browser settings.'
-            : pipelineError?.message || 'An error occurred with the audio pipeline.'}
+            : pipelineError?.message ||
+              'An error occurred with the audio pipeline.'}
         </p>
       )}
 
