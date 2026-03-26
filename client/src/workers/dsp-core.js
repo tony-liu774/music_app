@@ -2,7 +2,7 @@
  * Core DSP algorithms — imported by the Web Worker and by tests.
  *
  * Contains: frequency/note conversion, pYIN pitch detection,
- * sympathetic resonance filter, and performance monitor.
+ * sympathetic resonance filter, performance monitor, and note detection.
  */
 
 /* ------------------------------------------------------------------ */
@@ -25,24 +25,79 @@ const NOTE_NAMES = [
 ]
 
 /**
- * Convert a frequency (Hz) to the nearest MIDI note number.
- * A4 = 440 Hz = MIDI 69.
+ * Default tuning reference (A4 in Hz).
  */
-export function frequencyToMidi(freq) {
-  return 69 + 12 * Math.log2(freq / 440)
+export const DEFAULT_TUNING_REFERENCE = 440
+
+/**
+ * Instrument frequency ranges for string instruments.
+ * These represent the practical playable range (fundamentals + harmonics).
+ */
+export const INSTRUMENT_RANGES = {
+  violin: { min: 196.0, max: 2637.0, label: 'Violin (G3–E7)' },
+  viola: { min: 130.81, max: 1760.0, label: 'Viola (C3–A6)' },
+  cello: { min: 65.41, max: 880.0, label: 'Cello (C2–A5)' },
+  'double-bass': { min: 41.2, max: 392.0, label: 'Double Bass (E1–G4)' },
+}
+
+/**
+ * Convert a frequency (Hz) to the nearest MIDI note number.
+ * @param {number} freq — frequency in Hz
+ * @param {number} [tuningRef=440] — A4 reference frequency
+ * @returns {number} MIDI note number (fractional)
+ */
+export function frequencyToMidi(freq, tuningRef = DEFAULT_TUNING_REFERENCE) {
+  return 69 + 12 * Math.log2(freq / tuningRef)
 }
 
 /**
  * Given a frequency, return { note, octave, cents }.
+ * @param {number} freq — frequency in Hz
+ * @param {number} [tuningRef=440] — A4 reference frequency
  */
-export function frequencyToNote(freq) {
+export function frequencyToNote(freq, tuningRef = DEFAULT_TUNING_REFERENCE) {
   if (freq <= 0) return { note: null, octave: null, cents: null }
-  const midi = frequencyToMidi(freq)
+  const midi = frequencyToMidi(freq, tuningRef)
   const rounded = Math.round(midi)
   const cents = Math.round((midi - rounded) * 100)
   const noteIndex = ((rounded % 12) + 12) % 12
   const octave = Math.floor(rounded / 12) - 1
   return { note: NOTE_NAMES[noteIndex], octave, cents }
+}
+
+/**
+ * Calculate cents deviation between a detected frequency and a reference frequency.
+ * Formula: 1200 * Math.log2(detectedFreq / referenceFreq)
+ *
+ * @param {number} detectedFreq — detected frequency in Hz
+ * @param {number} referenceFreq — reference frequency in Hz
+ * @returns {number} cents deviation (positive = sharp, negative = flat)
+ */
+export function centsDeviation(detectedFreq, referenceFreq) {
+  if (detectedFreq <= 0 || referenceFreq <= 0) return 0
+  return 1200 * Math.log2(detectedFreq / referenceFreq)
+}
+
+/**
+ * Convert a MIDI note number to frequency (Hz).
+ * @param {number} midi — MIDI note number
+ * @param {number} [tuningRef=440] — A4 reference frequency
+ * @returns {number} frequency in Hz
+ */
+export function midiToFrequency(midi, tuningRef = DEFAULT_TUNING_REFERENCE) {
+  return tuningRef * Math.pow(2, (midi - 69) / 12)
+}
+
+/**
+ * Check whether a frequency falls within an instrument's playable range.
+ * @param {number} freq — frequency in Hz
+ * @param {string} instrument — instrument key
+ * @returns {boolean}
+ */
+export function isInInstrumentRange(freq, instrument) {
+  const range = INSTRUMENT_RANGES[instrument]
+  if (!range) return true // unknown instrument — don't filter
+  return freq >= range.min && freq <= range.max
 }
 
 /* ------------------------------------------------------------------ */
@@ -419,8 +474,7 @@ export class VibratoSmoother {
     }
 
     // Time span in seconds
-    const spanSec =
-      (this.samples[n - 1].ts - this.samples[0].ts) / 1000
+    const spanSec = (this.samples[n - 1].ts - this.samples[0].ts) / 1000
     if (spanSec <= 0) {
       return { rate: null, extent, isVibrato: false }
     }
