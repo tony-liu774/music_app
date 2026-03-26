@@ -12,6 +12,7 @@ const STAVE_HEIGHT = SYSTEM_HEIGHT - 40 // Height of the actual stave area
 /* eslint-disable no-hardcoded-hex/no-hardcoded-hex */
 const FALLBACKS = {
   crimson: '#dc2626',
+  emerald: '#10b981',
   surface: '#141420',
   borderLight: '#3a3a4a',
   ivory: '#f3f4f6',
@@ -34,6 +35,7 @@ function getThemeColors() {
 
   return {
     crimson: get('--color-crimson', FALLBACKS.crimson),
+    emerald: get('--color-emerald', FALLBACKS.emerald),
     surface: get('--color-surface', FALLBACKS.surface),
     borderLight: get('--color-border-light', FALLBACKS.borderLight),
     ivory: get('--color-ivory', FALLBACKS.ivory),
@@ -106,7 +108,7 @@ export default function HeatMapOverlay({
               y={y}
               width={width}
               height={STAVE_HEIGHT}
-              fill={theme.crimson}
+              fill={data.type === 'success' ? theme.emerald : theme.crimson}
               opacity={0}
               /* eslint-disable-next-line no-restricted-syntax -- SVG requires inline styles for CSS animation + pointer-events */
               style={{
@@ -147,6 +149,7 @@ HeatMapOverlay.propTypes = {
       maxDeviation: PropTypes.number.isRequired,
       worstNote: PropTypes.string,
       opacity: PropTypes.number.isRequired,
+      type: PropTypes.oneOf(['error', 'success']),
     }),
   ),
   totalMeasures: PropTypes.number,

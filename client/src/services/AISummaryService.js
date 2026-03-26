@@ -8,6 +8,43 @@ const API_ENDPOINT = '/api/ai-summary'
 const REQUEST_TIMEOUT_MS = 10000
 
 /**
+ * Simple in-memory LRU cache for AI debrief responses.
+ * Keyed by a hash of the error pattern to avoid redundant API calls.
+ */
+const CACHE_MAX_SIZE = 20
+const responseCache = new Map()
+
+/**
+ * Generate a cache key from the payload's error signature.
+ * Uses accuracy, intonation trend, worst measures, and deviation count
+ * so identical error patterns produce the same key.
+ */
+function getCacheKey(payload) {
+  const worstKey = (payload.worstMeasures || [])
+    .map((m) => `${m.measureNumber}:${m.errorCount}`)
+    .join(',')
+  return `${payload.instrument}|${payload.accuracyPercent}|${payload.intonationTrend}|${worstKey}|${payload.summaryStats?.total_deviations || 0}`
+}
+
+function cacheGet(key) {
+  if (!responseCache.has(key)) return null
+  const value = responseCache.get(key)
+  // Move to end (most recently used)
+  responseCache.delete(key)
+  responseCache.set(key, value)
+  return value
+}
+
+function cacheSet(key, value) {
+  if (responseCache.size >= CACHE_MAX_SIZE) {
+    // Evict oldest entry
+    const firstKey = responseCache.keys().next().value
+    responseCache.delete(firstKey)
+  }
+  responseCache.set(key, value)
+}
+
+/**
  * Build the aggregation payload from session log, summary stats,
  * worst measures, and vibrato data.
  */
@@ -133,8 +170,16 @@ export function generateLocalDebrief(payload) {
 /**
  * Request an AI-generated debrief from the backend.
  * Returns { debrief, score, isOfflineFallback } on success or fallback.
+ * Caches responses to avoid redundant API calls for identical error patterns.
  */
 export async function requestAIDebrief(payload) {
+  // Check cache first
+  const cacheKey = getCacheKey(payload)
+  const cached = cacheGet(cacheKey)
+  if (cached) {
+    return { ...cached, isCached: true }
+  }
+
   const prompt = buildPrompt(payload)
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
@@ -166,7 +211,7 @@ export async function requestAIDebrief(payload) {
       }
     }
 
-    return {
+    const result = {
       debrief: parsed.debrief || data.summary || data.overall_assessment || '',
       score:
         typeof parsed.score === 'number'
@@ -176,10 +221,22 @@ export async function requestAIDebrief(payload) {
             : null,
       isOfflineFallback: false,
     }
+
+    // Cache the result
+    cacheSet(cacheKey, result)
+
+    return result
   } catch {
     // Network error / timeout → offline fallback
     return generateLocalDebrief(payload)
   } finally {
     clearTimeout(timeout)
   }
+}
+
+/**
+ * Clear the AI debrief response cache. Exported for testing.
+ */
+export function clearAICache() {
+  responseCache.clear()
 }

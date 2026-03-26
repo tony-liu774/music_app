@@ -7,6 +7,9 @@ import { useSessionStore } from '../stores/useSessionStore'
 import { useSessionLogger } from '../hooks/useSessionLogger'
 import { useHeatMapData } from '../hooks/useHeatMapData'
 import { useSmartLoop } from '../hooks/useSmartLoop'
+import { buildPayload, requestAIDebrief } from '../services/AISummaryService'
+import { savePracticeSession, getProgressTrend } from '../services/PracticeSessionService'
+import { useAuth } from '../contexts/AuthContext'
 import useMetronome from '../hooks/useMetronome'
 import { Button } from '../components/ui'
 import { useToast } from '../components/ui/Toast'
@@ -14,7 +17,7 @@ import PracticeView from '../components/practice/PracticeView'
 import PracticeControls from '../components/practice/PracticeControls'
 import AudioSuspensionOverlay from '../components/practice/AudioSuspensionOverlay'
 import SheetMusic from '../components/practice/SheetMusic'
-import CoachDebrief from '../components/practice/CoachDebrief'
+import PracticeSummary from '../components/practice/PracticeSummary'
 import PredictiveCursor from '../components/practice/PredictiveCursor'
 import IntonationNeedle from '../components/practice/IntonationNeedle'
 import HeatMapOverlay from '../components/practice/HeatMapOverlay'
@@ -26,6 +29,7 @@ const CONTROLS_AUTO_HIDE_MS = 3000
 
 export default function PracticePage() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const ghostMode = useUIStore((s) => s.ghostMode)
   const enterGhostMode = useUIStore((s) => s.enterGhostMode)
   const exitGhostMode = useUIStore((s) => s.exitGhostMode)
@@ -52,10 +56,13 @@ export default function PracticePage() {
   } = useSessionLogger()
 
   const selectedInstrument = useAudioStore((s) => s.selectedInstrument)
-  const [debriefOpen, setDebriefOpen] = useState(false)
-  const debriefDataRef = useRef(null)
 
-  const heatMapData = useHeatMapData(sessionLog)
+  // Practice summary state (shown after practice ends)
+  const [showSummary, setShowSummary] = useState(false)
+  const [aiResult, setAiResult] = useState(null)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [progressTrend, setProgressTrend] = useState(null)
+
   const [heatMapVisible, setHeatMapVisible] = useState(false)
 
   const resumeAudioContext = useAudioStore((s) => s.resumeAudioContext)
@@ -88,6 +95,9 @@ export default function PracticePage() {
   const part = score?.parts?.[0]
   const timeSignature = part?.measures?.[0]?.timeSignature || '4/4'
   const beatsPerMeasure = parseInt(timeSignature.split('/')[0], 10) || 4
+  const totalMeasures = part?.measures?.length || 0
+
+  const heatMapData = useHeatMapData(sessionLog, totalMeasures)
 
   // Web Audio API metronome click
   useMetronome({
@@ -122,8 +132,6 @@ export default function PracticePage() {
     onSeekToMeasure: seekToMeasure,
     onAutoExit: handleSmartLoopAutoExit,
   })
-
-  const totalMeasures = part?.measures?.length || 0
 
   const handleLoopChange = useCallback((start, end) => {
     setLoopStart(start)
@@ -169,7 +177,8 @@ export default function PracticePage() {
       setControlsVisible(true)
       clearTimeout(hideTimerRef.current)
     } else {
-      // Play / Resume — enter ghost mode
+      // Play / Resume — enter ghost mode, dismiss summary if showing
+      setShowSummary(false)
       setIsPracticing(true)
       if (sessionPaused) {
         // Resume an existing paused session
@@ -195,29 +204,97 @@ export default function PracticePage() {
     selectedScore,
   ])
 
-  // Stop handler — exit ghost mode, end session logging, show debrief
+  // Fetch AI debrief after practice stops
+  const fetchAIDebrief = useCallback(
+    async (log, summary, worstMeasures) => {
+      if (!log && !summary) return
+      setAiLoading(true)
+      setAiResult(null)
+
+      const payload = buildPayload({
+        sessionLog: log,
+        sessionSummary: summary,
+        worstMeasures,
+        durationMs: log?.duration_ms || 0,
+        instrument: selectedInstrument || 'violin',
+      })
+
+      const debrief = await requestAIDebrief(payload)
+      setAiResult(debrief)
+      setAiLoading(false)
+    },
+    [selectedInstrument],
+  )
+
+  // Stop handler — exit ghost mode, end session logging, show summary
   const handleStop = useCallback(() => {
     // Capture worst measures before endSession resets the logger
     const worst = getWorstMeasures(5)
     setIsPracticing(false)
-    endSession()
+    const result = endSession()
     exitGhostMode()
     setControlsVisible(true)
     clearTimeout(hideTimerRef.current)
     resetCursor()
 
-    debriefDataRef.current = { worstMeasures: worst }
-    setDebriefOpen(true)
+    // Transition to PracticeSummary view
+    setShowSummary(true)
+    setProgressTrend(null)
+
+    // Fetch AI debrief asynchronously
+    if (result) {
+      fetchAIDebrief(result.log, result.summary, worst)
+
+      // Persist session to Supabase and load progress trend
+      const scoreId = selectedScore?.id
+      const instrument = selectedInstrument || 'violin'
+
+      // Calculate accuracy for persistence
+      const pitchDevs = (result.log?.deviations || []).filter(
+        (d) => d.type === 'pitch',
+      )
+      const accurateCount = pitchDevs.filter(
+        (d) => Math.abs(d.centsDeviation || 0) <= 15,
+      ).length
+      const accuracyPercent =
+        pitchDevs.length > 0
+          ? Math.round((accurateCount / pitchDevs.length) * 100)
+          : 100
+
+      if (user?.id) {
+        savePracticeSession({
+          userId: user.id,
+          scoreId,
+          scoreTitle: selectedScore?.title,
+          sessionLog: result.log,
+          sessionSummary: result.summary,
+          accuracyPercent,
+          instrument,
+        })
+
+        // Fetch progress trend if practicing a specific piece
+        if (scoreId) {
+          getProgressTrend(user.id, scoreId).then((trend) => {
+            if (trend.length > 0) setProgressTrend(trend)
+          })
+        }
+      }
+    }
   }, [
     setIsPracticing,
     exitGhostMode,
     endSession,
     getWorstMeasures,
     resetCursor,
+    fetchAIDebrief,
+    user,
+    selectedScore,
+    selectedInstrument,
   ])
 
   // Start smart loop: extract worst measures and begin loop practice
   const handleStartSmartLoop = useCallback(() => {
+    setShowSummary(false)
     const started = smartLoop.startLoop()
     if (started && !isPracticing) {
       handlePlayPause()
@@ -295,13 +372,35 @@ export default function PracticePage() {
   return (
     <PracticeView>
       <div data-testid="practice-page" className="relative h-full">
+        {/* Practice Summary — full post-session analytics view */}
+        {showSummary && !isPracticing && !ghostMode && (
+          <div className="absolute inset-0 z-30 bg-oxford-blue overflow-y-auto">
+            <PracticeSummary
+              sessionLog={sessionLog}
+              sessionSummary={sessionSummary}
+              aiResult={aiResult}
+              aiLoading={aiLoading}
+              heatMapData={heatMapData}
+              progressTrend={progressTrend}
+              onPracticeAgain={() => {
+                setShowSummary(false)
+                handlePlayPause()
+              }}
+              onSmartLoop={handleStartSmartLoop}
+              onToggleHeatMap={() => setHeatMapVisible((v) => !v)}
+              heatMapVisible={heatMapVisible}
+              onClose={() => setShowSummary(false)}
+            />
+          </div>
+        )}
+
         {/* Sheet music area */}
         <div
           ref={sheetMusicAreaRef}
           data-testid="sheet-music-area"
           className={`${ghostMode ? 'h-full' : 'h-[80%]'} relative flex flex-col items-center justify-center`}
         >
-          {!isPracticing && !ghostMode && (
+          {!isPracticing && !ghostMode && !showSummary && (
             <div className="text-center mb-4">
               <h1 className="font-heading text-3xl text-ivory mb-4">
                 Practice
@@ -389,47 +488,6 @@ export default function PracticePage() {
           {isPracticing && <IntonationNeedle />}
         </div>
 
-        {/* Session summary — shown after practice ends */}
-        {!isPracticing &&
-          !ghostMode &&
-          sessionSummary &&
-          sessionSummary.total_deviations > 0 && (
-            <div
-              data-testid="session-summary"
-              className="absolute top-4 right-4 w-72 bg-surface border border-border rounded-lg p-4 shadow-lg z-20"
-            >
-              <h3 className="font-heading text-sm text-ivory mb-2">
-                Session Summary
-              </h3>
-              <div className="space-y-1 font-body text-xs text-ivory-muted">
-                <p>Deviations logged: {sessionSummary.total_deviations}</p>
-                {sessionSummary.pitch_deviation_count > 0 && (
-                  <p>
-                    Pitch: {sessionSummary.pitch_deviation_count} (avg{' '}
-                    {sessionSummary.average_pitch_deviation_cents}c)
-                  </p>
-                )}
-                {sessionSummary.intonation_deviation_count > 0 && (
-                  <p>Intonation: {sessionSummary.intonation_deviation_count}</p>
-                )}
-                {sessionSummary.worst_measure && (
-                  <p className="text-amber">
-                    Needs work: m.{sessionSummary.worst_measure}
-                  </p>
-                )}
-              </div>
-              {heatMapData.length > 0 && (
-                <button
-                  data-testid="start-smart-loop-button"
-                  onClick={handleStartSmartLoop}
-                  className="mt-3 w-full font-body text-xs text-amber border border-amber/30 hover:bg-amber/10 rounded px-3 py-1.5 transition-colors"
-                >
-                  Smart Loop Weak Measures
-                </button>
-              )}
-            </div>
-          )}
-
         {/* Tap overlay hint — shows briefly when controls are hidden */}
         {ghostMode && !controlsVisible && (
           <div
@@ -467,20 +525,6 @@ export default function PracticePage() {
             }
           />
         )}
-
-        {/* AI Coach Debrief modal */}
-        <CoachDebrief
-          isOpen={debriefOpen}
-          onClose={() => setDebriefOpen(false)}
-          sessionLog={sessionLog}
-          sessionSummary={sessionSummary}
-          worstMeasures={debriefDataRef.current?.worstMeasures || []}
-          instrument={selectedInstrument || 'violin'}
-          onPracticeAgain={() => {
-            setDebriefOpen(false)
-            handlePlayPause()
-          }}
-        />
       </div>
     </PracticeView>
   )

@@ -1,23 +1,25 @@
 const express = require('express');
 const router = express.Router();
 
-// Initialize OpenAI client (will use OPENAI_API_KEY from environment)
-let openai = null;
+// Initialize Anthropic client (will use ANTHROPIC_API_KEY from environment)
+let anthropic = null;
 
-// Lazy initialization of OpenAI client
-function getOpenAIClient() {
-    if (!openai) {
-        const OpenAI = require('openai');
-        openai = new OpenAI({
-            apiKey: process.env.OPENAI_API_KEY
+// Lazy initialization of Anthropic client
+function getAnthropicClient() {
+    if (!anthropic) {
+        const Anthropic = require('@anthropic-ai/sdk');
+        anthropic = new Anthropic({
+            apiKey: process.env.ANTHROPIC_API_KEY
         });
     }
-    return openai;
+    return anthropic;
 }
 
 /**
  * POST /api/ai-summary
- * Generate AI-powered performance summary using GPT-4o-mini
+ * Generate AI-powered performance summary using Claude API.
+ * The LLM is prompted as an encouraging masterclass professor,
+ * returning max 2 sentences of feedback.
  */
 router.post('/ai-summary', async (req, res) => {
     try {
@@ -30,38 +32,32 @@ router.post('/ai-summary', async (req, res) => {
             });
         }
 
-        // Check if OpenAI API key is available
-        if (!process.env.OPENAI_API_KEY) {
-            console.warn('OpenAI API key not configured, using fallback');
+        // Check if Anthropic API key is available
+        if (!process.env.ANTHROPIC_API_KEY) {
+            console.warn('Anthropic API key not configured, using fallback');
             return res.status(200).json({
                 error: 'API key not configured',
                 message: 'Using fallback summary generation',
-                // Fallback will be handled by frontend
                 use_fallback: true
             });
         }
 
-        const client = getOpenAIClient();
+        const client = getAnthropicClient();
 
-        // Call GPT-4o-mini to generate summary
-        const completion = await client.chat.completions.create({
-            model: 'gpt-4o-mini',
+        const message = await client.messages.create({
+            model: 'claude-sonnet-4-6',
+            max_tokens: 500,
+            temperature: 0.7,
+            system: 'You are a masterclass string instructor providing encouraging and actionable feedback to students after their practice sessions. Keep your feedback concise, specific, and focused on improvement. Always respond with valid JSON.',
             messages: [
-                {
-                    role: 'system',
-                    content: 'You are a masterclass violin instructor providing encouraging and actionable feedback to students after their practice sessions. Keep your feedback concise, specific, and focused on improvement.'
-                },
                 {
                     role: 'user',
                     content: prompt
                 }
             ],
-            response_format: { type: 'json_object' },
-            temperature: 0.7,
-            max_tokens: 500
         });
 
-        const responseContent = completion.choices[0].message.content;
+        const responseContent = message.content[0].text;
 
         // Parse JSON response
         let parsedResponse;
@@ -106,7 +102,7 @@ router.post('/ai-summary', async (req, res) => {
         if (error.status === 401) {
             return res.status(401).json({
                 error: 'Authentication failed',
-                message: 'Invalid API key. Please check your OpenAI API key.',
+                message: 'Invalid API key. Please check your Anthropic API key.',
                 use_fallback: true
             });
         }

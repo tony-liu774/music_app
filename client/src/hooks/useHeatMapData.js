@@ -1,10 +1,26 @@
 import { useMemo } from 'react'
 
 /**
- * Maximum opacity for the crimson overlay (40% = 0.4).
- * Matches the design spec: `bg-crimson/40`.
+ * Maximum opacity for the crimson overlay.
+ * Error-dense measures scale up to 60% (0.6).
  */
-const MAX_OPACITY = 0.4
+const MAX_OPACITY = 0.6
+
+/**
+ * Minimum error count for a measure to be considered "error" vs "success".
+ * Measures with fewer errors than this AND low avg deviation get a success overlay.
+ */
+const SUCCESS_THRESHOLD_ERRORS = 2
+
+/**
+ * Maximum average deviation (cents) for a measure to qualify as "excellent".
+ */
+const SUCCESS_MAX_AVG_DEVIATION = 10
+
+/**
+ * Opacity for the success (emerald) overlay on excellent measures.
+ */
+const SUCCESS_OPACITY = 0.2
 
 /**
  * Calculate heat map data from a session log's deviations array.
@@ -14,9 +30,10 @@ const MAX_OPACITY = 0.4
  * heavily-errored measures approach MAX_OPACITY.
  *
  * @param {object|null} sessionLog - Session log from SessionLogger.getSessionLog()
- * @returns {Array<{measureNumber: number, errorCount: number, avgDeviation: number, maxDeviation: number, worstNote: string, opacity: number}>}
+ * @param {number} [totalMeasures=0] - Total measures in the score (for success overlays on clean measures)
+ * @returns {Array<{measureNumber: number, errorCount: number, avgDeviation: number, maxDeviation: number, worstNote: string, opacity: number, type: 'error'|'success'}>}
  */
-export function useHeatMapData(sessionLog) {
+export function useHeatMapData(sessionLog, totalMeasures = 0) {
   return useMemo(() => {
     if (
       !sessionLog ||
@@ -26,15 +43,19 @@ export function useHeatMapData(sessionLog) {
       return []
     }
 
-    return calculateHeatMapData(sessionLog.deviations)
-  }, [sessionLog])
+    return calculateHeatMapData(sessionLog.deviations, totalMeasures)
+  }, [sessionLog, totalMeasures])
 }
 
 /**
  * Pure function to compute heat map data from an array of deviations.
  * Exported for testing.
+ *
+ * @param {Array} deviations - Array of deviation objects
+ * @param {number} [totalMeasures=0] - Total measures in the score (enables success overlays)
+ * @returns {Array<{measureNumber: number, errorCount: number, avgDeviation: number, maxDeviation: number, worstNote: string, opacity: number, type: 'error'|'success'}>}
  */
-export function calculateHeatMapData(deviations) {
+export function calculateHeatMapData(deviations, totalMeasures = 0) {
   if (!deviations || deviations.length === 0) return []
 
   // Group deviations by measure
@@ -90,11 +111,45 @@ export function calculateHeatMapData(deviations) {
   // log(1 + count) / log(1 + maxCount) gives 0..1, then scale to MAX_OPACITY
   const logMax = Math.log(1 + maxErrors)
 
-  return measures
+  const errorMeasures = measures
     .map((m) => ({
       ...m,
+      type: 'error',
       opacity:
         logMax > 0 ? (Math.log(1 + m.errorCount) / logMax) * MAX_OPACITY : 0,
     }))
+
+  // Identify "excellent" measures: those with very few/no errors
+  const errorMeasureNumbers = new Set(measures.map((m) => m.measureNumber))
+  const successMeasures = []
+
+  if (totalMeasures > 0) {
+    for (let i = 1; i <= totalMeasures; i++) {
+      if (!errorMeasureNumbers.has(i)) {
+        // No errors at all — mark as success
+        successMeasures.push({
+          measureNumber: i,
+          errorCount: 0,
+          avgDeviation: 0,
+          maxDeviation: 0,
+          worstNote: null,
+          type: 'success',
+          opacity: SUCCESS_OPACITY,
+        })
+      }
+    }
+    // Also mark error measures that have very low error counts and deviation as success
+    for (const m of errorMeasures) {
+      if (
+        m.errorCount <= SUCCESS_THRESHOLD_ERRORS &&
+        m.avgDeviation <= SUCCESS_MAX_AVG_DEVIATION
+      ) {
+        m.type = 'success'
+        m.opacity = SUCCESS_OPACITY
+      }
+    }
+  }
+
+  return [...errorMeasures, ...successMeasures]
     .sort((a, b) => a.measureNumber - b.measureNumber)
 }
