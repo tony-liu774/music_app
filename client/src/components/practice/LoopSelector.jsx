@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useCallback } from 'react'
 
 /* eslint-disable react/prop-types */
 
@@ -20,8 +20,6 @@ export default function LoopSelector({
   onLoopChange,
   disabled = false,
 }) {
-  const [isOpen, setIsOpen] = useState(false)
-
   const isActive = loopStart !== null && loopEnd !== null
 
   const handleStartChange = useCallback(
@@ -44,21 +42,17 @@ export default function LoopSelector({
 
   const handleClearLoop = useCallback(() => {
     onLoopChange?.(null, null)
-    setIsOpen(false)
   }, [onLoopChange])
 
   const handleToggle = useCallback(() => {
     if (isActive) {
       handleClearLoop()
     } else {
-      setIsOpen((prev) => !prev)
-      if (!isOpen && !isActive) {
-        // Default: first 4 measures
-        const defaultEnd = Math.min(4, totalMeasures)
-        onLoopChange?.(1, defaultEnd)
-      }
+      // Default: first 4 measures
+      const defaultEnd = Math.min(4, totalMeasures)
+      onLoopChange?.(1, defaultEnd)
     }
-  }, [isActive, isOpen, totalMeasures, onLoopChange, handleClearLoop])
+  }, [isActive, totalMeasures, onLoopChange, handleClearLoop])
 
   return (
     <div className="flex items-center gap-2" data-testid="loop-selector">

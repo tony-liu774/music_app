@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import PracticeView from '../PracticeView'
 import { useUIStore } from '../../../stores/useUIStore'
 
@@ -13,7 +13,7 @@ describe('PracticeView', () => {
 
   it('renders children', () => {
     render(
-      <PracticeView isPlaying={false} onRequestStop={vi.fn()}>
+      <PracticeView>
         <div data-testid="child">Hello</div>
       </PracticeView>,
     )
@@ -22,7 +22,7 @@ describe('PracticeView', () => {
 
   it('renders with practice-view test id', () => {
     render(
-      <PracticeView isPlaying={false} onRequestStop={vi.fn()}>
+      <PracticeView>
         <div>Content</div>
       </PracticeView>,
     )
@@ -31,7 +31,7 @@ describe('PracticeView', () => {
 
   it('has relative positioning when not in ghost mode', () => {
     render(
-      <PracticeView isPlaying={false} onRequestStop={vi.fn()}>
+      <PracticeView>
         <div>Content</div>
       </PracticeView>,
     )
@@ -43,7 +43,7 @@ describe('PracticeView', () => {
   it('takes full viewport in ghost mode', () => {
     useUIStore.setState({ ghostMode: true })
     render(
-      <PracticeView isPlaying={true} onRequestStop={vi.fn()}>
+      <PracticeView>
         <div>Content</div>
       </PracticeView>,
     )
@@ -55,7 +55,7 @@ describe('PracticeView', () => {
 
   it('has 500ms transition for smooth fade', () => {
     render(
-      <PracticeView isPlaying={false} onRequestStop={vi.fn()}>
+      <PracticeView>
         <div>Content</div>
       </PracticeView>,
     )
@@ -64,40 +64,19 @@ describe('PracticeView', () => {
     expect(view.className).toContain('transition-all')
   })
 
-  it('calls onRequestStop when Escape is pressed during play', () => {
-    const onRequestStop = vi.fn()
+  it('is a purely visual wrapper with no keyboard handlers', () => {
+    // PracticeView should not register any keydown listeners —
+    // keyboard shortcuts are handled by PracticePage
+    const addSpy = vi.spyOn(window, 'addEventListener')
     render(
-      <PracticeView isPlaying={true} onRequestStop={onRequestStop}>
+      <PracticeView>
         <div>Content</div>
       </PracticeView>,
     )
-
-    fireEvent.keyDown(window, { code: 'Escape' })
-    expect(onRequestStop).toHaveBeenCalledTimes(1)
-  })
-
-  it('does not call onRequestStop on Escape when not playing', () => {
-    const onRequestStop = vi.fn()
-    render(
-      <PracticeView isPlaying={false} onRequestStop={onRequestStop}>
-        <div>Content</div>
-      </PracticeView>,
+    const keydownCalls = addSpy.mock.calls.filter(
+      ([event]) => event === 'keydown',
     )
-
-    fireEvent.keyDown(window, { code: 'Escape' })
-    expect(onRequestStop).not.toHaveBeenCalled()
-  })
-
-  it('cleans up keydown listener on unmount', () => {
-    const onRequestStop = vi.fn()
-    const { unmount } = render(
-      <PracticeView isPlaying={true} onRequestStop={onRequestStop}>
-        <div>Content</div>
-      </PracticeView>,
-    )
-
-    unmount()
-    fireEvent.keyDown(window, { code: 'Escape' })
-    expect(onRequestStop).not.toHaveBeenCalled()
+    expect(keydownCalls).toHaveLength(0)
+    addSpy.mockRestore()
   })
 })

@@ -5,13 +5,11 @@ import { useSettingsStore } from '../../stores/useSettingsStore'
 /* eslint-disable react/prop-types */
 
 /**
- * "Breath" Intonation Needle — a subtle visual indicator that is invisible
- * when the player is in tune (within 10 cents) and smoothly appears with
- * color feedback when intonation drifts.
+ * "Breath" Intonation Needle — a subtle visual indicator fixed to the right
+ * edge of the screen. Invisible when the player is in tune (within 10 cents)
+ * and smoothly appears with color feedback when intonation drifts.
  *
  * Props:
- * - cursorX: number — horizontal pixel position to track (predictive cursor)
- * - cursorY: number — vertical pixel position to track
  * - className: string — additional CSS classes
  */
 
@@ -55,19 +53,9 @@ export default function IntonationNeedle({ className = '' }) {
     const needle = needleRef.current
     if (!needle) return
 
-    const { pitchData, vibratoData, isPracticing } = useAudioStore.getState()
+    const { pitchData, isPracticing } = useAudioStore.getState()
 
-    // Use vibrato-filtered cents when vibrato is active, raw cents otherwise
-    let cents = pitchData.cents
-    if (
-      vibratoData.isVibrato &&
-      vibratoData.centerFrequency != null &&
-      pitchData.frequency != null
-    ) {
-      // Recalculate cents from the smoothed center frequency vs the nearest note
-      // For vibrato, the raw cents already reflects the center, so we use it directly
-      cents = pitchData.cents
-    }
+    const cents = pitchData.cents
 
     // If not practicing or no pitch data, hide immediately
     if (!isPracticing || cents === null || pitchData.confidence < 0.3) {

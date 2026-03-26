@@ -293,7 +293,7 @@ export default function PracticePage() {
   }, [])
 
   return (
-    <PracticeView isPlaying={isPracticing} onRequestStop={handleStop}>
+    <PracticeView>
       <div data-testid="practice-page" className="relative h-full">
         {/* Sheet music area */}
         <div
