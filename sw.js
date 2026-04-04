@@ -1,4 +1,4 @@
-const CACHE_NAME = 'concertmaster-v3';
+const CACHE_NAME = 'concertmaster-v4';
 const API_CACHE_NAME = 'concertmaster-api-v2';
 const ASSETS = [
     '/',
