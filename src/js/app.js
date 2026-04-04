@@ -38,7 +38,8 @@ class ConcertmasterApp {
         this.annotationService = null;
         this.annotationCanvasClickHandler = null;
 
-        // Onboarding
+        // Onboarding & Global State
+        this.instrumentStore = (typeof window !== 'undefined' && window.instrumentStore) || null;
         this.onboardingService = null;
         this.onboardingUI = null;
 
@@ -391,13 +392,28 @@ class ConcertmasterApp {
      * Initialize onboarding flow
      */
     initOnboarding() {
-        // Create onboarding service
-        this.onboardingService = new OnboardingService();
+        // Create onboarding service with global store
+        this.onboardingService = new OnboardingService(this.instrumentStore);
 
-        // Load saved instrument if available
-        const savedInstrument = localStorage.getItem('selected_instrument');
+        // Load saved instrument from store or localStorage
+        const savedInstrument = this.instrumentStore?.getInstrument() ||
+            localStorage.getItem('selected_instrument');
         if (savedInstrument && this.onboardingService.instrumentRanges[savedInstrument]) {
             this.selectedInstrument = savedInstrument;
+        }
+
+        // Subscribe to store changes so DSP engine stays in sync
+        if (this.instrumentStore) {
+            this.instrumentStore.subscribe((key, value) => {
+                if (key === 'instrument' && value && this.audioEngine) {
+                    this.audioEngine.setInstrument(value);
+                    this.selectedInstrument = value;
+                }
+                // Remove mic-blocked banners when permission is granted
+                if (key === 'microphoneGranted' && value === true) {
+                    document.querySelectorAll('.mic-blocked-banner').forEach(b => b.remove());
+                }
+            });
         }
 
         // Create onboarding UI
@@ -407,7 +423,7 @@ class ConcertmasterApp {
         this.onboardingService.setOnComplete((data) => {
             // Apply instrument calibration to audio engine
             if (this.audioEngine && data.instrument) {
-                this.audioEngine.setInstrumentCalibration(data.instrument);
+                this.audioEngine.setInstrument(data.instrument);
                 this.selectedInstrument = data.instrument;
             }
 
@@ -711,6 +727,20 @@ class ConcertmasterApp {
     }
 
     showView(viewId) {
+        // Block Tuner/Practice views if microphone not granted
+        const micRequiredViews = ['tuner-view', 'practice-view'];
+        if (micRequiredViews.includes(viewId) && this.instrumentStore && !this.instrumentStore.isMicrophoneGranted()) {
+            this._showMicBlockedOverlay(viewId);
+            return;
+        }
+
+        this._activateView(viewId);
+    }
+
+    /**
+     * Activate a view (update nav, show view, refresh if needed)
+     */
+    _activateView(viewId) {
         // Update nav links
         document.querySelectorAll('.nav-link').forEach(link => {
             link.classList.remove('active');
@@ -765,6 +795,45 @@ class ConcertmasterApp {
         if (pieceId && this.selectScore) {
             this.selectScore(pieceId);
         }
+    }
+
+    /**
+     * Show mic-blocked overlay that prevents access to mic-required views
+     */
+    _showMicBlockedOverlay(viewId) {
+        // Remove any existing overlay
+        document.querySelector('.mic-blocked-banner')?.remove();
+
+        const overlay = document.createElement('div');
+        overlay.className = 'mic-blocked-banner';
+        overlay.setAttribute('role', 'alert');
+        overlay.innerHTML = `
+            <h3>Microphone Required</h3>
+            <p>This feature needs microphone access for real-time audio analysis. Please enable microphone permissions in your browser or OS settings.</p>
+            <div class="mic-blocked-actions">
+                <button class="btn btn-primary mic-blocked-settings-btn">Enable Microphone</button>
+                <button class="btn btn-secondary mic-blocked-back-btn">Go Back</button>
+            </div>
+        `;
+
+        overlay.querySelector('.mic-blocked-settings-btn')?.addEventListener('click', async () => {
+            if (this.onboardingService) {
+                const granted = await this.onboardingService.requestMicrophonePermission();
+                if (granted) {
+                    overlay.remove();
+                    this._activateView(viewId);
+                }
+            }
+        });
+
+        overlay.querySelector('.mic-blocked-back-btn')?.addEventListener('click', () => {
+            overlay.remove();
+            this._activateView('dashboard-view');
+        });
+
+        // Show overlay in the app container instead of navigating to the view
+        const mainContent = document.querySelector('.main-content') || document.body;
+        mainContent.appendChild(overlay);
     }
 
     setupModals() {

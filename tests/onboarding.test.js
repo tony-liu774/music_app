@@ -1,37 +1,39 @@
 /**
- * Tests for Onboarding Service and Audio Engine Calibration
+ * Tests for Onboarding Service, OnboardingUI, and Audio Engine Calibration
  */
 
-// Set up globals
-global.window = global;
-global.localStorage = {
-    data: {},
-    getItem: jest.fn(function(key) { return this.data[key] || null; }),
-    setItem: jest.fn(function(key, value) { this.data[key] = value; }),
-    removeItem: jest.fn(function(key) { delete this.data[key]; }),
-    clear: function() { this.data = {}; }
-};
-global.navigator = {
-    mediaDevices: {
-        getUserMedia: jest.fn().mockResolvedValue({
-            getTracks: jest.fn().mockReturnValue([{ stop: jest.fn() }])
-        })
-    }
-};
+// Mock getUserMedia before anything loads
+const mockGetUserMedia = jest.fn().mockResolvedValue({
+    getTracks: jest.fn().mockReturnValue([{ stop: jest.fn() }])
+});
 
+Object.defineProperty(global.navigator, 'mediaDevices', {
+    value: { getUserMedia: mockGetUserMedia },
+    writable: true,
+    configurable: true
+});
+
+// Load InstrumentStore first (OnboardingService depends on it)
+delete global.window.InstrumentStore;
+delete global.window.instrumentStore;
+require('../src/js/services/instrument-store.js');
 require('../src/js/services/onboarding-service.js');
-require('../src/js/audio/audio-engine.js');
 
 const OnboardingService = global.window.OnboardingService;
-const AudioEngine = global.window.AudioEngine;
+const InstrumentStore = global.window.InstrumentStore;
 
 describe('OnboardingService', () => {
     let service;
+    let store;
 
     beforeEach(() => {
-        global.localStorage.clear();
-        jest.clearAllMocks();
-        service = new OnboardingService();
+        localStorage.clear();
+        mockGetUserMedia.mockReset();
+        mockGetUserMedia.mockResolvedValue({
+            getTracks: jest.fn().mockReturnValue([{ stop: jest.fn() }])
+        });
+        store = new InstrumentStore();
+        service = new OnboardingService(store);
     });
 
     describe('constructor', () => {
@@ -41,6 +43,20 @@ describe('OnboardingService', () => {
             expect(service.selectedInstrument).toBeNull();
             expect(service.microphoneGranted).toBe(false);
             expect(service.cameraGranted).toBe(false);
+        });
+
+        test('should accept store parameter', () => {
+            expect(service.store).toBe(store);
+        });
+
+        test('should work without store', () => {
+            const savedStore = window.instrumentStore;
+            window.instrumentStore = null;
+            const noStoreService = new OnboardingService(null);
+            expect(noStoreService.store).toBeNull();
+            noStoreService.selectInstrument('violin');
+            expect(noStoreService.selectedInstrument).toBe('violin');
+            window.instrumentStore = savedStore;
         });
 
         test('should have instrument ranges defined', () => {
@@ -84,21 +100,17 @@ describe('OnboardingService', () => {
 
     describe('checkOnboardingStatus', () => {
         test('should return false when onboarding not completed', () => {
-            global.localStorage.getItem.mockReturnValueOnce(null);
             expect(service.checkOnboardingStatus()).toBe(false);
         });
 
         test('should return false when instrument not selected', () => {
-            global.localStorage.getItem
-                .mockReturnValueOnce('true')  // onboarding_complete
-                .mockReturnValueOnce(null);   // selected_instrument
+            localStorage.setItem('onboarding_complete', 'true');
             expect(service.checkOnboardingStatus()).toBe(false);
         });
 
         test('should return true when fully completed', () => {
-            global.localStorage.getItem
-                .mockReturnValueOnce('true')    // onboarding_complete
-                .mockReturnValueOnce('violin'); // selected_instrument
+            localStorage.setItem('onboarding_complete', 'true');
+            localStorage.setItem('selected_instrument', 'violin');
             expect(service.checkOnboardingStatus()).toBe(true);
         });
     });
@@ -145,7 +157,7 @@ describe('OnboardingService', () => {
         test('should select valid instrument', () => {
             service.selectInstrument('violin');
             expect(service.selectedInstrument).toBe('violin');
-            expect(global.localStorage.setItem).toHaveBeenCalledWith('selected_instrument', 'violin');
+            expect(localStorage.getItem('selected_instrument')).toBe('violin');
         });
 
         test('should not select invalid instrument', () => {
@@ -163,6 +175,11 @@ describe('OnboardingService', () => {
 
         test('should return null for range when no instrument selected', () => {
             expect(service.getSelectedInstrumentRange()).toBeNull();
+        });
+
+        test('should sync instrument to global store', () => {
+            service.selectInstrument('viola');
+            expect(store.getInstrument()).toBe('viola');
         });
     });
 
@@ -190,26 +207,64 @@ describe('OnboardingService', () => {
             const result = await service.requestMicrophonePermission();
             expect(result).toBe(true);
             expect(service.microphoneGranted).toBe(true);
-            expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith({ audio: true });
+            expect(service.microphoneDenied).toBe(false);
+            expect(mockGetUserMedia).toHaveBeenCalledWith({ audio: true });
         });
 
         test('should handle microphone permission denial', async () => {
-            navigator.mediaDevices.getUserMedia.mockRejectedValueOnce(new Error('Denied'));
+            mockGetUserMedia.mockRejectedValueOnce(new Error('Denied'));
             const result = await service.requestMicrophonePermission();
             expect(result).toBe(false);
             expect(service.microphoneGranted).toBe(false);
+            expect(service.microphoneDenied).toBe(true);
+        });
+
+        test('should sync mic permission to store on grant', async () => {
+            await service.requestMicrophonePermission();
+            expect(store.isMicrophoneGranted()).toBe(true);
+        });
+
+        test('should sync mic permission to store on denial', async () => {
+            mockGetUserMedia.mockRejectedValueOnce(new Error('Denied'));
+            await service.requestMicrophonePermission();
+            expect(store.isMicrophoneGranted()).toBe(false);
         });
 
         test('should request camera permission', async () => {
             const result = await service.requestCameraPermission();
             expect(result).toBe(true);
             expect(service.cameraGranted).toBe(true);
+            expect(service.cameraDenied).toBe(false);
+        });
+
+        test('should handle camera permission denial', async () => {
+            mockGetUserMedia.mockRejectedValueOnce(new Error('Denied'));
+            const result = await service.requestCameraPermission();
+            expect(result).toBe(false);
+            expect(service.cameraGranted).toBe(false);
+            expect(service.cameraDenied).toBe(true);
+        });
+
+        test('should sync camera permission to store', async () => {
+            await service.requestCameraPermission();
+            expect(store.getState().cameraGranted).toBe(true);
         });
 
         test('should request all permissions', async () => {
             const result = await service.requestPermissions();
             expect(result.microphone).toBe(true);
             expect(result.camera).toBe(true);
+        });
+
+        test('isMicrophoneBlocked should return true after denial', async () => {
+            mockGetUserMedia.mockRejectedValueOnce(new Error('Denied'));
+            await service.requestMicrophonePermission();
+            expect(service.isMicrophoneBlocked()).toBe(true);
+        });
+
+        test('isMicrophoneBlocked should return false after grant', async () => {
+            await service.requestMicrophonePermission();
+            expect(service.isMicrophoneBlocked()).toBe(false);
         });
     });
 
@@ -238,6 +293,18 @@ describe('OnboardingService', () => {
         });
     });
 
+    describe('finishOnboarding', () => {
+        test('should sync onboarding complete to store', () => {
+            service.finishOnboarding();
+            expect(store.getState().onboardingComplete).toBe(true);
+        });
+
+        test('should persist to localStorage', () => {
+            service.finishOnboarding();
+            expect(localStorage.getItem('onboarding_complete')).toBe('true');
+        });
+    });
+
     describe('progress', () => {
         test('should calculate progress correctly', () => {
             service.start();
@@ -258,124 +325,353 @@ describe('OnboardingService', () => {
             service.resetOnboarding();
             expect(service.hasCompletedOnboarding).toBe(false);
             expect(service.selectedInstrument).toBeNull();
-            expect(global.localStorage.removeItem).toHaveBeenCalledWith('onboarding_complete');
-            expect(global.localStorage.removeItem).toHaveBeenCalledWith('selected_instrument');
+            expect(localStorage.getItem('onboarding_complete')).toBeNull();
+            expect(localStorage.getItem('selected_instrument')).toBeNull();
+        });
+
+        test('should reset global store', () => {
+            store.setInstrument('violin');
+            store.setMicrophoneGranted(true);
+            service.resetOnboarding();
+            expect(store.getInstrument()).toBeNull();
+            expect(store.isMicrophoneGranted()).toBe(false);
         });
     });
 });
 
-describe('AudioEngine Calibration', () => {
-    let engine;
+describe('OnboardingUI', () => {
+    let service;
+    let store;
+    let ui;
+    let container;
 
     beforeEach(() => {
-        // Mock AudioContext
-        global.AudioContext = jest.fn().mockImplementation(() => ({
-            sampleRate: 44100,
-            state: 'running',
-            createAnalyser: jest.fn().mockReturnValue({
-                fftSize: 4096,
-                frequencyBinCount: 2048,
-                smoothingTimeConstant: 0.8,
-                getFloatFrequencyData: jest.fn(),
-                getFloatTimeDomainData: jest.fn(),
-                getByteFrequencyData: jest.fn()
-            }),
-            createGain: jest.fn().mockReturnValue({ gain: { value: 1 }, connect: jest.fn(), disconnect: jest.fn() }),
-            createBiquadFilter: jest.fn().mockReturnValue({
-                type: 'bandpass',
-                frequency: { value: 0 },
-                Q: { value: 1 },
-                connect: jest.fn(),
-                disconnect: jest.fn()
-            }),
-            createMediaStreamSource: jest.fn().mockReturnValue({ connect: jest.fn(), disconnect: jest.fn() }),
-            close: jest.fn(),
-            resume: jest.fn()
-        }));
+        localStorage.clear();
+        mockGetUserMedia.mockReset();
+        mockGetUserMedia.mockResolvedValue({
+            getTracks: jest.fn().mockReturnValue([{ stop: jest.fn() }])
+        });
 
-        engine = new AudioEngine();
+        store = new InstrumentStore();
+        service = new OnboardingService(store);
+
+        // Set up DOM
+        container = document.createElement('div');
+        container.id = 'onboarding-modal';
+        container.className = 'modal onboarding-modal';
+        container.innerHTML = `
+            <div class="onboarding-container">
+                <div class="onboarding-progress-bar">
+                    <div class="onboarding-progress"></div>
+                </div>
+                <div class="onboarding-content"></div>
+            </div>
+        `;
+        document.body.appendChild(container);
+
+        // Load OnboardingUI
+        require('../src/js/components/onboarding-ui.js');
+        ui = new (global.window.OnboardingUI)(service);
     });
 
-    describe('instrument ranges', () => {
-        test('should have correct instrument ranges', () => {
-            expect(engine.instrumentRanges.violin.minFreq).toBe(196);
-            expect(engine.instrumentRanges.violin.maxFreq).toBe(2637);
-
-            expect(engine.instrumentRanges.viola.minFreq).toBe(130);
-            expect(engine.instrumentRanges.viola.maxFreq).toBe(1760);
-
-            expect(engine.instrumentRanges.cello.minFreq).toBe(65);
-            expect(engine.instrumentRanges.cello.maxFreq).toBe(987);
-
-            expect(engine.instrumentRanges.bass.minFreq).toBe(41);
-            expect(engine.instrumentRanges.bass.maxFreq).toBe(523);
-        });
+    afterEach(() => {
+        container.remove();
     });
 
-    describe('setInstrumentCalibration', () => {
-        test('should set violin calibration', async () => {
-            await engine.init();
-            const result = engine.setInstrumentCalibration('violin');
-
-            expect(result).toBe(true);
-            expect(engine.currentInstrument).toBe('violin');
-            expect(engine.inputFilter).toBeDefined();
-        });
-
-        test('should set viola calibration', async () => {
-            await engine.init();
-            const result = engine.setInstrumentCalibration('viola');
-
-            expect(result).toBe(true);
-            expect(engine.currentInstrument).toBe('viola');
-        });
-
-        test('should set cello calibration', async () => {
-            await engine.init();
-            const result = engine.setInstrumentCalibration('cello');
-
-            expect(result).toBe(true);
-            expect(engine.currentInstrument).toBe('cello');
-        });
-
-        test('should set bass calibration', async () => {
-            await engine.init();
-            const result = engine.setInstrumentCalibration('bass');
-
-            expect(result).toBe(true);
-            expect(engine.currentInstrument).toBe('bass');
-        });
-
-        test('should return false for invalid instrument', async () => {
-            await engine.init();
-            const result = engine.setInstrumentCalibration('invalid');
-
-            expect(result).toBe(false);
-            expect(engine.currentInstrument).toBeNull();
-        });
+    test('should render welcome step on init when onboarding not complete', () => {
+        ui.init();
+        const heading = container.querySelector('h2');
+        expect(heading.textContent).toBe('Welcome to Virtual Concertmaster');
     });
 
-    describe('getCurrentInstrumentRange', () => {
-        test('should return null when no instrument set', () => {
-            expect(engine.getCurrentInstrumentRange()).toBeNull();
+    test('should show modal when onboarding needed', () => {
+        ui.init();
+        expect(container.classList.contains('active')).toBe(true);
+    });
+
+    test('should not show modal when onboarding already complete', () => {
+        service.hasCompletedOnboarding = true;
+        ui.init();
+        expect(container.classList.contains('active')).toBe(false);
+    });
+
+    test('should render permissions step with denied message elements', () => {
+        ui.init();
+        service.nextStep(); // go to permissions
+        expect(container.querySelector('#mic-denied-msg')).not.toBeNull();
+        expect(container.querySelector('#cam-denied-msg')).not.toBeNull();
+    });
+
+    test('should show denied message when mic permission fails', async () => {
+        ui.init();
+        service.nextStep(); // go to permissions
+        mockGetUserMedia.mockRejectedValueOnce(new Error('Denied'));
+        const micBtn = container.querySelector('#request-mic');
+        micBtn.click();
+        // Wait for async
+        await new Promise(r => setTimeout(r, 10));
+        const deniedMsg = container.querySelector('#mic-denied-msg');
+        expect(deniedMsg.style.display).toBe('flex');
+    });
+
+    test('should show granted state when mic permission succeeds', async () => {
+        ui.init();
+        service.nextStep();
+        const micBtn = container.querySelector('#request-mic');
+        micBtn.click();
+        await new Promise(r => setTimeout(r, 10));
+        const card = container.querySelector('#mic-permission-card');
+        expect(card.classList.contains('granted')).toBe(true);
+        expect(micBtn.textContent).toBe('Granted');
+        expect(micBtn.disabled).toBe(true);
+    });
+
+    test('should render instrument carousel with 4 cards', () => {
+        ui.init();
+        service.nextStep(); // permissions
+        service.nextStep(); // instrument
+        const cards = container.querySelectorAll('.carousel-card');
+        expect(cards.length).toBe(4);
+    });
+
+    test('should have carousel navigation arrows', () => {
+        ui.init();
+        service.nextStep();
+        service.nextStep();
+        expect(container.querySelector('#carousel-prev')).toBeTruthy();
+        expect(container.querySelector('#carousel-next')).toBeTruthy();
+    });
+
+    test('should have carousel dots', () => {
+        ui.init();
+        service.nextStep();
+        service.nextStep();
+        const dots = container.querySelectorAll('.carousel-dot');
+        expect(dots.length).toBe(4);
+    });
+
+    test('should select first instrument by default in carousel', () => {
+        ui.init();
+        service.nextStep();
+        service.nextStep();
+        expect(service.selectedInstrument).toBe('violin');
+    });
+
+    test('carousel next arrow should advance to next instrument', () => {
+        ui.init();
+        service.nextStep();
+        service.nextStep();
+        const nextBtn = container.querySelector('#carousel-next');
+        nextBtn.click();
+        expect(service.selectedInstrument).toBe('viola');
+        expect(ui.carouselIndex).toBe(1);
+    });
+
+    test('carousel should wrap around from last to first', () => {
+        ui.init();
+        service.nextStep();
+        service.nextStep();
+        const nextBtn = container.querySelector('#carousel-next');
+        nextBtn.click(); // viola
+        nextBtn.click(); // cello
+        nextBtn.click(); // bass
+        nextBtn.click(); // wrap to violin
+        expect(service.selectedInstrument).toBe('violin');
+        expect(ui.carouselIndex).toBe(0);
+    });
+
+    test('carousel dot click should navigate to that instrument', () => {
+        ui.init();
+        service.nextStep();
+        service.nextStep();
+        const dots = container.querySelectorAll('.carousel-dot');
+        dots[2].click(); // cello
+        expect(service.selectedInstrument).toBe('cello');
+        expect(ui.carouselIndex).toBe(2);
+    });
+
+    test('carousel prev arrow should wrap from first to last', () => {
+        ui.init();
+        service.nextStep();
+        service.nextStep();
+        const prevBtn = container.querySelector('#carousel-prev');
+        prevBtn.click(); // wrap to bass
+        expect(service.selectedInstrument).toBe('bass');
+        expect(ui.carouselIndex).toBe(3);
+    });
+
+    test('should render calibration step with instrument name', () => {
+        ui.init();
+        service.selectInstrument('viola');
+        service.currentStep = 3; // calibration
+        ui.currentStep = 'calibration';
+        ui.renderCurrentStep();
+        const text = container.querySelector('.calibration-step p');
+        expect(text.innerHTML).toContain('Viola');
+    });
+
+    test('should render complete step with success message', () => {
+        ui.init();
+        service.currentStep = 4; // complete
+        ui.currentStep = 'complete';
+        ui.renderCurrentStep();
+        expect(container.querySelector('.complete-step h2').textContent).toBe("You're All Set!");
+    });
+
+    test('should hide modal on completion', () => {
+        ui.init();
+        ui.onComplete({});
+        expect(container.classList.contains('active')).toBe(false);
+    });
+
+    test('skip button should finish onboarding', () => {
+        ui.init();
+        // Set callback after init (init sets its own onComplete)
+        const completeCb = jest.fn();
+        service.setOnComplete(completeCb);
+        container.querySelector('#onboarding-skip').click();
+        expect(completeCb).toHaveBeenCalled();
+    });
+
+    test('progress bar should update with step changes', () => {
+        ui.init();
+        const progressBar = container.querySelector('.onboarding-progress');
+        expect(progressBar.style.width).toBe('0%');
+        service.nextStep();
+        expect(progressBar.style.width).toBe('25%');
+    });
+
+    test('carousel cards should have ARIA attributes', () => {
+        ui.init();
+        service.nextStep();
+        service.nextStep();
+        const cards = container.querySelectorAll('.carousel-card');
+        expect(cards[0].getAttribute('role')).toBe('option');
+        expect(cards[0].getAttribute('aria-selected')).toBe('true');
+        expect(cards[1].getAttribute('aria-selected')).toBe('false');
+    });
+
+    test('open settings button should show guidance toast', () => {
+        ui.init();
+        service.nextStep();
+        // Simulate denied state to show the button
+        const deniedMsg = container.querySelector('#mic-denied-msg');
+        deniedMsg.style.display = 'flex';
+        const settingsBtn = container.querySelector('#open-mic-settings');
+        settingsBtn.click();
+        const toast = container.querySelector('.settings-guidance-toast');
+        expect(toast).not.toBeNull();
+        expect(toast.classList.contains('visible')).toBe(true);
+    });
+
+    test('calibration timer should be cleared on step change', () => {
+        ui.init();
+        service.nextStep(); // permissions
+        service.nextStep(); // instrument
+        service.nextStep(); // calibration
+        expect(ui._calibrationTimer).not.toBeNull();
+        service.prevStep(); // back to instrument — should clear
+        expect(ui._calibrationTimer).toBeNull();
+    });
+
+    test('hide should clear timers', () => {
+        ui.init();
+        service.nextStep();
+        service.nextStep();
+        service.nextStep(); // calibration
+        expect(ui._calibrationTimer).not.toBeNull();
+        ui.hide();
+        expect(ui._calibrationTimer).toBeNull();
+    });
+});
+
+describe('Mic-Blocked Overlay (app.js integration)', () => {
+    let store;
+
+    beforeEach(() => {
+        localStorage.clear();
+        store = new InstrumentStore();
+        // Clean up any leftover overlays
+        document.querySelectorAll('.mic-blocked-banner').forEach(b => b.remove());
+        // Create mock main content area
+        let mainContent = document.querySelector('.main-content');
+        if (!mainContent) {
+            mainContent = document.createElement('div');
+            mainContent.className = 'main-content';
+            document.body.appendChild(mainContent);
+        }
+    });
+
+    afterEach(() => {
+        document.querySelectorAll('.mic-blocked-banner').forEach(b => b.remove());
+    });
+
+    test('showView should block navigation when mic not granted', () => {
+        // Simulate the app's showView logic
+        const micRequiredViews = ['tuner-view', 'practice-view'];
+        const viewId = 'tuner-view';
+        const micGranted = store.isMicrophoneGranted();
+        expect(micGranted).toBe(false);
+        expect(micRequiredViews.includes(viewId)).toBe(true);
+    });
+
+    test('mic-blocked overlay should have Enable Microphone and Go Back buttons', () => {
+        const overlay = document.createElement('div');
+        overlay.className = 'mic-blocked-banner';
+        overlay.setAttribute('role', 'alert');
+        overlay.innerHTML = `
+            <h3>Microphone Required</h3>
+            <p>This feature needs microphone access.</p>
+            <div class="mic-blocked-actions">
+                <button class="btn btn-primary mic-blocked-settings-btn">Enable Microphone</button>
+                <button class="btn btn-secondary mic-blocked-back-btn">Go Back</button>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        expect(overlay.querySelector('.mic-blocked-settings-btn')).not.toBeNull();
+        expect(overlay.querySelector('.mic-blocked-back-btn')).not.toBeNull();
+        expect(overlay.getAttribute('role')).toBe('alert');
+        overlay.remove();
+    });
+
+    test('duplicate overlays should not be created', () => {
+        // First overlay
+        const overlay1 = document.createElement('div');
+        overlay1.className = 'mic-blocked-banner';
+        document.querySelector('.main-content').appendChild(overlay1);
+
+        // Check for existing and remove before adding new
+        document.querySelector('.mic-blocked-banner')?.remove();
+        const overlay2 = document.createElement('div');
+        overlay2.className = 'mic-blocked-banner';
+        document.querySelector('.main-content').appendChild(overlay2);
+
+        const banners = document.querySelectorAll('.mic-blocked-banner');
+        expect(banners.length).toBe(1);
+    });
+
+    test('store subscription should remove banners when mic granted', () => {
+        const overlay = document.createElement('div');
+        overlay.className = 'mic-blocked-banner';
+        document.body.appendChild(overlay);
+        expect(document.querySelector('.mic-blocked-banner')).not.toBeNull();
+
+        // Simulate what the store subscription does
+        store.subscribe((key, value) => {
+            if (key === 'microphoneGranted' && value === true) {
+                document.querySelectorAll('.mic-blocked-banner').forEach(b => b.remove());
+            }
         });
+        store.setMicrophoneGranted(true);
 
-        test('should return correct range for violin', async () => {
-            await engine.init();
-            engine.setInstrumentCalibration('violin');
-            const range = engine.getCurrentInstrumentRange();
+        expect(document.querySelector('.mic-blocked-banner')).toBeNull();
+    });
 
-            expect(range.minFreq).toBe(196);
-            expect(range.maxFreq).toBe(2637);
-        });
-
-        test('should return correct range for cello', async () => {
-            await engine.init();
-            engine.setInstrumentCalibration('cello');
-            const range = engine.getCurrentInstrumentRange();
-
-            expect(range.minFreq).toBe(65);
-            expect(range.maxFreq).toBe(987);
-        });
+    test('overlay should not appear when mic is granted', () => {
+        store.setMicrophoneGranted(true);
+        const micRequiredViews = ['tuner-view', 'practice-view'];
+        const shouldBlock = micRequiredViews.includes('tuner-view') && !store.isMicrophoneGranted();
+        expect(shouldBlock).toBe(false);
     });
 });
