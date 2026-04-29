@@ -11,7 +11,6 @@ import Library from './pages/Library'
 import PracticePage from './pages/PracticePage'
 import Tuner from './pages/Tuner'
 import Settings from './pages/Settings'
-import StudioDashboard from './pages/StudioDashboard'
 
 function App() {
   return (
@@ -34,10 +33,6 @@ function App() {
                   <Route path="practice" element={<PracticePage />} />
                   <Route path="tuner" element={<Tuner />} />
                   <Route path="settings" element={<Settings />} />
-                  <Route
-                    path="studio-dashboard"
-                    element={<StudioDashboard />}
-                  />
                 </Route>
               </Routes>
             </HashRouter>

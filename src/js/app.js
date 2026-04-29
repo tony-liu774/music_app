@@ -62,30 +62,10 @@ class ConcertmasterApp {
         // Screen reader live region
         this.liveRegion = null;
 
-        // Teacher mode
-        this.isTeacherMode = false;
-        this.teacherService = null;
-        this.studioDashboard = null;
-
-        // Assignment service (Smart Assignments)
-        this.assignmentService = null;
-        this.assignmentUI = null;
-
-        // Up Next widget (Student view)
-        this.upNextWidget = null;
-
         // SSO / OAuth
         this.authService = null;
         this.oauthService = null;
         this.ssoLoginUI = null;
-
-        // License service
-        this.licenseService = null;
-        this.licenseUI = null;
-
-        // Role Selection
-        this.roleSelectionService = null;
-        this.roleSelectionUI = null;
     }
 
     async init() {
@@ -118,20 +98,6 @@ class ConcertmasterApp {
             // Load library
             await this.loadLibrary();
 
-            // Initialize teacher mode if enabled
-            this.initTeacherMode();
-
-            // Initialize student widget when teacher mode is not active
-            if (!this.isTeacherMode) {
-                await this.initStudentWidget();
-            }
-
-            // Initialize license service (always needed for feature gating)
-            await this.initLicense();
-
-            // Initialize video snippet feature
-            this.initVideoSnippets();
-
             // Initialize dashboard UI
             this.initDashboard();
 
@@ -159,9 +125,7 @@ class ConcertmasterApp {
             practice: document.getElementById('practice-view'),
             metronome: document.getElementById('metronome-view'),
             settings: document.getElementById('settings-view'),
-            tuner: document.getElementById('tuner-view'),
-            studio: document.getElementById('studio-dashboard-view'),
-            license: document.getElementById('license-view')
+            tuner: document.getElementById('tuner-view')
         };
 
         this.toastContainer = document.getElementById('toast-container');
@@ -445,11 +409,6 @@ class ConcertmasterApp {
         this.authService = new AuthService();
         this.oauthService = new OAuthService(this.authService);
 
-        // Initialize role selection service
-        if (typeof RoleSelectionService !== 'undefined') {
-            this.roleSelectionService = new RoleSelectionService(this.authService);
-        }
-
         // Initialize offline session manager and session persistence
         if (typeof OfflineSessionManager !== 'undefined') {
             this.offlineSessionManager = new OfflineSessionManager();
@@ -490,13 +449,10 @@ class ConcertmasterApp {
         // Fetch OAuth client IDs from the server endpoint
         await this.oauthService.fetchConfig();
 
-        // Listen for logout events to clear OAuth provider, role, and session
+        // Listen for logout events to clear OAuth provider and session
         this.authService.onAuthStateChange((event) => {
             if (event === 'logout') {
                 this.oauthService.clearProvider();
-                if (this.roleSelectionService) {
-                    this.roleSelectionService.clearRole();
-                }
                 if (this.sessionPersistence) {
                     this.sessionPersistence.onLogout();
                 }
@@ -506,9 +462,6 @@ class ConcertmasterApp {
                 }
             }
         });
-
-        // Initialize role selection UI
-        this._initRoleSelectionUI();
 
         // Show SSO login screen if user is not authenticated
         if (typeof SSOLoginUI !== 'undefined') {
@@ -522,12 +475,6 @@ class ConcertmasterApp {
                             this.sessionPersistence.onLogin(user);
                         }
                     }
-                    // Show role selection for new users (first sign-in)
-                    if (user && this.roleSelectionService && !this.roleSelectionService.hasSelectedRole()) {
-                        this._showRoleSelection();
-                    } else if (this.roleSelectionService) {
-                        this._applyUserRole(this.roleSelectionService.getRole());
-                    }
                 },
                 onError: (error, provider) => {
                     console.warn(`SSO error (${provider}):`, error.message);
@@ -536,86 +483,6 @@ class ConcertmasterApp {
 
             if (!this.authService.isAuthenticated()) {
                 this.ssoLoginUI.show();
-            } else if (this.roleSelectionService && !this.roleSelectionService.hasSelectedRole()) {
-                // User is authenticated but hasn't picked a role yet
-                this._showRoleSelection();
-            } else if (this.roleSelectionService) {
-                // Apply saved role on app load
-                this._applyUserRole(this.roleSelectionService.getRole());
-            }
-        }
-    }
-
-    /**
-     * Initialize the role selection UI component.
-     * @private
-     */
-    _initRoleSelectionUI() {
-        if (typeof RoleSelectionUI === 'undefined' || !this.roleSelectionService) {
-            return;
-        }
-
-        this.roleSelectionUI = new RoleSelectionUI(this.roleSelectionService);
-        this.roleSelectionUI.init({
-            onRoleSelected: (role, inviteLink) => {
-                if (role === 'skip') {
-                    // Default to student view so the user is not left in limbo.
-                    // Mark role as selected so the screen does not re-appear on reload.
-                    this.roleSelectionService.setRole('student');
-                    this._applyUserRole('student');
-                    return;
-                }
-                this._applyUserRole(role);
-                if (role === 'teacher' && inviteLink) {
-                    this.showToast('Studio invite link generated!', 'success');
-                }
-            }
-        });
-    }
-
-    /**
-     * Show the role selection screen.
-     * @private
-     */
-    _showRoleSelection() {
-        if (this.roleSelectionUI) {
-            this.roleSelectionUI.show();
-        }
-    }
-
-    /**
-     * Apply user role: route to correct dashboard and trigger appropriate flows.
-     * Student → Home Dashboard → Trigger Instrument Calibration
-     * Teacher → Studio Dashboard → Generate Studio Invite Link
-     * @param {string} role - 'student' or 'teacher'
-     * @private
-     */
-    _applyUserRole(role) {
-        if (!role) {
-            // Corrupted state: selected flag is set but role is missing.
-            // Re-show role selection or default to student view.
-            if (this.roleSelectionService) {
-                this.roleSelectionService.clearRole();
-            }
-            this._showRoleSelection();
-            return;
-        }
-
-        if (role === 'teacher') {
-            // Enable teacher mode and show studio dashboard
-            this.toggleTeacherMode(true);
-            const teacherToggle = document.getElementById('teacher-mode-toggle');
-            if (teacherToggle) {
-                teacherToggle.classList.add('active');
-                teacherToggle.setAttribute('aria-checked', 'true');
-            }
-            localStorage.setItem('teacher_mode', 'true');
-            this.showView('studio-dashboard-view');
-        } else if (role === 'student') {
-            // Show home dashboard (library) and trigger calibration if needed
-            this.showView('library-view');
-            if (this.onboardingService && !this.onboardingService.hasCompletedOnboarding) {
-                this.onboardingService.start();
             }
         }
     }
@@ -748,8 +615,7 @@ class ConcertmasterApp {
             'practice': 'practice-view',
             'metronome': 'metronome-view',
             'settings': 'settings-view',
-            'tuner': 'tuner-view',
-            'studio': 'studio-dashboard-view'
+            'tuner': 'tuner-view'
         };
 
         const viewId = viewMap[viewName];
@@ -1282,24 +1148,6 @@ class ConcertmasterApp {
             this.pitchDetector.confidenceThreshold = value;
             if (sensitivityValue) sensitivityValue.textContent = value.toFixed(2);
         });
-
-        // Teacher mode toggle
-        const teacherToggle = document.getElementById('teacher-mode-toggle');
-        if (teacherToggle) {
-            // Restore saved state
-            const savedTeacherMode = localStorage.getItem('teacher_mode') === 'true';
-            if (savedTeacherMode) {
-                teacherToggle.classList.add('active');
-                teacherToggle.setAttribute('aria-checked', 'true');
-            }
-
-            teacherToggle.addEventListener('click', () => {
-                const isActive = teacherToggle.classList.toggle('active');
-                teacherToggle.setAttribute('aria-checked', isActive ? 'true' : 'false');
-                localStorage.setItem('teacher_mode', isActive ? 'true' : 'false');
-                this.toggleTeacherMode(isActive);
-            });
-        }
     }
 
     updateInstrumentSettings() {
@@ -1307,508 +1155,6 @@ class ConcertmasterApp {
         const range = this.pitchDetector.getInstrumentRange(this.selectedInstrument);
         this.pitchDetector.minFrequency = range.min;
         this.pitchDetector.maxFrequency = range.max;
-    }
-
-    // ============================================
-    // Teacher Mode / Studio Dashboard
-    // ============================================
-
-    initTeacherMode() {
-        const savedTeacherMode = localStorage.getItem('teacher_mode') === 'true';
-        if (savedTeacherMode) {
-            this.toggleTeacherMode(true);
-        }
-    }
-
-    async toggleTeacherMode(enabled) {
-        this.isTeacherMode = enabled;
-
-        // Show/hide studio nav link
-        const studioNavLinks = document.querySelectorAll('.studio-nav-link');
-        studioNavLinks.forEach(link => {
-            link.style.display = enabled ? '' : 'none';
-        });
-
-        // Show/hide the studio dashboard view
-        const studioView = document.getElementById('studio-dashboard-view');
-        if (studioView) {
-            studioView.style.display = enabled ? '' : 'none';
-        }
-
-        // Show/hide assignments section
-        const assignmentsSection = document.getElementById('assignments-section');
-        if (assignmentsSection) {
-            assignmentsSection.style.display = enabled ? '' : 'none';
-        }
-
-        if (enabled && !this.studioDashboard) {
-            // Initialize teacher service and dashboard on first enable
-            this.teacherService = new TeacherService();
-            this.studioDashboard = new StudioDashboard(this.teacherService);
-            await this.studioDashboard.init();
-
-            // Initialize AssignmentService and AssignmentUI for Smart Assignments
-            this.assignmentService = new AssignmentService();
-            this.assignmentUI = new AssignmentUI(this.assignmentService, this.teacherService, this.scoreLibrary);
-            await this.assignmentUI.init();
-        } else if (enabled && this.studioDashboard) {
-            await this.studioDashboard.refresh();
-        }
-
-        // Initialize Up Next widget for students (when not in teacher mode)
-        if (!enabled) {
-            await this.initStudentWidget();
-        }
-    }
-
-    async initStudentWidget() {
-        // Initialize Up Next widget for student view
-        if (!this.upNextWidget) {
-            this.assignmentService = new AssignmentService();
-            this.upNextWidget = new UpNextWidget(this.assignmentService);
-            await this.upNextWidget.init();
-
-            // Show the widget
-            const widgetContainer = document.getElementById('up-next-widget');
-            if (widgetContainer) {
-                widgetContainer.style.display = '';
-            }
-        } else {
-            await this.upNextWidget.refresh();
-        }
-    }
-
-    // ============================================
-    // License Service
-    // ============================================
-
-    async initLicense() {
-        // Initialize license service
-        if (!this.licenseService) {
-            this.licenseService = new LicenseService(this.apiBaseUrl);
-            this.licenseService.init();
-        }
-
-        // Initialize license UI
-        if (!this.licenseUI) {
-            this.licenseUI = new StudioLicenseUI(
-                this.licenseService,
-                this.authService,
-                () => this.applyFeatureGating() // Callback to re-apply feature gating on license change
-            );
-            await this.licenseUI.init();
-        }
-
-        // Apply feature gating
-        this.applyFeatureGating();
-    }
-
-    /**
-     * Apply feature gating based on license status
-     */
-    applyFeatureGating() {
-        if (!this.licenseService) return;
-
-        // Feature gating for navigation and UI elements
-        const featuresToGate = [
-            { id: 'studioDashboard', selector: '.studio-nav-link' },
-            { id: 'aiCoach', selector: '#ai-coach-toggle, .ai-coach-section' },
-            { id: 'heatMap', selector: '#heatmap-btn' },
-            { id: 'omrScanner', selector: '#scan-music-btn' },
-            { id: 'communityLibrary', selector: '#library-upload-btn' },
-            { id: 'scaleEngine', selector: '#scale-engine-btn' },
-            { id: 'annotations', selector: '#annotation-toolbar' },
-            { id: 'teacherReports', selector: '#generate-report-btn' },
-            { id: 'videoSnippets', selector: '#video-snippet-btn' },
-            { id: 'bluetoothPedal', selector: '#bluetooth-pedal-toggle' },
-            { id: 'advancedDSP', selector: '.advanced-dsp-toggle' }
-        ];
-
-        featuresToGate.forEach(feature => {
-            const hasFeature = this.licenseService.hasFeature(feature.id);
-            document.querySelectorAll(feature.selector).forEach(el => {
-                // Only apply gating if element wasn't explicitly hidden by other code
-                // Use data attribute to track explicit hides vs license-gated hides
-                if (el.dataset.explicitHide === 'true') return;
-                el.style.display = hasFeature ? '' : 'none';
-            });
-        });
-
-        // Show/hide studio dashboard based on license
-        const tier = this.licenseService.getTier();
-        const studioNavLinks = document.querySelectorAll('.studio-nav-link');
-        studioNavLinks.forEach(link => {
-            // Show studio dashboard if pro/studio or teacher mode enabled
-            link.style.display = (tier === 'pro' || tier === 'studio' || this.isTeacherMode) ? '' : 'none';
-        });
-    }
-
-    // ============================================
-    // Video Snippet / Office Hours Drop
-    // ============================================
-
-    initVideoSnippets() {
-        // Video snippet button in practice view
-        const videoSnippetBtn = document.getElementById('video-snippet-btn');
-        const videoSnippetModal = document.getElementById('video-snippet-modal');
-        const videoSnippetClose = document.getElementById('video-snippet-close');
-        const cancelVideoBtn = document.getElementById('cancel-video-btn');
-        const submitVideoBtn = document.getElementById('submit-video-btn');
-        const startRecordBtn = document.getElementById('start-record-btn');
-        const videoPreview = document.getElementById('video-preview');
-        const videoOverlay = document.getElementById('video-overlay');
-        const recordingIndicator = document.getElementById('recording-indicator');
-        const recordingTime = document.getElementById('recording-time');
-        const videoForm = document.getElementById('video-form');
-        const snippetTitle = document.getElementById('snippet-title');
-        const snippetNotes = document.getElementById('snippet-notes');
-
-        // Teacher inbox elements
-        const teacherInboxModal = document.getElementById('teacher-inbox-modal');
-        const inboxClose = document.getElementById('inbox-close');
-        const inboxTabs = document.querySelectorAll('.inbox-tab');
-
-        // Video reply elements
-        const videoReplyModal = document.getElementById('video-reply-modal');
-        const replyClose = document.getElementById('reply-close');
-        const cancelReplyBtn = document.getElementById('cancel-reply-btn');
-        const sendReplyBtn = document.getElementById('send-reply-btn');
-        const replyTypeBtns = document.querySelectorAll('.reply-type-btn');
-        const replyText = document.getElementById('reply-text');
-        const voiceReplyRecorder = document.getElementById('voice-reply-recorder');
-        const voiceRecordBtn = document.getElementById('voice-record-btn');
-
-        let currentRecording = null;
-        let isRecording = false;
-
-        // Open video snippet modal
-        if (videoSnippetBtn && videoSnippetModal) {
-            videoSnippetBtn.addEventListener('click', async () => {
-                this.openModal(videoSnippetModal);
-                await this.startVideoPreview(videoPreview, videoOverlay, startRecordBtn);
-            });
-        }
-
-        // Close video snippet modal
-        const closeVideoModal = () => {
-            this.closeModal(videoSnippetModal);
-            this.stopVideoPreview();
-            resetVideoRecorder();
-        };
-
-        if (videoSnippetClose) videoSnippetClose.addEventListener('click', closeVideoModal);
-        if (cancelVideoBtn) cancelVideoBtn.addEventListener('click', closeVideoModal);
-
-        // Start recording
-        if (startRecordBtn) {
-            startRecordBtn.addEventListener('click', async () => {
-                if (!window.videoSnippetService) {
-                    this.showToast('Video service not available', 'error');
-                    return;
-                }
-
-                try {
-                    await window.videoSnippetService.requestPermissions();
-                    window.videoSnippetService.startRecording(videoPreview);
-                    isRecording = true;
-
-                    videoOverlay.style.display = 'none';
-                    recordingIndicator.style.display = 'flex';
-
-                    // Update time display
-                    window.videoSnippetService.onTimeUpdate = (elapsed, max) => {
-                        recordingTime.textContent = `0:${elapsed.toString().padStart(2, '0')} / 0:${max.toString().padStart(2, '0')}`;
-                    };
-
-                    // Handle recording complete
-                    window.videoSnippetService.onRecordingComplete = (recording) => {
-                        currentRecording = recording;
-                        videoForm.style.display = 'block';
-                        submitVideoBtn.style.display = 'inline-block';
-                    };
-                } catch (error) {
-                    this.showToast('Failed to start recording: ' + error.message, 'error');
-                }
-            });
-        }
-
-        // Submit video
-        if (submitVideoBtn) {
-            submitVideoBtn.addEventListener('click', async () => {
-                if (!currentRecording) return;
-
-                try {
-                    const studentId = localStorage.getItem('user_id') || 'student-1';
-                    const studentName = localStorage.getItem('user_name') || 'Student';
-
-                    await window.videoSnippetService.submitSnippet({
-                        studentId,
-                        studentName,
-                        videoData: currentRecording.videoData,
-                        thumbnail: currentRecording.thumbnail,
-                        duration: currentRecording.duration,
-                        title: snippetTitle.value,
-                        notes: snippetNotes.value
-                    });
-
-                    this.showToast('Video sent to teacher!', 'success');
-                    closeVideoModal();
-                } catch (error) {
-                    this.showToast('Failed to send video: ' + error.message, 'error');
-                }
-            });
-        }
-
-        // Reset video recorder
-        const resetVideoRecorder = () => {
-            currentRecording = null;
-            isRecording = false;
-            videoOverlay.style.display = 'flex';
-            recordingIndicator.style.display = 'none';
-            videoForm.style.display = 'none';
-            submitVideoBtn.style.display = 'none';
-            snippetTitle.value = '';
-            snippetNotes.value = '';
-            recordingTime.textContent = '0:00 / 0:15';
-        };
-
-        // Teacher inbox tab switching
-        inboxTabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                inboxTabs.forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-
-                const tabName = tab.dataset.tab;
-                document.getElementById('inbox-received').style.display = tabName === 'received' ? 'block' : 'none';
-                document.getElementById('inbox-sent').style.display = tabName === 'sent' ? 'block' : 'none';
-            });
-        });
-
-        // Close inbox modal
-        if (inboxClose) {
-            inboxClose.addEventListener('click', () => this.closeModal(teacherInboxModal));
-        }
-
-        // Close reply modal
-        if (replyClose) {
-            replyClose.addEventListener('click', () => this.closeModal(videoReplyModal));
-        }
-        if (cancelReplyBtn) {
-            cancelReplyBtn.addEventListener('click', () => this.closeModal(videoReplyModal));
-        }
-
-        // Reply type switching
-        let currentReplyType = 'text';
-        let currentSnippetId = null;
-        let voiceRecordingData = null;
-
-        replyTypeBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                replyTypeBtns.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-
-                const type = btn.dataset.type;
-                currentReplyType = type;
-                if (type === 'text') {
-                    replyText.style.display = 'block';
-                    voiceReplyRecorder.style.display = 'none';
-                } else {
-                    replyText.style.display = 'none';
-                    voiceReplyRecorder.style.display = 'flex';
-                }
-            });
-        });
-
-        // Send reply
-        if (sendReplyBtn) {
-            sendReplyBtn.addEventListener('click', async () => {
-                if (!currentSnippetId) {
-                    this.showToast('No snippet selected', 'error');
-                    return;
-                }
-
-                try {
-                    let replyTextValue = null;
-                    let replyVoiceDataValue = null;
-
-                    if (currentReplyType === 'text') {
-                        replyTextValue = replyText.value.trim();
-                        if (!replyTextValue) {
-                            this.showToast('Please enter a reply', 'error');
-                            return;
-                        }
-                    } else {
-                        replyVoiceDataValue = voiceRecordingData;
-                        if (!replyVoiceDataValue) {
-                            this.showToast('Please record a voice note', 'error');
-                            return;
-                        }
-                    }
-
-                    await window.videoSnippetService.submitReply(
-                        currentSnippetId,
-                        replyTextValue,
-                        replyVoiceDataValue,
-                        currentReplyType
-                    );
-
-                    this.showToast('Reply sent!', 'success');
-                    this.closeModal(videoReplyModal);
-                    replyText.value = '';
-                    voiceRecordingData = null;
-                    currentSnippetId = null;
-
-                    // Refresh inbox
-                    this.loadTeacherInbox();
-                } catch (error) {
-                    this.showToast('Failed to send reply: ' + error.message, 'error');
-                }
-            });
-        }
-
-        // Load teacher inbox data
-        this.loadTeacherInbox = async () => {
-            try {
-                const response = await window.videoSnippetService.getAllSnippets();
-                this.renderTeacherInbox(response.snippets);
-            } catch (error) {
-                console.error('Failed to load inbox:', error);
-            }
-        };
-
-        // Render teacher inbox
-        this.renderTeacherInbox = (snippets) => {
-            const receivedList = document.getElementById('received-snippets-list');
-            if (!receivedList) return;
-
-            receivedList.innerHTML = '';
-
-            if (snippets.length === 0) {
-                document.getElementById('inbox-empty-received').style.display = 'block';
-                return;
-            }
-
-            document.getElementById('inbox-empty-received').style.display = 'none';
-
-            snippets.forEach(snippet => {
-                const item = document.createElement('div');
-                item.className = 'inbox-item';
-                item.innerHTML = `
-                    <img class="inbox-item-thumb" src="${snippet.thumbnail || ''}" alt="">
-                    <div class="inbox-item-info">
-                        <div class="inbox-item-title">${snippet.title || 'Untitled'}</div>
-                        <div class="inbox-item-meta">
-                            ${snippet.studentName}
-                            <span class="inbox-item-status ${snippet.status}">${snippet.status}</span>
-                        </div>
-                    </div>
-                `;
-                item.addEventListener('click', () => this.openReplyModal(snippet));
-                receivedList.appendChild(item);
-            });
-        };
-
-        // Open reply modal
-        this.openReplyModal = (snippet) => {
-            currentSnippetId = snippet.id;
-            const videoPlayer = document.getElementById('reply-video-player');
-            if (videoPlayer && snippet.videoData) {
-                // Convert base64 to blob URL
-                const blob = this.base64ToBlob(snippet.videoData, 'video/webm');
-                videoPlayer.src = URL.createObjectURL(blob);
-            }
-            this.openModal(videoReplyModal);
-        };
-
-        // Convert base64 to blob
-        this.base64ToBlob = (base64, mimeType) => {
-            const byteCharacters = atob(base64.split(',')[1]);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
-            return new Blob([byteArray], { type: mimeType });
-        };
-
-        // Load student's sent snippets
-        this.loadStudentSnippets = async () => {
-            try {
-                const studentId = localStorage.getItem('user_id') || 'student-1';
-                const response = await window.videoSnippetService.getSnippets(studentId);
-                this.renderStudentSnippets(response.snippets);
-            } catch (error) {
-                console.error('Failed to load student snippets:', error);
-            }
-        };
-
-        // Render student sent snippets
-        this.renderStudentSnippets = (snippets) => {
-            const sentList = document.getElementById('sent-snippets-list');
-            if (!sentList) return;
-
-            sentList.innerHTML = '';
-
-            if (snippets.length === 0) {
-                document.getElementById('inbox-empty-sent').style.display = 'block';
-                return;
-            }
-
-            document.getElementById('inbox-empty-sent').style.display = 'none';
-
-            snippets.forEach(snippet => {
-                const card = document.createElement('div');
-                card.className = 'sent-snippet-card';
-
-                const hasReply = snippet.teacherReply && snippet.teacherReply.length > 0;
-
-                card.innerHTML = `
-                    <img class="sent-snippet-thumb" src="${snippet.thumbnail || ''}" alt="">
-                    <div class="sent-snippet-info">
-                        <div class="sent-snippet-title">${snippet.title || 'Untitled'}</div>
-                        <div class="sent-snippet-meta">
-                            ${new Date(snippet.submittedAt).toLocaleDateString()}
-                            <span class="sent-snippet-status ${snippet.status}">${snippet.status}</span>
-                        </div>
-                        ${hasReply ? `<div class="sent-snippet-reply">${snippet.replyType === 'voice' ? 'Voice reply received' : snippet.teacherReply}</div>` : ''}
-                    </div>
-                `;
-                sentList.appendChild(card);
-            });
-        };
-
-        // Listen for tab changes to load student snippets
-        inboxTabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                if (tab.dataset.tab === 'sent') {
-                    this.loadStudentSnippets();
-                }
-            });
-        });
-    }
-
-    async startVideoPreview(videoElement, overlay, startBtn) {
-        if (!window.videoSnippetService) return;
-
-        try {
-            await window.videoSnippetService.requestPermissions();
-            const stream = window.videoSnippetService.getStream();
-            if (videoElement && stream) {
-                videoElement.srcObject = stream;
-                videoElement.play();
-            }
-            if (overlay && startBtn) {
-                overlay.style.display = 'flex';
-            }
-        } catch (error) {
-            this.showToast('Camera access denied', 'error');
-        }
-    }
-
-    stopVideoPreview() {
-        if (window.videoSnippetService) {
-            window.videoSnippetService.stopPreview();
-        }
     }
 
     // ============================================

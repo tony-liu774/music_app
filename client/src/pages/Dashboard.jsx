@@ -1,7 +1,6 @@
 import PracticeStreakWidget from '../components/dashboard/PracticeStreakWidget'
 import RecentSessionsList from '../components/dashboard/RecentSessionsList'
 import ProgressChart from '../components/dashboard/ProgressChart'
-import UpNextWidget from '../components/dashboard/UpNextWidget'
 
 export default function Dashboard() {
   return (
@@ -10,7 +9,6 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <PracticeStreakWidget />
-        <UpNextWidget />
       </div>
 
       <ProgressChart />
