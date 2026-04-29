@@ -3,6 +3,9 @@
  * Generates comprehensive post-session reports with AI insights
  */
 
+const { SessionLogger } = require('./session-logger.js');
+const { LLMService } = require('../services/llm-service.js');
+
 class AISummaryGenerator {
     constructor() {
         this.sessionLogger = new SessionLogger();
@@ -67,7 +70,6 @@ class AISummaryGenerator {
      */
     logToneQualityDeviation(params) {
         this.sessionLogger.logToneQualityDeviation(params);
-    }
     }
 
     /**
