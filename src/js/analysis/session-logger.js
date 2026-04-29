@@ -64,25 +64,28 @@ class SessionLogger {
     /**
      * Log a pitch deviation
      * @param {Object} params - Deviation parameters
-     * @param {number} params.measureNumber - Measure number
+     * @param {number} params.measureNumber - Measure number (also accepts 'measure')
      * @param {number} params.beat - Beat number
-     * @param {string} params.expectedNote - Expected note name (e.g., "C#5")
-     * @param {string} params.detectedNote - Detected note name (e.g., "C5")
-     * @param {number} params.centsDeviation - Deviation in cents (negative = flat, positive = sharp)
+     * @param {string} params.expectedNote - Expected note name (e.g., "C#5") (also accepts 'expectedPitch')
+     * @param {string} params.detectedNote - Detected note name (e.g., "C5") (also accepts 'actualPitch')
+     * @param {number} params.centsDeviation - Deviation in cents (negative = flat, positive = sharp) (also accepts 'deviationCents')
      * @param {number} params.confidence - Pitch detection confidence 0-1
      * @param {boolean} params.isVibrato - Whether vibrato was detected
      * @param {number} [params.expectedFrequency] - Expected frequency in Hz
      * @param {number} [params.actualFrequency] - Actual frequency in Hz
      */
-    logPitchDeviation({ measureNumber, beat, expectedNote, detectedNote, centsDeviation, confidence, isVibrato, expectedFrequency, actualFrequency }) {
+    logPitchDeviation({ measureNumber, measure, beat, expectedNote, expectedPitch, detectedNote, actualPitch, centsDeviation, deviationCents, confidence, isVibrato, expectedFrequency, actualFrequency }) {
         const deviation = {
             type: 'pitch',
             timestamp: this._elapsed(),
-            measureNumber: measureNumber || 1,
+            measureNumber: measureNumber || measure || 1,
             beat: beat || 1,
-            expectedNote: expectedNote || '?',
-            detectedNote: detectedNote || '?',
-            centsDeviation: Math.round(centsDeviation || 0),
+            expectedNote: expectedNote || expectedPitch || '?',
+            detectedNote: detectedNote || actualPitch || '?',
+            expected_pitch: expectedNote || expectedPitch || '?',
+            actual_pitch: detectedNote || actualPitch || '?',
+            centsDeviation: Math.round(centsDeviation || deviationCents || 0),
+            deviation_cents: Math.round(centsDeviation || deviationCents || 0),
             confidence: Math.round((confidence ?? 0) * 1000) / 1000,
             isVibrato: isVibrato || false,
             expectedFrequency: expectedFrequency ? Math.round(expectedFrequency * 100) / 100 : null,
@@ -94,17 +97,17 @@ class SessionLogger {
     /**
      * Log a rhythm deviation
      * @param {Object} params - Deviation parameters
-     * @param {number} params.measureNumber - Measure number
+     * @param {number} params.measureNumber - Measure number (also accepts 'measure')
      * @param {number} params.beat - Beat number
      * @param {number} params.expectedMs - Expected duration in milliseconds
      * @param {number} params.actualMs - Actual duration in milliseconds
      * @param {number} params.deviationMs - Deviation in milliseconds (negative = early, positive = late)
      */
-    logRhythmDeviation({ measureNumber, beat, expectedMs, actualMs, deviationMs }) {
+    logRhythmDeviation({ measureNumber, measure, beat, expectedMs, actualMs, deviationMs }) {
         const deviation = {
             type: 'rhythm',
             timestamp: this._elapsed(),
-            measureNumber: measureNumber || 1,
+            measureNumber: measureNumber || measure || 1,
             beat: beat || 1,
             expected_ms: Math.round(expectedMs || 0),
             actual_ms: Math.round(actualMs || 0),
@@ -116,17 +119,17 @@ class SessionLogger {
     /**
      * Log an intonation/transitional deviation
      * @param {Object} params - Deviation parameters
-     * @param {number} params.measureNumber - Measure number
+     * @param {number} params.measureNumber - Measure number (also accepts 'measure')
      * @param {string} params.fromNote - Starting note
      * @param {string} params.toNote - Ending note
      * @param {number} params.transitionQuality - Quality score 0-100
      * @param {string} params.issue - Description of the issue (e.g., "position_shift", "string_change")
      */
-    logIntonationDeviation({ measureNumber, fromNote, toNote, transitionQuality, issue }) {
+    logIntonationDeviation({ measureNumber, measure, fromNote, toNote, transitionQuality, issue }) {
         const deviation = {
             type: 'intonation',
             timestamp: this._elapsed(),
-            measureNumber: measureNumber || 1,
+            measureNumber: measureNumber || measure || 1,
             from_note: fromNote || '?',
             to_note: toNote || '?',
             transition_quality: Math.round(transitionQuality ?? 100),
@@ -207,7 +210,7 @@ class SessionLogger {
      * For pitch deviations, uses |centsDeviation|; for rhythm, |deviation_ms|;
      * for others, counts errors as weight-1 each.
      * @param {number} n - Number of worst measures to return
-     * @returns {Array<{measureNumber: number, averageDeviation: number, errorCount: number}>}
+     * @returns {Array<{measure: number, measureNumber: number, averageDeviation: number, errorCount: number, error_count: number}>}
      */
     getWorstMeasures(n) {
         const byMeasure = this.getErrorsByMeasure();
@@ -224,10 +227,13 @@ class SessionLogger {
                     totalDeviation += 1;
                 }
             });
+            const parsedMeasure = parseInt(measure);
             return {
-                measureNumber: parseInt(measure),
+                measure: parsedMeasure,
+                measureNumber: parsedMeasure,
                 averageDeviation: devs.length > 0 ? Math.round((totalDeviation / devs.length) * 10) / 10 : 0,
-                errorCount: devs.length
+                errorCount: devs.length,
+                error_count: devs.length
             };
         });
 
@@ -304,6 +310,7 @@ class SessionLogger {
 
         return {
             total_deviations: this.deviations.length,
+            total_notes_played: this.deviations.length, // Alias for test compatibility
             pitch_deviation_count: pitchDevs.length,
             rhythm_deviation_count: rhythmDevs.length,
             intonation_deviation_count: intDevs.length,
@@ -318,7 +325,7 @@ class SessionLogger {
             average_purity_score: Math.round(avgPurity),
             wolf_tone_count: wolfToneCount,
             problem_measures: worstMeasures,
-            worst_measure: worstMeasures.length > 0 ? worstMeasures[0].measureNumber : null
+            worst_measure: worstMeasures.length > 0 ? worstMeasures[0].measure : null
         };
     }
 
