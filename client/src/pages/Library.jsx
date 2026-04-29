@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useLibraryStore, SORT_OPTIONS } from '../stores/useLibraryStore'
 import { Input, Select, Button } from '../components/ui'
 import ScoreCard from '../components/library/ScoreCard'
+import SmartIngestion from '../components/ingestion/SmartIngestion'
 
 const INSTRUMENT_OPTIONS = [
   { value: '', label: 'All Instruments' },
@@ -34,9 +35,11 @@ export default function Library() {
     error,
     fetchScores,
     getFilteredScores,
+    addScore,
   } = useLibraryStore()
 
   const [viewMode, setViewMode] = useState('grid')
+  const [showIngestion, setShowIngestion] = useState(false)
   const filteredScores = getFilteredScores()
 
   useEffect(() => {
@@ -46,6 +49,16 @@ export default function Library() {
   function handlePractice(score) {
     setSelectedScore(score)
     navigate('/practice')
+  }
+
+  function handleAddScore() {
+    setShowIngestion(true)
+  }
+
+  function handleScoreCreated(scoreData) {
+    // Add the score to the library
+    addScore(scoreData)
+    setShowIngestion(false)
   }
 
   return (
@@ -58,7 +71,27 @@ export default function Library() {
             Your music library and repertoire collection.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {/* Add Score Button */}
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleAddScore}
+            className="flex items-center gap-2"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="w-4 h-4"
+            >
+              <path d="M12 4v12m0 0l-4-4m4 4l4-4" />
+              <rect x="4" y="14" width="16" height="6" rx="2" />
+            </svg>
+            Add Score
+          </Button>
           <Button
             variant={viewMode === 'grid' ? 'primary' : 'ghost'}
             size="sm"
@@ -190,8 +223,24 @@ export default function Library() {
               ? 'Try adjusting your search or filters.'
               : 'Add scores to your library to get started.'}
           </p>
+          {!searchQuery && !filterInstrument && (
+            <Button
+              variant="primary"
+              onClick={handleAddScore}
+              className="mt-4"
+            >
+              Add Your First Score
+            </Button>
+          )}
         </div>
       )}
+
+      {/* Smart Ingestion Modal */}
+      <SmartIngestion
+        isOpen={showIngestion}
+        onClose={() => setShowIngestion(false)}
+        onScoreCreated={handleScoreCreated}
+      />
     </div>
   )
 }
