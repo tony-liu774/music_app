@@ -9,7 +9,6 @@ import { useHeatMapData } from '../hooks/useHeatMapData'
 import { useSmartLoop } from '../hooks/useSmartLoop'
 import { buildPayload, requestAIDebrief } from '../services/AISummaryService'
 import { savePracticeSession, getProgressTrend } from '../services/PracticeSessionService'
-import { useAuth } from '../contexts/AuthContext'
 import useMetronome from '../hooks/useMetronome'
 import { Button } from '../components/ui'
 import { useToast } from '../components/ui/Toast'
@@ -30,7 +29,6 @@ const CONTROLS_AUTO_HIDE_MS = 3000
 
 export default function PracticePage() {
   const navigate = useNavigate()
-  const { user } = useAuth()
   const ghostMode = useUIStore((s) => s.ghostMode)
   const enterGhostMode = useUIStore((s) => s.enterGhostMode)
   const exitGhostMode = useUIStore((s) => s.exitGhostMode)
@@ -263,9 +261,8 @@ export default function PracticePage() {
           ? Math.round((accurateCount / pitchDevs.length) * 100)
           : 100
 
-      if (user?.id) {
+      if (selectedScore?.id) {
         savePracticeSession({
-          userId: user.id,
           scoreId,
           scoreTitle: selectedScore?.title,
           sessionLog: result.log,
@@ -276,7 +273,7 @@ export default function PracticePage() {
 
         // Fetch progress trend if practicing a specific piece
         if (scoreId) {
-          getProgressTrend(user.id, scoreId).then((trend) => {
+          getProgressTrend(scoreId).then((trend) => {
             if (trend.length > 0) setProgressTrend(trend)
           })
         }
@@ -289,7 +286,6 @@ export default function PracticePage() {
     getWorstMeasures,
     resetCursor,
     fetchAIDebrief,
-    user,
     selectedScore,
     selectedInstrument,
   ])
