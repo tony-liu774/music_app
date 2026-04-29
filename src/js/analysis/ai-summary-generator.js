@@ -68,7 +68,6 @@ class AISummaryGenerator {
     logToneQualityDeviation(params) {
         this.sessionLogger.logToneQualityDeviation(params);
     }
-    }
 
     /**
      * Generate the complete post-session summary
