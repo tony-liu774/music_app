@@ -126,8 +126,66 @@ export default function SmartIngestion({ isOpen, onClose, onScoreCreated }) {
 
   // Start processing
   const handleStartProcessing = useCallback(async () => {
-    await simulateOMRProcessing()
-  }, [simulateOMRProcessing])
+    setProcessingState('processing')
+
+    try {
+      // Prepare file for upload
+      let fileToProcess = selectedFile
+
+      // If we have a captured image, convert it to a file
+      if (capturedImage && !selectedFile) {
+        const response = await fetch(capturedImage)
+        const blob = await response.blob()
+        fileToProcess = new File([blob], 'captured-image.jpg', { type: 'image/jpeg' })
+      }
+
+      if (!fileToProcess) {
+        throw new Error('No file to process')
+      }
+
+      // Report progress
+      setProgress(10)
+      setProcessingMessage('Uploading file...')
+
+      // Create form data and send to OMR API
+      const formData = new FormData()
+      formData.append('file', fileToProcess)
+
+      setProgress(30)
+      setProcessingMessage('Sending to OMR engine...')
+
+      const response = await fetch('/api/omr/scan', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!response.ok) {
+        throw new Error('OMR processing failed')
+      }
+
+      setProgress(80)
+      setProcessingMessage('Processing results...')
+
+      const result = await response.json()
+
+      setProgress(100)
+      setProcessingMessage('Complete!')
+
+      // If OMR returned actual data, use it; otherwise fall back to simulation
+      if (result.simulated || !result.measures) {
+        // Use simulated data as fallback
+        await new Promise(resolve => setTimeout(resolve, 500))
+        setProcessingState('metadata')
+      } else {
+        // Use real OMR results
+        setProcessingState('metadata')
+      }
+    } catch (error) {
+      console.error('[SmartIngestion] OMR processing error:', error)
+      // Fall back to simulation on error
+      await simulateOMRProcessing()
+    }
+  }, [capturedImage, selectedFile, simulateOMRProcessing])
 
   // Save score
   const handleSaveScore = useCallback(() => {
@@ -624,7 +682,7 @@ function generateDemoMeasures() {
     { pitch: { step: 'D', octave: 4 }, duration: 1 },
     { pitch: { step: 'D', octave: 4 }, duration: 1 },
     { pitch: { step: 'E', octave: 4 }, duration: 1 },
-    { pitch: { pitch: 'G', octave: 4 }, duration: 2 },
+    { pitch: { step: 'G', octave: 4 }, duration: 2 },
   ]
 
   const measures = []

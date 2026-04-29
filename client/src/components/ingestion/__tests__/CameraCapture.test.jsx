@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { CameraCapture } from '../CameraCapture'
+import CameraCapture from '../CameraCapture'
 
 // Mock the Button component
 vi.mock('../../ui/Button', () => ({

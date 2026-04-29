@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { IMSLPSearch } from '../IMSLPSearch'
+import IMSLPSearch from '../IMSLPSearch'
 
 // Mock the UI components
 vi.mock('../../ui/Button', () => ({

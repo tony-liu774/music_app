@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { PDFUpload } from '../PDFUpload'
+import PDFUpload from '../PDFUpload'
 
 // Mock the Button component
 vi.mock('../../ui/Button', () => ({
