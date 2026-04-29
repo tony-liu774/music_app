@@ -9,15 +9,7 @@ const rateLimiter = require('./middleware/rateLimiter');
 const healthRoutes = require('./routes/health');
 const imslpRoutes = require('./routes/imslp');
 const omrRoutes = require('./routes/omr');
-const teacherRoutes = require('./routes/teacher');
-const authRoutes = require('./routes/auth');
-const oauthRoutes = require('./routes/oauth');
-const syncRoutes = require('./routes/sync');
-const assignmentRoutes = require('./routes/assignments');
-const notificationRoutes = require('./routes/notifications');
-const licenseRoutes = require('./routes/license');
 const aiRoutes = require('./routes/ai');
-const scheduler = require('./services/scheduler');
 
 const app = express();
 
@@ -34,14 +26,13 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-eval'", "https://cdnjs.cloudflare.com", "https://accounts.google.com", "https://appleid.cdn-apple.com"],
+      scriptSrc: ["'self'", "'unsafe-eval'", "https://cdnjs.cloudflare.com"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", 'data:', 'https:'],
-      connectSrc: ["'self'", 'blob:', "https://accounts.google.com", "https://appleid.apple.com", "https://oauth2.googleapis.com"],
+      connectSrc: ["'self'", 'blob:'],
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
       mediaSrc: ["'self'", 'blob:', 'mediastream:'],
-      frameSrc: ["https://accounts.google.com"],
       workerSrc: ["'self'", 'blob:'],
     },
   },
@@ -82,48 +73,21 @@ app.use('/api/imslp', imslpRoutes);
 // OMR (Optical Music Recognition) routes
 app.use('/api/omr', upload.single('image'), omrRoutes);
 
-// Teacher (Studio Dashboard) routes
-app.use('/api/teacher', teacherRoutes);
-
-// Authentication routes
-app.use('/api/auth', authRoutes);
-
-// OAuth SSO routes
-app.use('/api/auth/oauth', oauthRoutes);
-
-// Cloud sync routes
-app.use('/api/sync', syncRoutes);
-
-// Assignments routes (Smart Assignments & Routine Builder)
-app.use('/api/assignments', assignmentRoutes);
-
-// Push notifications routes
-app.use('/api/notifications', notificationRoutes);
-
-// License and subscription routes
-app.use('/api/licenses', licenseRoutes);
-
 // AI summary routes
 app.use('/api', aiRoutes);
 
 // API routes (placeholder for future routes)
 app.use('/api', (req, res) => {
   res.status(200).json({
-    message: 'Music App API',
+    message: 'Virtual Concertmaster API',
     version: '1.0.0',
     endpoints: {
       health: '/health',
       healthDetailed: '/health/detailed',
       imslpSearch: '/api/imslp/search',
       imslpDownload: '/api/imslp/download/:id',
-      teacherStudents: '/api/teacher/students',
-      teacherMetrics: '/api/teacher/metrics',
-      authRegister: '/api/auth/register',
-      authLogin: '/api/auth/login',
-      sync: '/api/sync',
-      syncStatus: '/api/sync/status',
-      assignments: '/api/assignments',
-      assignmentProgress: '/api/assignments/:id/progress',
+      omrScan: '/api/omr/scan',
+      aiSummary: '/api/ai-summary',
     },
   });
 });
@@ -151,9 +115,6 @@ app.use((err, req, res, _next) => {
 
 // Start server only when run directly (not when imported by tests)
 if (require.main === module) {
-  // Start the scheduler for background jobs
-  scheduler.start();
-
   const server = app.listen(config.port, () => {
     console.log(`Server running in ${config.nodeEnv} mode on port ${config.port}`);
     console.log(`Health check: http://localhost:${config.port}/health`);

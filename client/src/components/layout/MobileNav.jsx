@@ -1,5 +1,4 @@
 import { NavLink } from 'react-router-dom'
-import OfflineIndicator from './OfflineIndicator'
 
 const tabs = [
   {
@@ -99,14 +98,9 @@ const tabs = [
   },
 ]
 
-export default function MobileNav({ isOnline = true, pendingCount = 0 }) {
+export default function MobileNav() {
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex flex-col items-center bg-surface border-t border-border px-2 pb-safe">
-      {!isOnline && (
-        <div className="w-full flex justify-center py-1">
-          <OfflineIndicator isOnline={isOnline} pendingCount={pendingCount} />
-        </div>
-      )}
       <div className="flex items-center justify-around w-full h-18">
         {tabs.map(({ to, label, icon }) => (
           <NavLink

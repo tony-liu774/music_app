@@ -28,18 +28,4 @@ export function registerServiceWorker() {
       // SW registration failed — app still works without it
     }
   })
-
-  // Listen for token requests from the SW
-  navigator.serviceWorker.addEventListener('message', (event) => {
-    if (event.data && event.data.type === 'REQUEST_AUTH_TOKEN') {
-      // Respond with the current auth token if available
-      const token =
-        typeof window.__getAuthToken === 'function'
-          ? window.__getAuthToken()
-          : null
-      if (event.ports && event.ports[0]) {
-        event.ports[0].postMessage({ token })
-      }
-    }
-  })
 }
