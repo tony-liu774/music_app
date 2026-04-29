@@ -8,7 +8,7 @@
     "dev": "node --watch src/index.js",
     "build:css": "npx @tailwindcss/cli -i src/css/app.css -o public/styles.css",
     "watch:css": "npx @tailwindcss/cli -i src/css/app.css -o public/styles.css --watch",
-    "test": "NODE_ENV=test node --test tests/session-logger.test.js tests/pitch-detector.test.js tests/dsp-engine.test.js tests/llm-service.test.js tests/ai-summary-generator.test.js tests/omr-client.test.js tests/library-service.test.js tests/tone-quality-analyzer.test.js tests/offline-session-manager.test.js tests/session-persistence-service.test.js tests/middleware.test.js && node tests/volume-envelope-analyzer.test.js && node tests/articulation-detector.test.js && node tests/dynamics-comparator.test.js && node tests/musicxml-dynamics.test.js && node tests/intonation-analyzer.test.js && npx jest tests/tuner.test.js"
+    "test": "NODE_ENV=test node --test tests/session-logger.test.js tests/dsp-engine.test.js tests/llm-service.test.js tests/ai-summary-generator.test.js tests/omr-client.test.js tests/library-service.test.js tests/tone-quality-analyzer.test.js tests/offline-session-manager.test.js tests/session-persistence-service.test.js tests/middleware.test.js && node tests/volume-envelope-analyzer.test.js && node tests/articulation-detector.test.js && node tests/dynamics-comparator.test.js && node tests/musicxml-dynamics.test.js && node tests/intonation-analyzer.test.js && npx jest tests/tuner.test.js tests/pitch-detector.test.js"
   },
   "keywords": [
     "express",
