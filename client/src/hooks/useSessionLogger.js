@@ -249,6 +249,26 @@ export function useSessionLogger(options = {}) {
     }
   }, [])
 
+  /**
+   * Log a rhythm deviation event.
+   * @param {Object} params - Deviation parameters
+   * @param {number} params.measureNumber - Measure number
+   * @param {number} params.beat - Beat number
+   * @param {number} params.deviationMs - Timing deviation in ms
+   * @param {boolean} params.isOnTime - Whether within rhythm tolerance
+   */
+  const logRhythmDeviation = useCallback((params) => {
+    if (!loggerRef.current) return
+    const { measureNumber = 1, beat = 1, deviationMs = 0, isOnTime = true } = params || {}
+    loggerRef.current.logRhythmDeviation({
+      measureNumber,
+      beat,
+      expectedMs: 0,
+      actualMs: 0,
+      deviationMs,
+    })
+  }, [])
+
   return {
     startSession,
     pauseSession,
@@ -259,6 +279,7 @@ export function useSessionLogger(options = {}) {
     getErrorsByMeasure,
     getWorstMeasures,
     setPosition,
+    logRhythmDeviation,
     isActive,
     isPaused,
   }

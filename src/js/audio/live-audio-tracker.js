@@ -262,7 +262,6 @@ class LiveAudioTracker {
             this.audioEngine.setAudioDataCallback((data) => this.processAudioData(data));
 
             const intervalMs = Math.max(10, (this.config.hopSize / this.config.sampleRate) * 1000);
-            this.audioEngine.startCapture(null, intervalMs);
 
             this.isTracking = true;
             this.sessionStartTime = Date.now();
@@ -375,6 +374,7 @@ class LiveAudioTracker {
         const rhythmEvent = {
             timestamp,
             note: note.midi,
+            position: this.currentPosition,
             expectedTime,
             actualTime: timestamp,
             deviationMs: rhythmDeviation,

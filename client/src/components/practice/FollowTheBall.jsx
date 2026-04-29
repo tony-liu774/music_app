@@ -229,33 +229,3 @@ export default function FollowTheBall({
     </div>
   )
 }
-
-// Export helper for connecting to renderer
-export function useFollowTheBall(containerRef) {
-  const cursorRef = useRef(null)
-
-  const connectToRenderer = useCallback(() => {
-    // This would be called to connect to a sheet music renderer
-    // to receive position updates
-    return {
-      setTargetPosition: (position) => {
-        // Position update logic
-      },
-      jumpToMeasure: (measureNumber, totalMeasures) => {
-        const measureProgress = measureNumber / totalMeasures
-        // Jump logic
-      },
-    }
-  }, [])
-
-  return {
-    cursorRef,
-    connectToRenderer,
-    jumpToMeasure: (measure, total) => {
-      // Jump to measure logic
-    },
-    reset: () => {
-      // Reset logic
-    },
-  }
-}

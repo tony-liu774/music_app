@@ -59,65 +59,65 @@ export default function TunerGauge({ className = '' }) {
     status: 'waiting',
   })
 
-  // Subscribe to audio store
-  useEffect(() => {
-    const updateDisplay = useCallback(() => {
-      const { pitchData, isPracticing } = useAudioStore.getState()
+  // Read-only display update (no React state dependencies — reads directly from store)
+  const updateDisplay = useCallback(() => {
+    const { pitchData, isPracticing } = useAudioStore.getState()
 
-      if (!isPracticing || !pitchData.frequency) {
-        setDisplayData({
-          note: '--',
-          octave: '',
-          frequency: '--',
-          cents: 0,
-          status: 'waiting',
-        })
-        return
-      }
-
-      const { note, cents, frequency } = pitchData
-      const absCents = Math.abs(cents || 0)
-
-      let status = 'in_tune'
-      if (absCents > CONFIG.warningThreshold) {
-        status = cents < 0 ? 'flat' : 'sharp'
-      } else if (absCents > CONFIG.inTuneThreshold) {
-        status = cents < 0 ? 'slightly_flat' : 'slightly_sharp'
-      }
-
-      // Parse note string (e.g., "A#4" -> note: "A#", octave: "4")
-      const noteMatch = note?.match(/^([A-G][#b]?)([0-9])$/)
-      const notePart = noteMatch ? noteMatch[1] : (note || '--')
-      const octavePart = noteMatch ? noteMatch[2] : ''
-
+    if (!isPracticing || !pitchData.frequency) {
       setDisplayData({
-        note: notePart,
-        octave: octavePart,
-        frequency: frequency ? `${frequency.toFixed(1)}` : '--',
-        cents: cents || 0,
-        status,
+        note: '--',
+        octave: '',
+        frequency: '--',
+        cents: 0,
+        status: 'waiting',
       })
+      return
+    }
 
-      // Update needle rotation
-      if (needleRef.current) {
-        const angle = centsToAngle(Math.max(-50, Math.min(50, cents || 0)))
-        const centerX = CONFIG.size / 2
-        const centerY = CONFIG.size * 0.85
-        needleRef.current.setAttribute(
-          'transform',
-          `rotate(${angle}, ${centerX}, ${centerY})`,
-        )
+    const { note, cents, frequency } = pitchData
+    const absCents = Math.abs(cents || 0)
 
-        // Update needle color
-        const color = getStatusColor(cents || 0)
-        const needleShape = needleRef.current.querySelector('.needle-shape')
-        if (needleShape) {
-          needleShape.setAttribute('fill', color)
-        }
+    let status = 'in_tune'
+    if (absCents > CONFIG.warningThreshold) {
+      status = cents < 0 ? 'flat' : 'sharp'
+    } else if (absCents > CONFIG.inTuneThreshold) {
+      status = cents < 0 ? 'slightly_flat' : 'slightly_sharp'
+    }
+
+    // Parse note string (e.g., "A#4" -> note: "A#", octave: "4")
+    const noteMatch = note?.match(/^([A-G][#b]?)([0-9])$/)
+    const notePart = noteMatch ? noteMatch[1] : (note || '--')
+    const octavePart = noteMatch ? noteMatch[2] : ''
+
+    setDisplayData({
+      note: notePart,
+      octave: octavePart,
+      frequency: frequency ? `${frequency.toFixed(1)}` : '--',
+      cents: cents || 0,
+      status,
+    })
+
+    // Update needle rotation
+    if (needleRef.current) {
+      const angle = centsToAngle(Math.max(-50, Math.min(50, cents || 0)))
+      const centerX = CONFIG.size / 2
+      const centerY = CONFIG.size * 0.85
+      needleRef.current.setAttribute(
+        'transform',
+        `rotate(${angle}, ${centerX}, ${centerY})`,
+      )
+
+      // Update needle color
+      const color = getStatusColor(cents || 0)
+      const needleShape = needleRef.current.querySelector('.needle-shape')
+      if (needleShape) {
+        needleShape.setAttribute('fill', color)
       }
-    }, [])
+    }
+  }, [])
 
-    // Use RAF for smooth updates
+  // RAF loop: re-reads store on every frame without stale closure issues
+  useEffect(() => {
     const animate = () => {
       updateDisplay()
       rafRef.current = requestAnimationFrame(animate)
@@ -129,7 +129,7 @@ export default function TunerGauge({ className = '' }) {
         cancelAnimationFrame(rafRef.current)
       }
     }
-  }, [])
+  }, [updateDisplay])
 
   return (
     <div
