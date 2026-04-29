@@ -59,8 +59,9 @@ describe('RoleSelectionService', () => {
         assert.strictEqual(svc.authService, null);
     });
 
-    test('hasSelectedRole returns false initially', () => {
-        assert.strictEqual(service.hasSelectedRole(), false);
+    test('hasSelectedRole returns true initially in public mode', () => {
+        // In public mode, role defaults to student
+        assert.strictEqual(service.hasSelectedRole(), true);
     });
 
     test('hasSelectedRole returns true after role is set', async () => {
@@ -68,8 +69,9 @@ describe('RoleSelectionService', () => {
         assert.strictEqual(service.hasSelectedRole(), true);
     });
 
-    test('getRole returns null initially', () => {
-        assert.strictEqual(service.getRole(), null);
+    test('getRole returns student initially in public mode', () => {
+        // In public mode, role defaults to student
+        assert.strictEqual(service.getRole(), 'student');
     });
 
     test('setRole stores student role', async () => {
@@ -108,8 +110,9 @@ describe('RoleSelectionService', () => {
         assert.strictEqual(service.isStudent(), false);
     });
 
-    test('isStudent and isTeacher return false when no role set', () => {
-        assert.strictEqual(service.isStudent(), false);
+    test('isStudent returns true and isTeacher returns false in public mode (default student)', () => {
+        // In public mode, default to student role
+        assert.strictEqual(service.isStudent(), true);
         assert.strictEqual(service.isTeacher(), false);
     });
 
@@ -189,15 +192,16 @@ describe('RoleSelectionService', () => {
         console.warn = origWarn;
     });
 
-    test('clearRole removes all role data', async () => {
+    test('clearRole removes role data and defaults back to student in public mode', async () => {
         await service.setRole('teacher');
         assert.strictEqual(service.getRole(), 'teacher');
         assert.strictEqual(service.hasSelectedRole(), true);
         assert.ok(service.getInviteLink());
 
         service.clearRole();
-        assert.strictEqual(service.getRole(), null);
-        assert.strictEqual(service.hasSelectedRole(), false);
+        // In public mode, role defaults back to student after clear
+        assert.strictEqual(service.getRole(), 'student');
+        assert.strictEqual(service.hasSelectedRole(), true);
         assert.strictEqual(service.getInviteLink(), null);
     });
 

@@ -47,12 +47,13 @@ describe('LicenseService', () => {
     });
 
     describe('Initialization', () => {
-        it('should initialize with empty license', () => {
+        it('should initialize with studio tier in public mode (no license)', () => {
+            // In public mode, no license is required - all features available
             assert.strictEqual(license.hasLicense(), false);
-            assert.strictEqual(license.getTier(), 'free');
+            assert.strictEqual(license.getTier(), 'studio');
         });
 
-        it('should load cached license from localStorage', () => {
+        it('should load cached license from localStorage and respect its tier', () => {
             const cachedLicense = {
                 id: 'lic-123',
                 tier: 'pro',
@@ -70,23 +71,18 @@ describe('LicenseService', () => {
     });
 
     describe('Feature Gating', () => {
-        it('should allow free features without license', () => {
+        it('should allow all features in public mode', () => {
+            // In public mode, all features are available without a license
             assert.strictEqual(license.hasFeature('tuner'), true);
             assert.strictEqual(license.hasFeature('metronome'), true);
             assert.strictEqual(license.hasFeature('sheetMusicRenderer'), true);
             assert.strictEqual(license.hasFeature('audioInput'), true);
-        });
-
-        it('should block pro features without license', () => {
-            assert.strictEqual(license.hasFeature('studioDashboard'), false);
-            assert.strictEqual(license.hasFeature('cloudSync'), false);
-            assert.strictEqual(license.hasFeature('aiCoach'), false);
-            assert.strictEqual(license.hasFeature('heatMap'), false);
-        });
-
-        it('should block studio features without license', () => {
-            assert.strictEqual(license.hasFeature('studentInvites'), false);
-            assert.strictEqual(license.hasFeature('bulkUnlocks'), false);
+            assert.strictEqual(license.hasFeature('studioDashboard'), true);
+            assert.strictEqual(license.hasFeature('cloudSync'), true);
+            assert.strictEqual(license.hasFeature('aiCoach'), true);
+            assert.strictEqual(license.hasFeature('heatMap'), true);
+            assert.strictEqual(license.hasFeature('studentInvites'), true);
+            assert.strictEqual(license.hasFeature('bulkUnlocks'), true);
         });
 
         it('should allow pro features with pro license', () => {
@@ -137,8 +133,9 @@ describe('LicenseService', () => {
     });
 
     describe('Student Management', () => {
-        it('should return 0 student limit for free tier', () => {
-            assert.strictEqual(license.getStudentLimit(), 0);
+        it('should return 30 student limit in public mode (default studio tier)', () => {
+            // In public mode, all features are enabled including student invites
+            assert.strictEqual(license.getStudentLimit(), 30);
         });
 
         it('should return 0 student limit for pro tier', () => {
@@ -170,8 +167,9 @@ describe('LicenseService', () => {
             assert.strictEqual(license.getStudentCount(), 5);
         });
 
-        it('should not allow adding students for free tier', () => {
-            assert.strictEqual(license.canAddStudent(), false);
+        it('should allow adding students in public mode (no license = studio tier)', () => {
+            // In public mode, no license means studio tier, which allows students
+            assert.strictEqual(license.canAddStudent(), true);
         });
 
         it('should allow adding students if under limit', () => {
@@ -321,7 +319,26 @@ describe('LicenseService', () => {
     });
 
     describe('Feature Lists', () => {
-        it('should return available features', () => {
+        it('should return all features as available in public mode (no license)', () => {
+            // In public mode, no license means studio tier
+            license.init();
+
+            const { available, unavailable } = license.getAvailableFeatures();
+
+            // All features should be available in public mode (studio tier)
+            assert.ok(available.length > 0);
+            assert.strictEqual(unavailable.length, 0);
+
+            // Verify all features are in available list
+            const freeFeature = available.find(f => f.id === 'tuner');
+            assert.ok(freeFeature);
+
+            // Verify studio feature is available
+            const studioFeature = available.find(f => f.id === 'studentInvites');
+            assert.ok(studioFeature);
+        });
+
+        it('should respect tier restrictions when license is stored', () => {
             const proLicense = {
                 id: 'lic-123',
                 tier: 'pro',
@@ -333,18 +350,9 @@ describe('LicenseService', () => {
 
             const { available, unavailable } = license.getAvailableFeatures();
 
-            // Should have some available (free + pro features)
-            assert.ok(available.length > 0);
-            // Should have some unavailable (studio features)
-            assert.ok(unavailable.length > 0);
-
-            // Verify free features are available
-            const freeFeature = available.find(f => f.id === 'tuner');
-            assert.ok(freeFeature);
-
-            // Verify studio feature is unavailable
-            const studioFeature = unavailable.find(f => f.id === 'studentInvites');
-            assert.ok(studioFeature);
+            // With pro license, studio features should be unavailable
+            const studioFeatureUnavailable = unavailable.find(f => f.id === 'studentInvites');
+            assert.ok(studioFeatureUnavailable);
         });
     });
 

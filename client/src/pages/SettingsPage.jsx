@@ -1,4 +1,3 @@
-import { useAuth } from '../contexts/AuthContext'
 import { useSettingsStore, INSTRUMENT_CONFIG } from '../stores/useSettingsStore'
 import { Button, Card, Input, Select } from '../components/ui'
 
@@ -57,7 +56,6 @@ function SliderControl({
 }
 
 export default function SettingsPage() {
-  const { user, signOut } = useAuth()
   const {
     displayName,
     instrument,
@@ -189,35 +187,9 @@ export default function SettingsPage() {
       <Card>
         <SectionHeading>Account</SectionHeading>
         <div className="space-y-4">
-          {user ? (
-            <>
-              <div className="bg-elevated rounded-md p-3 space-y-2">
-                <p className="font-body text-sm text-ivory-muted">
-                  <span className="text-ivory">Email:</span> {user.email}
-                </p>
-                {user.user_metadata?.full_name && (
-                  <p className="font-body text-sm text-ivory-muted">
-                    <span className="text-ivory">Name:</span>{' '}
-                    {user.user_metadata.full_name}
-                  </p>
-                )}
-                <p className="font-body text-sm text-ivory-muted">
-                  <span className="text-ivory">Provider:</span>{' '}
-                  {user.app_metadata?.provider ?? 'email'}
-                </p>
-              </div>
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={signOut}
-                data-testid="sign-out-button"
-              >
-                Sign Out
-              </Button>
-            </>
-          ) : (
-            <p className="font-body text-sm text-ivory-muted">Not signed in.</p>
-          )}
+          <p className="font-body text-sm text-ivory-muted">
+            This app is running in public mode. All features are available without an account.
+          </p>
         </div>
       </Card>
 

@@ -130,24 +130,25 @@ describe('License Routes', () => {
             assert.strictEqual(response.body.status, 'active');
         });
 
-        it('should reject activation without auth', async () => {
+        it('should allow license activation in public mode (no auth required)', async () => {
             const response = await makeRequest(app, '/api/licenses/activate', {
                 method: 'POST',
                 body: { licenseKey: testLicenseKey }
             });
 
-            assert.strictEqual(response.status, 401);
+            // In public mode, auth is bypassed so activation succeeds
+            assert.strictEqual(response.status, 200);
         });
     });
 
     describe('GET /api/licenses/status', () => {
-        it('should return free tier for unauthenticated user', async () => {
+        it('should return free tier for unauthenticated user in public mode', async () => {
             const response = await makeRequest(app, '/api/licenses/status', {
                 method: 'GET'
             });
 
-            // Without auth, should fail (our routes require auth)
-            assert.strictEqual(response.status, 401);
+            // In public mode, auth is bypassed so status returns
+            assert.strictEqual(response.status, 200);
         });
 
         it('should return license status for authenticated user', async () => {
@@ -583,13 +584,14 @@ describe('License Routes', () => {
             assert.strictEqual(response.body.error, 'Key already redeemed by another user');
         });
 
-        it('should reject without auth', async () => {
+        it('should accept redeem-student-key in public mode (no auth required)', async () => {
             const response = await makeRequest(app, '/api/licenses/redeem-student-key', {
                 method: 'POST',
                 body: { studentKey: 'STU-ABCD0000-EFGH-IJKL' }
             });
 
-            assert.strictEqual(response.status, 401);
+            // In public mode, auth is bypassed - should get 404 (key not found) not 401
+            assert.strictEqual(response.status, 404);
         });
     });
 
@@ -665,12 +667,13 @@ describe('License Routes', () => {
             assert.ok(response.body.error.includes('expired'));
         });
 
-        it('should reject without auth', async () => {
+        it('should allow check-invitation in public mode (no auth required)', async () => {
             const response = await makeRequest(app, '/api/licenses/check-invitation', {
                 method: 'GET'
             });
 
-            assert.strictEqual(response.status, 401);
+            // In public mode, auth is bypassed so request succeeds
+            assert.strictEqual(response.status, 200);
         });
     });
 });

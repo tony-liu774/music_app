@@ -114,15 +114,18 @@ class LicenseService {
 
     /**
      * Get the current license tier
+     * In public mode, returns 'studio' to enable all features when no license is stored
      * @returns {string} 'free', 'pro', or 'studio'
      */
     getTier() {
-        if (!this.hasLicense()) return 'free';
+        // If no license stored, return studio tier for public mode
+        if (!this.hasLicense()) return 'studio';
         return this._cachedLicense.tier || 'free';
     }
 
     /**
      * Check if a specific feature is available
+     * In public mode (no license), all features are available
      * @param {string} featureId - Feature identifier
      * @returns {boolean}
      */
@@ -133,9 +136,10 @@ class LicenseService {
         // Free features are always available
         if (feature.tier === 'free') return true;
 
-        // Pro and studio features require a license
-        if (!this.hasLicense()) return false;
+        // In public mode (no license stored), all features are available
+        if (!this.hasLicense()) return true;
 
+        // Pro and studio features require a license
         // Check tier requirements
         if (feature.tier === 'pro') {
             return this.getTier() === 'pro' || this.getTier() === 'studio';
