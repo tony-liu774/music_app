@@ -176,30 +176,27 @@
     overflow-x: hidden;
   }
 
-  /* Background Pattern */
+  /* Minimal Background Pattern - Subtle grid */
   body::before {
     content: '';
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    inset: 0;
     background:
-      radial-gradient(ellipse at top left, rgba(201, 162, 39, 0.03) 0%, transparent 50%),
-      radial-gradient(ellipse at bottom right, rgba(45, 90, 74, 0.02) 0%, transparent 50%),
+      radial-gradient(ellipse at 20% 0%, rgba(201, 162, 39, 0.03) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 100%, rgba(16, 185, 129, 0.02) 0%, transparent 50%),
       repeating-linear-gradient(
         0deg,
         transparent,
         transparent 50px,
-        rgba(42, 42, 58, 0.1) 50px,
-        rgba(42, 42, 58, 0.1) 51px
+        rgba(42, 42, 58, 0.05) 50px,
+        rgba(42, 42, 58, 0.05) 51px
       ),
       repeating-linear-gradient(
         90deg,
         transparent,
         transparent 50px,
-        rgba(42, 42, 58, 0.1) 50px,
-        rgba(42, 42, 58, 0.1) 51px
+        rgba(42, 42, 58, 0.05) 50px,
+        rgba(42, 42, 58, 0.05) 51px
       );
     pointer-events: none;
     z-index: -1;
@@ -679,45 +676,28 @@
   /* Library Grid */
   .library-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: var(--space-6);
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 1.25rem;
   }
 
   .library-card {
       background: var(--bg-surface);
       border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 20px;
+      border-radius: var(--radius-xl);
+      padding: 1.25rem;
       cursor: pointer;
-      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.25s ease;
+      transition: all 200ms ease;
       position: relative;
-      overflow: hidden;
-  }
-
-  .library-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 4px;
-      background: linear-gradient(90deg, var(--primary), var(--primary-light));
-      opacity: 0;
-      transition: opacity var(--transition-fast);
   }
 
   .library-card:hover {
-      transform: translateY(-4px);
       border-color: var(--primary);
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 24px var(--primary-glow);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2), var(--shadow-amber-glow);
   }
 
   .library-card:active {
-      transform: translateY(-1px) scale(0.98);
-  }
-
-  .library-card:hover::before {
-      opacity: 1;
+      transform: translateY(0) scale(0.99);
   }
 
   /* Focused state for keyboard navigation */
@@ -874,93 +854,76 @@
   .dashboard-card {
       background: var(--bg-surface);
       border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 24px 20px;
+      border-radius: var(--radius-xl);
+      padding: 1.25rem 1rem;
       cursor: pointer;
-      transition: transform 0.2s ease, box-shadow 0.25s ease, border-color 0.2s ease;
-      position: relative;
-      overflow: hidden;
+      transition: all 200ms ease;
       display: flex;
       flex-direction: column;
       align-items: center;
       text-align: center;
-      gap: 12px;
-  }
-
-  .dashboard-card::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(180deg, rgba(201, 162, 39, 0.04) 0%, transparent 60%);
-      opacity: 0;
-      transition: opacity 0.25s ease;
-      pointer-events: none;
+      gap: 0.75rem;
   }
 
   .dashboard-card:hover {
-      transform: translateY(-4px);
       border-color: var(--primary);
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 24px var(--primary-glow);
-  }
-
-  .dashboard-card:hover::before {
-      opacity: 1;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2), var(--shadow-amber-glow);
   }
 
   .dashboard-card:active {
-      transform: translateY(-1px) scale(0.98);
+      transform: translateY(0) scale(0.98);
   }
 
   .dashboard-card-icon {
-      width: 52px;
-      height: 52px;
-      border-radius: 16px;
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-lg);
       display: flex;
       align-items: center;
       justify-content: center;
-      flex-shrink: 0;
-      transition: box-shadow 0.25s ease;
+      transition: box-shadow 200ms ease;
   }
 
   .dashboard-card-icon svg {
-      width: 26px;
-      height: 26px;
+      width: 24px;
+      height: 24px;
   }
 
   .dashboard-card-icon.practice-icon {
-      background: rgba(201, 162, 39, 0.15);
+      background: rgba(201, 162, 39, 0.12);
       color: var(--primary);
   }
 
   .dashboard-card:hover .practice-icon {
-      box-shadow: 0 0 20px var(--primary-glow);
+      box-shadow: 0 0 12px var(--primary-glow);
   }
 
   .dashboard-card-icon.tuner-icon {
-      background: rgba(16, 185, 129, 0.15);
+      background: rgba(16, 185, 129, 0.12);
       color: var(--success);
   }
 
   .dashboard-card:hover .tuner-icon {
-      box-shadow: 0 0 20px var(--success-glow);
+      box-shadow: 0 0 12px var(--success-glow);
   }
 
   .dashboard-card-icon.library-icon {
-      background: rgba(99, 102, 241, 0.15);
+      background: rgba(129, 140, 248, 0.12);
       color: #818cf8;
   }
 
   .dashboard-card:hover .library-icon {
-      box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+      box-shadow: 0 0 12px rgba(99, 102, 241, 0.3);
   }
 
   .dashboard-card-icon.metronome-icon {
-      background: rgba(244, 114, 182, 0.15);
+      background: rgba(244, 114, 182, 0.12);
       color: #f472b6;
   }
 
   .dashboard-card:hover .metronome-icon {
-      box-shadow: 0 0 20px rgba(244, 114, 182, 0.3);
+      box-shadow: 0 0 12px rgba(244, 114, 182, 0.3);
   }
 
   .dashboard-card-label {
@@ -979,92 +942,79 @@
 
   /* Hero Practice Session Card */
   .hero-card {
-      background: linear-gradient(135deg, var(--bg-surface) 0%, var(--bg-elevated) 100%);
+      background: var(--bg-surface);
       border: 1px solid var(--border);
-      border-radius: 24px;
-      padding: 28px 24px;
-      margin-bottom: 32px;
+      border-radius: var(--radius-2xl);
+      padding: 1.5rem;
+      margin-bottom: 2rem;
       position: relative;
-      overflow: hidden;
-      transition: border-color 0.25s ease, box-shadow 0.25s ease;
-  }
-
-  .hero-card::before {
-      content: '';
-      position: absolute;
-      top: -40%;
-      right: -20%;
-      width: 300px;
-      height: 300px;
-      background: radial-gradient(circle, rgba(201, 162, 39, 0.06) 0%, transparent 70%);
-      pointer-events: none;
+      transition: border-color 200ms ease;
   }
 
   .hero-card:hover {
       border-color: rgba(201, 162, 39, 0.3);
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   }
 
   .hero-card-header {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      margin-bottom: 20px;
+      margin-bottom: 1.25rem;
   }
 
   .hero-card-header h2 {
       font-family: var(--font-heading);
-      font-size: 22px;
+      font-size: 1.25rem;
       color: var(--text-primary);
-      margin-bottom: 4px;
+      margin-bottom: 0.25rem;
   }
 
   .hero-card-subtitle {
-      font-size: 14px;
+      font-size: 0.875rem;
       color: var(--text-muted);
   }
 
   .hero-card-badge {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      padding: 6px 14px;
+      gap: 0.375rem;
+      padding: 0.375rem 0.875rem;
       background: rgba(201, 162, 39, 0.12);
-      border-radius: 9999px;
-      font-size: 13px;
+      border-radius: var(--radius-full);
+      font-size: 0.8125rem;
       font-weight: 600;
       color: var(--primary);
   }
 
   .hero-card-stats {
       display: flex;
-      gap: 32px;
+      gap: 2rem;
       flex-wrap: wrap;
   }
 
   .hero-stat {
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 0.25rem;
   }
 
   .hero-stat-value {
       font-family: var(--font-mono);
-      font-size: 24px;
+      font-size: 1.5rem;
       font-weight: 700;
       color: var(--text-primary);
       line-height: 1;
   }
 
   .hero-stat-label {
-      font-size: 12px;
+      font-size: 0.75rem;
       color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.05em;
   }
 
   .hero-card-action {
-      margin-top: 20px;
+      margin-top: 1.25rem;
   }
 
   /* SVG Progress Rings */
@@ -1402,25 +1352,24 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: var(--space-6);
-      padding-bottom: var(--space-4);
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
       border-bottom: 1px solid var(--border);
   }
 
   .practice-info h2 {
-      font-size: var(--text-2xl);
-      margin-bottom: var(--space-2);
+      font-size: 1.25rem;
+      margin-bottom: 0.25rem;
   }
 
   .sheet-music-container {
-      min-height: 400px;
+      min-height: 350px;
       background: var(--bg-surface);
       border: 1px solid var(--border);
-      border-radius: 20px;
-      margin-bottom: var(--space-6);
+      border-radius: var(--radius-xl);
+      margin-bottom: 1.5rem;
       overflow: hidden;
       position: relative;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   }
 
   .sheet-music-placeholder {
@@ -1428,28 +1377,27 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      height: 400px;
+      height: 350px;
       color: var(--text-muted);
   }
 
   .sheet-music-placeholder svg {
-      width: 64px;
-      height: 64px;
-      margin-bottom: var(--space-4);
-      opacity: 0.5;
+      width: 48px;
+      height: 48px;
+      margin-bottom: 1rem;
+      opacity: 0.4;
   }
 
   /* Feedback Panel */
   .feedback-panel {
-      display: grid;
-      grid-template-columns: auto 1fr auto;
-      gap: var(--space-6);
+      display: flex;
       align-items: center;
-      padding: 20px;
+      gap: 1.5rem;
+      padding: 1rem 1.25rem;
       background: var(--bg-surface);
       border: 1px solid var(--border);
-      border-radius: 20px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      border-radius: var(--radius-xl);
+      flex-wrap: wrap;
   }
 
   .feedback-current-note {

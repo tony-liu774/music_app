@@ -456,7 +456,7 @@ describe('Service Worker Queue', () => {
 
     describe('Constants', () => {
         it('should export expected constants', () => {
-            assert.strictEqual(sw.CACHE_NAME, 'concertmaster-v2');
+            assert.strictEqual(sw.CACHE_NAME, 'concertmaster-v3');
             assert.strictEqual(sw.API_CACHE_NAME, 'concertmaster-api-v2');
             assert.strictEqual(sw.MAX_QUEUE_RETRIES, 10);
             assert.strictEqual(sw.MAX_QUEUE_AGE_MS, 7 * 24 * 60 * 60 * 1000);
