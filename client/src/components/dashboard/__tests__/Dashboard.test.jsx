@@ -20,10 +20,9 @@ describe('Dashboard Page', () => {
     expect(screen.getByText('Dashboard')).toBeInTheDocument()
   })
 
-  it('renders all four widgets', () => {
+  it('renders all three widgets', () => {
     render(<Dashboard />)
     expect(screen.getByTestId('practice-streak-widget')).toBeInTheDocument()
-    expect(screen.getByTestId('up-next-widget')).toBeInTheDocument()
     expect(screen.getByTestId('progress-chart')).toBeInTheDocument()
     expect(screen.getByTestId('recent-sessions-list')).toBeInTheDocument()
   })
@@ -33,7 +32,7 @@ describe('Dashboard Page', () => {
     const page = screen.getByTestId('dashboard-page')
     expect(page.className).toContain('space-y-6')
 
-    // The grid container wrapping streak + up-next
+    // The grid container wrapping streak
     const grid = page.querySelector('.grid')
     expect(grid).not.toBeNull()
     expect(grid.className).toContain('grid-cols-1')

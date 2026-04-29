@@ -9,13 +9,10 @@ const rateLimiter = require('./middleware/rateLimiter');
 const healthRoutes = require('./routes/health');
 const imslpRoutes = require('./routes/imslp');
 const omrRoutes = require('./routes/omr');
-const teacherRoutes = require('./routes/teacher');
 const authRoutes = require('./routes/auth');
 const oauthRoutes = require('./routes/oauth');
 const syncRoutes = require('./routes/sync');
-const assignmentRoutes = require('./routes/assignments');
 const notificationRoutes = require('./routes/notifications');
-const licenseRoutes = require('./routes/license');
 const aiRoutes = require('./routes/ai');
 const scheduler = require('./services/scheduler');
 
@@ -82,9 +79,6 @@ app.use('/api/imslp', imslpRoutes);
 // OMR (Optical Music Recognition) routes
 app.use('/api/omr', upload.single('image'), omrRoutes);
 
-// Teacher (Studio Dashboard) routes
-app.use('/api/teacher', teacherRoutes);
-
 // Authentication routes
 app.use('/api/auth', authRoutes);
 
@@ -94,14 +88,8 @@ app.use('/api/auth/oauth', oauthRoutes);
 // Cloud sync routes
 app.use('/api/sync', syncRoutes);
 
-// Assignments routes (Smart Assignments & Routine Builder)
-app.use('/api/assignments', assignmentRoutes);
-
 // Push notifications routes
 app.use('/api/notifications', notificationRoutes);
-
-// License and subscription routes
-app.use('/api/licenses', licenseRoutes);
 
 // AI summary routes
 app.use('/api', aiRoutes);
@@ -116,14 +104,10 @@ app.use('/api', (req, res) => {
       healthDetailed: '/health/detailed',
       imslpSearch: '/api/imslp/search',
       imslpDownload: '/api/imslp/download/:id',
-      teacherStudents: '/api/teacher/students',
-      teacherMetrics: '/api/teacher/metrics',
       authRegister: '/api/auth/register',
       authLogin: '/api/auth/login',
       sync: '/api/sync',
       syncStatus: '/api/sync/status',
-      assignments: '/api/assignments',
-      assignmentProgress: '/api/assignments/:id/progress',
     },
   });
 });
