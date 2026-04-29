@@ -74,27 +74,19 @@ class ConcertmasterApp {
         // Up Next widget (Student view)
         this.upNextWidget = null;
 
-        // SSO / OAuth
-        this.authService = null;
-        this.oauthService = null;
-        this.ssoLoginUI = null;
+        // SSO / OAuth - removed, app is now public
 
         // License service
         this.licenseService = null;
         this.licenseUI = null;
 
-        // Role Selection
-        this.roleSelectionService = null;
-        this.roleSelectionUI = null;
+        // Role Selection - removed, app defaults to student mode
     }
 
     async init() {
         console.log('Initializing Virtual Concertmaster...');
 
         try {
-            // Initialize SSO / OAuth
-            await this.initSSO();
-
             // Initialize components
             this.initializeComponents();
 
@@ -126,7 +118,7 @@ class ConcertmasterApp {
                 await this.initStudentWidget();
             }
 
-            // Initialize license service (always needed for feature gating)
+            // Initialize license service - all features enabled in public mode
             await this.initLicense();
 
             // Initialize video snippet feature
@@ -435,173 +427,46 @@ class ConcertmasterApp {
     }
 
     /**
-     * Initialize SSO / OAuth services and show login screen if needed.
+     * Initialize SSO / OAuth services.
+     * No longer used - app is now public without authentication.
+     * Kept as a no-op for backwards compatibility.
      */
     async initSSO() {
-        if (typeof AuthService === 'undefined' || typeof OAuthService === 'undefined') {
-            return;
-        }
-
-        this.authService = new AuthService();
-        this.oauthService = new OAuthService(this.authService);
-
-        // Initialize role selection service
-        if (typeof RoleSelectionService !== 'undefined') {
-            this.roleSelectionService = new RoleSelectionService(this.authService);
-        }
-
-        // Initialize offline session manager and session persistence
-        if (typeof OfflineSessionManager !== 'undefined') {
-            this.offlineSessionManager = new OfflineSessionManager();
-        }
-
-        const syncService = typeof CloudSyncService !== 'undefined'
-            ? new CloudSyncService(this.authService)
-            : null;
-
-        if (typeof SessionPersistenceService !== 'undefined') {
-            this.sessionPersistence = new SessionPersistenceService(
-                this.authService,
-                this.offlineSessionManager || null,
-                { syncService }
-            );
-
-            // Restore session on startup (keeps user logged in across restarts)
-            await this.sessionPersistence.initialize();
-
-            // Register the service worker for offline caching and queue replay
-            if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('/sw.js').catch(err =>
-                    console.warn('SW registration failed:', err)
-                );
-
-                // Respond to SW token requests for offline queue replay
-                navigator.serviceWorker.addEventListener('message', async (event) => {
-                    if (event.data && event.data.type === 'REQUEST_AUTH_TOKEN') {
-                        if (event.ports && event.ports[0]) {
-                            const token = await this.authService.getToken();
-                            event.ports[0].postMessage({ token });
-                        }
-                    }
-                });
-            }
-        }
-
-        // Fetch OAuth client IDs from the server endpoint
-        await this.oauthService.fetchConfig();
-
-        // Listen for logout events to clear OAuth provider, role, and session
-        this.authService.onAuthStateChange((event) => {
-            if (event === 'logout') {
-                this.oauthService.clearProvider();
-                if (this.roleSelectionService) {
-                    this.roleSelectionService.clearRole();
-                }
-                if (this.sessionPersistence) {
-                    this.sessionPersistence.onLogout();
-                }
-                // Clear API cache in SW to prevent cross-user data leakage
-                if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-                    navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_API_CACHE' });
-                }
-            }
-        });
-
-        // Initialize role selection UI
-        this._initRoleSelectionUI();
-
-        // Show SSO login screen if user is not authenticated
-        if (typeof SSOLoginUI !== 'undefined') {
-            this.ssoLoginUI = new SSOLoginUI(this.oauthService, this.authService);
-            this.ssoLoginUI.init({
-                onSuccess: (user, provider) => {
-                    if (user) {
-                        this.showToast(`Signed in as ${user.displayName || user.email}`, 'success');
-                        // Track session on login
-                        if (this.sessionPersistence) {
-                            this.sessionPersistence.onLogin(user);
-                        }
-                    }
-                    // Show role selection for new users (first sign-in)
-                    if (user && this.roleSelectionService && !this.roleSelectionService.hasSelectedRole()) {
-                        this._showRoleSelection();
-                    } else if (this.roleSelectionService) {
-                        this._applyUserRole(this.roleSelectionService.getRole());
-                    }
-                },
-                onError: (error, provider) => {
-                    console.warn(`SSO error (${provider}):`, error.message);
-                }
-            });
-
-            if (!this.authService.isAuthenticated()) {
-                this.ssoLoginUI.show();
-            } else if (this.roleSelectionService && !this.roleSelectionService.hasSelectedRole()) {
-                // User is authenticated but hasn't picked a role yet
-                this._showRoleSelection();
-            } else if (this.roleSelectionService) {
-                // Apply saved role on app load
-                this._applyUserRole(this.roleSelectionService.getRole());
-            }
-        }
+        // App is now public - no SSO/OAuth initialization needed
+        console.log('SSO initialization skipped - app is running in public mode');
     }
 
     /**
      * Initialize the role selection UI component.
+     * No longer used - app defaults to student mode.
      * @private
      */
     _initRoleSelectionUI() {
-        if (typeof RoleSelectionUI === 'undefined' || !this.roleSelectionService) {
-            return;
-        }
-
-        this.roleSelectionUI = new RoleSelectionUI(this.roleSelectionService);
-        this.roleSelectionUI.init({
-            onRoleSelected: (role, inviteLink) => {
-                if (role === 'skip') {
-                    // Default to student view so the user is not left in limbo.
-                    // Mark role as selected so the screen does not re-appear on reload.
-                    this.roleSelectionService.setRole('student');
-                    this._applyUserRole('student');
-                    return;
-                }
-                this._applyUserRole(role);
-                if (role === 'teacher' && inviteLink) {
-                    this.showToast('Studio invite link generated!', 'success');
-                }
-            }
-        });
+        // App is now public - no role selection needed
     }
 
     /**
      * Show the role selection screen.
+     * No longer used - app defaults to student mode.
      * @private
      */
     _showRoleSelection() {
-        if (this.roleSelectionUI) {
-            this.roleSelectionUI.show();
-        }
+        // App is now public - no role selection needed
     }
 
     /**
      * Apply user role: route to correct dashboard and trigger appropriate flows.
+     * App now defaults to student mode in public mode.
      * Student → Home Dashboard → Trigger Instrument Calibration
      * Teacher → Studio Dashboard → Generate Studio Invite Link
      * @param {string} role - 'student' or 'teacher'
      * @private
      */
     _applyUserRole(role) {
-        if (!role) {
-            // Corrupted state: selected flag is set but role is missing.
-            // Re-show role selection or default to student view.
-            if (this.roleSelectionService) {
-                this.roleSelectionService.clearRole();
-            }
-            this._showRoleSelection();
-            return;
-        }
+        // Default to student mode in public app
+        const effectiveRole = role || 'student';
 
-        if (role === 'teacher') {
+        if (effectiveRole === 'teacher') {
             // Enable teacher mode and show studio dashboard
             this.toggleTeacherMode(true);
             const teacherToggle = document.getElementById('teacher-mode-toggle');
@@ -611,7 +476,7 @@ class ConcertmasterApp {
             }
             localStorage.setItem('teacher_mode', 'true');
             this.showView('studio-dashboard-view');
-        } else if (role === 'student') {
+        } else {
             // Show home dashboard (library) and trigger calibration if needed
             this.showView('library-view');
             if (this.onboardingService && !this.onboardingService.hasCompletedOnboarding) {
@@ -1389,17 +1254,17 @@ class ConcertmasterApp {
             this.licenseService.init();
         }
 
-        // Initialize license UI
+        // Initialize license UI (no authService needed in public mode)
         if (!this.licenseUI) {
             this.licenseUI = new StudioLicenseUI(
                 this.licenseService,
-                this.authService,
+                null, // No authService in public mode
                 () => this.applyFeatureGating() // Callback to re-apply feature gating on license change
             );
             await this.licenseUI.init();
         }
 
-        // Apply feature gating
+        // Apply feature gating - all features enabled in public mode
         this.applyFeatureGating();
     }
 

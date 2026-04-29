@@ -1,5 +1,6 @@
 /**
  * Role Selection Service - Manages user role (student/teacher) persistence and invite links.
+ * App now defaults to student role in public mode.
  * Stores role in localStorage and syncs to backend when available.
  */
 
@@ -10,6 +11,16 @@ class RoleSelectionService {
         this.roleKey = 'music_app_user_role';
         this.inviteLinkKey = 'music_app_studio_invite';
         this.roleSelectedKey = 'music_app_role_selected';
+
+        // In public mode, default to student role if not set
+        if (!this.hasSelectedRole()) {
+            try {
+                localStorage.setItem(this.roleKey, 'student');
+                localStorage.setItem(this.roleSelectedKey, 'true');
+            } catch {
+                // localStorage quota exceeded - non-critical
+            }
+        }
     }
 
     /**
@@ -26,13 +37,14 @@ class RoleSelectionService {
 
     /**
      * Get the current user role.
+     * In public mode, defaults to 'student'.
      * @returns {string|null} 'student' or 'teacher' or null
      */
     getRole() {
         try {
-            return localStorage.getItem(this.roleKey);
+            return localStorage.getItem(this.roleKey) || 'student';
         } catch {
-            return null;
+            return 'student';
         }
     }
 
@@ -53,7 +65,7 @@ class RoleSelectionService {
             // localStorage quota exceeded - non-critical
         }
 
-        // Sync to backend if authenticated
+        // Sync to backend if authenticated (public mode doesn't have auth)
         if (this.authService && this.authService.isAuthenticated()) {
             await this._syncRoleToBackend(role);
         }
@@ -69,7 +81,8 @@ class RoleSelectionService {
      * @returns {boolean}
      */
     isStudent() {
-        return this.getRole() === 'student';
+        const role = this.getRole();
+        return role === 'student' || !role;
     }
 
     /**
@@ -162,6 +175,9 @@ class RoleSelectionService {
             localStorage.removeItem(this.roleKey);
             localStorage.removeItem(this.roleSelectedKey);
             localStorage.removeItem(this.inviteLinkKey);
+            // In public mode, reset back to student role
+            localStorage.setItem(this.roleKey, 'student');
+            localStorage.setItem(this.roleSelectedKey, 'true');
         } catch {
             // non-critical
         }

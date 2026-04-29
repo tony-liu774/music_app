@@ -9,7 +9,6 @@ import { useHeatMapData } from '../hooks/useHeatMapData'
 import { useSmartLoop } from '../hooks/useSmartLoop'
 import { buildPayload, requestAIDebrief } from '../services/AISummaryService'
 import { savePracticeSession, getProgressTrend } from '../services/PracticeSessionService'
-import { useAuth } from '../contexts/AuthContext'
 import useMetronome from '../hooks/useMetronome'
 import { Button } from '../components/ui'
 import { useToast } from '../components/ui/Toast'
@@ -30,7 +29,8 @@ const CONTROLS_AUTO_HIDE_MS = 3000
 
 export default function PracticePage() {
   const navigate = useNavigate()
-  const { user } = useAuth()
+  // In public mode, user is always null - cloud sync features are disabled
+  const user = null
   const ghostMode = useUIStore((s) => s.ghostMode)
   const enterGhostMode = useUIStore((s) => s.enterGhostMode)
   const exitGhostMode = useUIStore((s) => s.exitGhostMode)

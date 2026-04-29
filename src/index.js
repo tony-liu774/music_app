@@ -10,8 +10,9 @@ const healthRoutes = require('./routes/health');
 const imslpRoutes = require('./routes/imslp');
 const omrRoutes = require('./routes/omr');
 const teacherRoutes = require('./routes/teacher');
-const authRoutes = require('./routes/auth');
-const oauthRoutes = require('./routes/oauth');
+// Auth routes - disabled for public mode
+// const authRoutes = require('./routes/auth');
+// const oauthRoutes = require('./routes/oauth');
 const syncRoutes = require('./routes/sync');
 const assignmentRoutes = require('./routes/assignments');
 const notificationRoutes = require('./routes/notifications');
@@ -34,14 +35,14 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-eval'", "https://cdnjs.cloudflare.com", "https://accounts.google.com", "https://appleid.cdn-apple.com"],
+      scriptSrc: ["'self'", "'unsafe-eval'", "https://cdnjs.cloudflare.com"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", 'data:', 'https:'],
-      connectSrc: ["'self'", 'blob:', "https://accounts.google.com", "https://appleid.apple.com", "https://oauth2.googleapis.com"],
+      connectSrc: ["'self'", 'blob:'],
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
       mediaSrc: ["'self'", 'blob:', 'mediastream:'],
-      frameSrc: ["https://accounts.google.com"],
+      frameSrc: ["'none'"],
       workerSrc: ["'self'", 'blob:'],
     },
   },
@@ -85,11 +86,9 @@ app.use('/api/omr', upload.single('file'), omrRoutes);
 // Teacher (Studio Dashboard) routes
 app.use('/api/teacher', teacherRoutes);
 
-// Authentication routes
-app.use('/api/auth', authRoutes);
-
-// OAuth SSO routes
-app.use('/api/auth/oauth', oauthRoutes);
+// Authentication routes - disabled for public mode
+// app.use('/api/auth', authRoutes);
+// app.use('/api/auth/oauth', oauthRoutes);
 
 // Cloud sync routes
 app.use('/api/sync', syncRoutes);
@@ -111,6 +110,7 @@ app.use('/api', (req, res) => {
   res.status(200).json({
     message: 'Music App API',
     version: '1.0.0',
+    publicMode: true,
     endpoints: {
       health: '/health',
       healthDetailed: '/health/detailed',
@@ -118,8 +118,7 @@ app.use('/api', (req, res) => {
       imslpDownload: '/api/imslp/download/:id',
       teacherStudents: '/api/teacher/students',
       teacherMetrics: '/api/teacher/metrics',
-      authRegister: '/api/auth/register',
-      authLogin: '/api/auth/login',
+      // Auth routes disabled for public mode
       sync: '/api/sync',
       syncStatus: '/api/sync/status',
       assignments: '/api/assignments',

@@ -7,23 +7,9 @@ import {
   SETTINGS_DEFAULTS,
 } from '../../stores/useSettingsStore'
 
-const mockSignOut = vi.fn()
-
-vi.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => ({
-    user: {
-      email: 'test@example.com',
-      user_metadata: { full_name: 'Test User' },
-      app_metadata: { provider: 'google' },
-    },
-    signOut: mockSignOut,
-  }),
-}))
-
 describe('SettingsPage', () => {
   beforeEach(() => {
     useSettingsStore.setState({ ...SETTINGS_DEFAULTS })
-    mockSignOut.mockClear()
   })
 
   it('renders the page title', () => {
@@ -101,27 +87,11 @@ describe('SettingsPage', () => {
     })
   })
 
-  describe('Account section', () => {
-    it('displays user email', () => {
+  describe('Account section - Public Mode', () => {
+    it('displays public mode message', () => {
       render(<SettingsPage />)
-      expect(screen.getByText('test@example.com')).toBeInTheDocument()
-    })
-
-    it('displays user name', () => {
-      render(<SettingsPage />)
-      expect(screen.getByText('Test User')).toBeInTheDocument()
-    })
-
-    it('displays provider', () => {
-      render(<SettingsPage />)
-      expect(screen.getByText('google')).toBeInTheDocument()
-    })
-
-    it('calls signOut when sign out button is clicked', async () => {
-      const user = userEvent.setup()
-      render(<SettingsPage />)
-      await user.click(screen.getByTestId('sign-out-button'))
-      expect(mockSignOut).toHaveBeenCalledTimes(1)
+      expect(screen.getByText(/This app is running in public mode/)).toBeInTheDocument()
+      expect(screen.getByText(/All features are available without an account/)).toBeInTheDocument()
     })
   })
 
@@ -138,23 +108,5 @@ describe('SettingsPage', () => {
       expect(state.instrument).toBe('violin')
       expect(state.tuningReference).toBe(440)
     })
-  })
-})
-
-describe('SettingsPage without user', () => {
-  beforeEach(() => {
-    vi.resetModules()
-  })
-
-  it('shows not signed in message when user is null', async () => {
-    vi.doMock('../../contexts/AuthContext', () => ({
-      useAuth: () => ({
-        user: null,
-        signOut: vi.fn(),
-      }),
-    }))
-    const { default: SettingsPageNoUser } = await import('../SettingsPage')
-    render(<SettingsPageNoUser />)
-    expect(screen.getByText('Not signed in.')).toBeInTheDocument()
   })
 })

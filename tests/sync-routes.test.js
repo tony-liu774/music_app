@@ -228,9 +228,10 @@ describe('Sync Routes - HTTP Endpoint Tests', () => {
         await new Promise(resolve => server.close(resolve));
     });
 
-    it('should require authentication for POST /api/sync', async () => {
+    it('should allow POST /api/sync in public mode (no auth required)', async () => {
         const res = await makeRequest(server, 'POST', '/api/sync', { lastSync: null, data: {} });
-        assert.strictEqual(res.status, 401);
+        // In public mode, auth is bypassed so requests succeed
+        assert.strictEqual(res.status, 200);
     });
 
     it('should sync data with valid auth via POST /api/sync', async () => {

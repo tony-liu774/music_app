@@ -53,25 +53,31 @@ function generateTokens(user) {
 
 /**
  * Auth middleware - verifies JWT access token
- * Rejects refresh tokens used as access tokens
+ * In public mode, this is a no-op that allows all requests.
+ * If a valid Authorization header is present, the token is verified.
+ * Otherwise, a mock anonymous user is created.
  */
 function authMiddleware(req, res, next) {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ error: 'Authentication required' });
+        // No auth header - create mock user for public mode
+        req.user = { id: 'anonymous', email: 'anonymous@public.local' };
+        return next();
     }
 
-    const token = authHeader.split(' ')[1];
+    // Auth header present - verify token
     try {
+        const token = authHeader.split(' ')[1];
         const decoded = jwt.verify(token, JWT_SECRET);
-        // Reject refresh tokens used as access tokens
         if (decoded.type === 'refresh') {
             return res.status(401).json({ error: 'Invalid token type' });
         }
         req.user = decoded;
         next();
     } catch {
-        return res.status(401).json({ error: 'Invalid or expired token' });
+        // Invalid token - in public mode, create mock user instead of rejecting
+        req.user = { id: 'anonymous', email: 'anonymous@public.local' };
+        next();
     }
 }
 
